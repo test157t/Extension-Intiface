@@ -1,0 +1,58 @@
+<div id="intiface-connect-button" class="drawer">
+  <div class="drawer-toggle drawer-header">
+    <div class="drawer-icon fa-solid fa-heart-pulse fa-fw closedIcon" title="Intiface Connect"></div>
+  </div>
+  <div class="drawer-content closedDrawer">
+    <div class="flex-container alignitemscenter">
+      <h3 class="margin0 flex1">
+        <span>Intiface Connect</span>
+        <a href="https://intiface.com/" class="notes-link" target="_blank">
+          <span class="fa-solid fa-circle-question note-link-span"></span>
+        </a>
+      </h3>
+    </div>
+    <div id="intiface-status-panel" class="intiface-status disconnected">Status: Disconnected</div>
+    <div id="intiface-devices" style="margin-top: 10px;"></div>
+    <div class="flex-container alignitemscenter" style="margin-top: 10px;">
+      <input type="text" id="intiface-ip-input" class="text_pole" value="127.0.0.1:12345" placeholder="127.0.0.1:12345" style="flex-grow: 1;">
+    </div>
+    <div class="flex-container alignitemscenter" style="margin-top: 10px;">
+      <input type="checkbox" id="intiface-auto-connect-toggle" style="margin-right: 8px;">
+      <label for="intiface-auto-connect-toggle">Auto-connect on load</label>
+    </div>
+    <div class="flex-container alignitemscenter" style="margin-top: 5px; margin-left: 24px;">
+      <input type="checkbox" id="intiface-chat-control-toggle" style="margin-right: 8px;">
+      <label for="intiface-chat-control-toggle" style="font-size: 0.9em;">Enable chat-based device control</label>
+    </div>
+    <div class="flex-container alignitemscenter" style="margin-top: 10px;">
+      <input type="checkbox" id="intiface-function-calling-toggle" style="margin-right: 8px;">
+      <label for="intiface-function-calling-toggle">Enable AI Function Calling</label>
+    </div>
+    <div style="margin-top: 10px; font-size: 0.85em; color: #888; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+      <strong>AI Control:</strong> Use function calls or chat commands to control devices
+    </div>
+
+    <!-- Advanced Configuration (Collapsed by default) -->
+    <div style="margin-top: 15px;">
+      <div id="intiface-advanced-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;">
+          <span>Advanced Configuration</span>
+          <span id="intiface-advanced-arrow" style="transition: transform 0.3s;">▼</span>
+        </span>
+      </div>
+      <div id="intiface-advanced-content" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 4px;">
+        <div style="font-size: 0.85em; color: #aaa; margin-bottom: 8px;">
+          Path to IntifaceCentral.exe (allows AI to auto-start)
+        </div>
+        <div class="flex-container alignitemscenter" style="gap: 8px;">
+          <input type="text" id="intiface-exe-path" class="text_pole" placeholder="C:\Program Files\Intiface\IntifaceCentral.exe" style="flex-grow: 1;">
+        </div>
+        <div id="intiface-exe-status" style="margin-top: 5px; font-size: 0.75em; color: #888;">Not configured</div>
+        <div style="margin-top: 5px; font-size: 0.7em; color: #666; font-style: italic;">
+          Type the full path to IntifaceCentral.exe
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
