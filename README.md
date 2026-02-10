@@ -14,7 +14,7 @@ This is an extension for SillyTavern that allows you to connect and control Inti
 1. Open SillyTavern.
 2. Click the "Extensions" button in the top toolbar.
 3. Click "Install Extension".
-4. Copy this URL into the input field: https://github.com/Enclave0775/Extension-Intiface
+4. Copy this URL into the input field: https://github.com/test157t/Extension-Intiface
 5. Click "Install just for me" or "Install for all users".
 
 ## How to Use
