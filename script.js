@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { renderExtensionTemplateAsync } from "../../../extensions.js"
-import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles, getRequestHeaders } from "../../../../script.js"
+import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles, getRequestHeaders, messageFormatting, appendMediaToMessage, addCopyToCodeBlocks } from "../../../../script.js"
 
 // @ts-ignore: Hack to suppress IDE errors
 const $ = window.$
@@ -23,8 +23,82 @@ let executedCommands = new Set() // Track executed commands
 let streamingText = '' // Accumulate streaming text
 let commandQueueInterval = null // Interval for sequential execution
 let isExecutingCommands = false
-let chatControlEnabled = false // Toggle for chat-based control
 let isStartingIntiface = false // Prevent multiple simultaneous start attempts
+
+// Timer worker for background vibration (avoids setTimeout throttling in hidden tabs)
+let timerWorker = null
+let workerTimers = new Map() // timerId -> { callback, interval }
+let workerTimerId = 0
+let isWorkerTimerRunning = false
+
+// Initialize timer worker
+function initTimerWorker() {
+  try {
+    const workerUrl = new URL('timer-worker.js', import.meta.url).href
+    timerWorker = new Worker(workerUrl)
+    
+    timerWorker.onmessage = (e) => {
+      const { type, drift } = e.data
+      if (type === 'tick') {
+        // Execute all registered callbacks
+        for (const [id, timer] of workerTimers) {
+          if (timer.callback) {
+            try {
+              timer.callback()
+            } catch (err) {
+              console.error(`${NAME}: Timer callback error:`, err)
+            }
+          }
+        }
+      }
+    }
+    
+    timerWorker.onerror = (err) => {
+      console.error(`${NAME}: Timer worker error:`, err)
+      timerWorker = null
+      isWorkerTimerRunning = false
+    }
+    
+    console.log(`${NAME}: Timer worker initialized successfully`)
+  } catch (e) {
+    console.error(`${NAME}: Failed to initialize timer worker:`, e)
+    timerWorker = null
+  }
+}
+
+// Set timeout using worker (if available) or fall back to regular setTimeout
+function setWorkerTimeout(callback, delay) {
+  if (timerWorker && delay >= 50) {
+    const id = ++workerTimerId
+    workerTimers.set(id, { callback, interval: delay })
+    
+    // Only start the worker timer if not already running
+    if (!isWorkerTimerRunning) {
+      timerWorker.postMessage({ command: 'start', data: { interval: delay } })
+      isWorkerTimerRunning = true
+    }
+    
+    return id
+  } else {
+    return setTimeout(callback, delay)
+  }
+}
+
+// Clear worker timeout
+function clearWorkerTimeout(id) {
+  if (typeof id === 'number' && workerTimers.has(id)) {
+    workerTimers.delete(id)
+    
+    // If no more timers, stop the worker
+    if (timerWorker && workerTimers.size === 0 && isWorkerTimerRunning) {
+      timerWorker.postMessage({ command: 'stop' })
+      isWorkerTimerRunning = false
+    }
+  } else if (typeof id === 'object' && id !== null) {
+    // It's a regular timeout ID
+    clearTimeout(id)
+  }
+}
 
 // Waveform pattern generator
 const WaveformPatterns = {
@@ -214,45 +288,45 @@ async function executeLinearWaveform(deviceIndex, config) {
       currentCycle++
     }
     
-    if (currentCycle < cycles) {
-      setTimeout(executeStep, 100)
-    }
-  }
-  
-  executeStep()
-}
+        if (currentCycle < cycles) {
+          setWorkerTimeout(executeStep, 100)
+        }
+      }
 
-// Execute linear gradient
-async function executeLinearGradient(deviceIndex, config) {
-  const { positions, duration, hold = 0 } = config
-  const [startPos, endPos] = positions
-  const steps = Math.floor(duration / 50)
-  
-  const targetDevice = devices[deviceIndex] || devices[0]
-  if (!targetDevice) return
-  
-  for (let i = 0; i < steps; i++) {
-    const progress = i / steps
-    const position = Math.round(startPos + (endPos - startPos) * progress)
-    try {
-      await targetDevice.linear(position / 100, 50)
-    } catch (e) {
-      console.error(`${NAME}: Linear gradient step failed:`, e)
+      executeStep()
     }
-    await new Promise(resolve => setTimeout(resolve, 50))
-  }
-  
-  if (hold > 0) {
-    await new Promise(resolve => setTimeout(resolve, hold))
-  }
-}
+
+    // Execute linear gradient
+    async function executeLinearGradient(deviceIndex, config) {
+      const { positions, duration, hold = 0 } = config
+      const [startPos, endPos] = positions
+      const steps = Math.floor(duration / 50)
+
+      const targetDevice = devices[deviceIndex] || devices[0]
+      if (!targetDevice) return
+
+      for (let i = 0; i < steps; i++) {
+        const progress = i / steps
+        const position = Math.round(startPos + (endPos - startPos) * progress)
+        try {
+          await targetDevice.linear(position / 100, 50)
+        } catch (e) {
+          console.error(`${NAME}: Linear gradient step failed:`, e)
+        }
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+
+      if (hold > 0) {
+        await new Promise(resolve => setTimeout(resolve, hold))
+      }
+    }
 
 // Stop pattern for specific device
 async function stopDevicePattern(deviceIndex) {
   if (activePatterns.has(deviceIndex)) {
     const active = activePatterns.get(deviceIndex)
     if (active.interval) {
-      clearTimeout(active.interval)
+      clearWorkerTimeout(active.interval)
     }
     activePatterns.delete(deviceIndex)
   }
@@ -278,13 +352,17 @@ async function stopDevicePattern(deviceIndex) {
 // Parse device commands from AI text
 // Supports self-closing format with device type matching:
 // <cage:VIBRATE: 50> - Matches devices with "cage" in name
-// <plug:OSCILLATE: 75> - Matches devices with "plug" in name
+// <plug:OSCILLATE: 75> - Matches devices with "plug" in its name
 // <any:VIBRATE: 50> - Matches any device (first available)
 // <solace:LINEAR: start=10, end=90, duration=1000>
 // <toy:PATTERN: [20, 40, 60], interval=[1000, 500, 1000], loop=3>
 // <cage:PRESET: tease> - Use device-specific preset
 // <any:WAVEFORM: sine, min=10, max=80, duration=5000>
 // <cage:GRADIENT: start=0, end=90, duration=10000>
+// Media commands:
+// <media:LIST> - List available media files
+// <media:PLAY: filename.mp4> - Play a media file with optional funscript sync
+// <media:STOP> - Stop media playback
 function parseDeviceCommands(text) {
   const commands = []
   
@@ -319,7 +397,7 @@ function parseDeviceCommands(text) {
       continue
     }
     
-    // Check for INTIFACE system commands (start, connect, disconnect)
+// Check for INTIFACE system commands (start, connect, disconnect)
     if (deviceType === 'intiface' || deviceType === 'system') {
       if (commandText === 'START') {
         commands.push({ type: 'intiface_start' })
@@ -334,7 +412,29 @@ function parseDeviceCommands(text) {
         continue
       }
     }
-    
+
+    // Check for MEDIA commands
+    if (deviceType === 'media') {
+      if (commandText === 'LIST') {
+        commands.push({ type: 'media_list' })
+        continue
+      }
+      if (commandText === 'STOP') {
+        commands.push({ type: 'media_stop' })
+        continue
+      }
+      // Parse PLAY command with filename
+      // Format: PLAY: filename.mp4 or PLAY filename.mp4
+      const playMatch = commandText.match(/PLAY[\s:]+(.+)/i)
+      if (playMatch) {
+        commands.push({
+          type: 'media_play',
+          filename: playMatch[1].trim()
+        })
+        continue
+      }
+    }
+
     // Parse PRESET command
     // Format: PRESET: tease or PRESET tease
     const presetMatch = commandText.match(/PRESET[\s:]+(\w+)/i)
@@ -508,7 +608,7 @@ function parseDeviceCommands(text) {
 async function executeCommand(cmd) {
   console.log(`${NAME}: Executing command type: ${cmd.type}`)
   
-  // System commands can run without connection
+// System commands can run without connection
   if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
     try {
       switch (cmd.type) {
@@ -527,7 +627,27 @@ async function executeCommand(cmd) {
     }
     return
   }
-  
+
+  // Media commands
+  if (cmd.type === 'media_list' || cmd.type === 'media_play' || cmd.type === 'media_stop') {
+    try {
+      switch (cmd.type) {
+        case 'media_list':
+          await handleMediaList()
+          break
+        case 'media_play':
+          await handleMediaPlay(cmd.filename)
+          break
+        case 'media_stop':
+          await handleMediaStop()
+          break
+      }
+    } catch (e) {
+      console.error(`${NAME}: Media command execution failed:`, e)
+    }
+    return
+  }
+
   // Device commands require connection
   if (!client.connected || devices.length === 0) {
     console.log(`${NAME}: Cannot execute device command - not connected or no devices`)
@@ -707,6 +827,139 @@ async function handleIntifaceDisconnect() {
   }
 }
 
+// Handle media list command - appends list to the last message
+async function handleMediaList() {
+  try {
+    // Get asset paths
+    const pathsResponse = await fetch('/api/plugins/intiface-launcher/asset-paths', {
+      method: 'GET',
+      headers: getRequestHeaders()
+    })
+
+    if (!pathsResponse.ok) throw new Error('Failed to get paths')
+
+    const pathsData = await pathsResponse.json()
+    const mediaPath = pathsData.paths?.intifaceMedia
+
+    if (!mediaPath) throw new Error('No media path configured')
+
+    // Fetch media files
+    const response = await fetch(`/api/plugins/intiface-launcher/media?dir=${encodeURIComponent(mediaPath)}`, {
+      method: 'GET',
+      headers: getRequestHeaders()
+    })
+
+    if (!response.ok) throw new Error('Failed to fetch media list')
+
+    const data = await response.json()
+    if (!data.success) throw new Error(data.error || 'Unknown error')
+
+      // Get video and audio files
+      const mediaFiles = data.files?.filter(f => f.type === 'video' || f.type === 'audio') || []
+
+      // Build the media list for display
+      let mediaListBlock
+      if (mediaFiles.length === 0) {
+        mediaListBlock = `\n\n---\n**Media Library** (0 media files found)\n\n\`\`\`\nNo media files available in the media library.\nPlace videos/audio in: ${mediaPath}\n\`\`\``
+      } else {
+        const fileList = mediaFiles.map(file => {
+          const funscriptStatus = file.hasFunscript ? '[has funscript]' : '[no funscript]'
+          const typeLabel = file.type === 'audio' ? '[audio]' : '[video]'
+          return `${file.name} ${typeLabel} ${funscriptStatus}`
+        }).join('\n')
+
+        mediaListBlock = `\n\n---\n**Media Library** (${mediaFiles.length} media files available)\n\n\`\`\`\n${fileList}\n\`\`\`\n\nUse <media:PLAY: filename.mp4> to play media with funscript sync.`
+      }
+
+    // Get the last message in chat and append the media list
+    const context = getContext()
+    const chat = context.chat
+    if (chat && chat.length > 0) {
+      // Find the last message (from the AI, not user)
+      let lastMessageIndex = chat.length - 1
+      while (lastMessageIndex >= 0 && chat[lastMessageIndex].is_user) {
+        lastMessageIndex--
+      }
+
+      if (lastMessageIndex >= 0) {
+        const lastMessage = chat[lastMessageIndex]
+        // Check if media list was already appended to avoid duplicates
+        if (lastMessage.mes && lastMessage.mes.includes('**Media Library**')) {
+          updateStatus(`Media list already exists in message`)
+          console.log(`${NAME}: Media list already appended to message ${lastMessageIndex}`)
+          return
+        }
+        // Append the media list to the message
+        lastMessage.mes = (lastMessage.mes || '') + mediaListBlock
+        // Save chat
+        context.saveChat()
+        // Update the message UI directly following SillyTavern's pattern
+        const messageElement = $(`.mes[mesid="${lastMessageIndex}"]`)
+        console.log(`${NAME}: Looking for message element with mesid=${lastMessageIndex}, found:`, messageElement.length > 0)
+        if (messageElement.length) {
+          const mesBlock = messageElement.find('.mes_block')
+          console.log(`${NAME}: Found mes_block:`, mesBlock.length > 0)
+          const formattedText = messageFormatting(lastMessage.mes, lastMessage.name, lastMessage.is_system, lastMessage.is_user, lastMessageIndex, {}, false)
+          const mesText = mesBlock.find('.mes_text')
+          console.log(`${NAME}: Found mes_text:`, mesText.length > 0, 'Message length:', lastMessage.mes.length)
+          mesText.empty().append(formattedText)
+          appendMediaToMessage(lastMessage, messageElement)
+          addCopyToCodeBlocks(messageElement)
+          console.log(`${NAME}: Message UI updated successfully`)
+        }
+        updateStatus(`Media list appended to last message (${mediaFiles.length} files)`)
+        console.log(`${NAME}: Media list appended to message ${lastMessageIndex}`)
+      } else {
+        updateStatus('No AI message found to append media list')
+      }
+    } else {
+      updateStatus('No chat messages found')
+    }
+  } catch (e) {
+    updateStatus(`Failed to list media: ${e.message}`, true)
+    console.error(`${NAME}: Media list error:`, e)
+  }
+}
+
+// Handle media play command
+async function handleMediaPlay(filename) {
+  if (!filename) {
+    updateStatus('No filename specified for media play', true)
+    return
+  }
+
+  try {
+    await loadChatMediaFile(filename)
+    updateStatus(`Playing media: ${filename}`)
+  } catch (e) {
+    updateStatus(`Failed to play media: ${e.message}`, true)
+    console.error(`${NAME}: Media play error:`, e)
+  }
+}
+
+// Handle media stop command
+async function handleMediaStop() {
+  try {
+    // Stop video playback
+    if (mediaPlayer.videoElement) {
+      mediaPlayer.videoElement.pause()
+      mediaPlayer.videoElement.currentTime = 0
+      mediaPlayer.isPlaying = false
+    }
+
+    // Stop funscript sync
+    stopFunscriptSync()
+
+    // Stop device actions
+    await stopAllDeviceActions()
+
+    updateStatus('Media playback stopped')
+  } catch (e) {
+    updateStatus(`Failed to stop media: ${e.message}`, true)
+    console.error(`${NAME}: Media stop error:`, e)
+  }
+}
+
 // Execute pattern commands with intervals
 async function executePattern(cmd, actionType, deviceIndex = 0) {
   const pattern = cmd.pattern || [50]
@@ -735,7 +988,7 @@ async function executePattern(cmd, actionType, deviceIndex = 0) {
     }
     
     if (currentLoop < loopCount || cmd.loop === undefined) {
-      commandQueueInterval = setTimeout(executeStep, interval)
+      commandQueueInterval = setWorkerTimeout(executeStep, interval)
     }
   }
   
@@ -770,8 +1023,6 @@ async function processCommandQueue() {
 
 // Handle streaming token received
 async function onStreamTokenReceived(data) {
-  if (!chatControlEnabled) return
-  
   const token = typeof data === 'string' ? data : (data?.text || data?.message || '')
   if (!token) return
   
@@ -809,8 +1060,6 @@ async function onStreamTokenReceived(data) {
 
 // Handle message received (fallback for non-streaming)
 async function onMessageReceived(data) {
-  if (!chatControlEnabled) return
-  
   const context = getContext()
   const messageId = typeof data === 'number' ? data : data?.index
   const message = context.chat[messageId]
@@ -850,17 +1099,17 @@ async function onMessageReceived(data) {
   // Only process device commands if connected
   if (!client.connected && !videoFilename) return
   
-  // Clear previous commands and stop current activity (unless we're playing video)
-  if (!mediaPlayer.isPlaying) {
+  // Clear previous commands and stop current activity (unless we're playing video OR tab is hidden)
+  if (!mediaPlayer.isPlaying && !document.hidden) {
     messageCommands = []
     executedCommands.clear()
     streamingText = ''
-    
+
     if (commandQueueInterval) {
-      clearTimeout(commandQueueInterval)
+      clearWorkerTimeout(commandQueueInterval)
       commandQueueInterval = null
     }
-    
+
     await stopAllDeviceActions()
   }
   
@@ -959,13 +1208,17 @@ function updateButtonStates(isConnected) {
 }
 
 async function connect() {
+  console.log(`${NAME}: connect() called`)
   try {
     const serverIp = $("#intiface-ip-input").val()
     const serverUrl = `ws://${serverIp}`
+    console.log(`${NAME}: Connecting to ${serverUrl}`)
     localStorage.setItem("intiface-server-ip", serverIp) // Save on connect
     connector = new buttplug.ButtplugBrowserWebsocketClientConnector(serverUrl)
     updateStatus("Connecting...")
+    console.log(`${NAME}: Calling client.connect()...`)
     await client.connect(connector)
+    console.log(`${NAME}: client.connect() succeeded`)
     updateStatus("Connected")
     $("#intiface-status-panel").removeClass("disconnected").addClass("connected")
     updateButtonStates(true)
@@ -973,12 +1226,6 @@ async function connect() {
 
     // Re-attach device event handlers
     attachDeviceEventHandlers()
-
-    // Re-register function tools after connection (if enabled)
-    const aiMode = localStorage.getItem("intiface-ai-mode") || "none"
-    if (aiMode === "function") {
-      registerFunctionTools()
-    }
 
     // Check for already-connected devices (devices paired before disconnect)
     // The buttplug client maintains internal device list
@@ -1020,15 +1267,19 @@ async function connect() {
     // Update prompt to show connection status
     updatePrompt()
   } catch (e) {
-    updateStatus(`Error connecting: ${e.message}`, true)
+    const errorMsg = e?.message || e?.toString?.() || String(e) || 'Unknown error'
+    console.error(`${NAME}: Connect error details:`, e, typeof e, JSON.stringify(e))
+    updateStatus(`Error connecting: ${errorMsg}`, true)
     // Update prompt even on failure
     updatePrompt()
   }
 }
 
 async function disconnect() {
+  console.log(`${NAME}: Disconnect called, client.connected = ${client?.connected}`)
   try {
     await client.disconnect()
+    console.log(`${NAME}: client.disconnect() completed`)
     updateStatus("Disconnected")
     $("#intiface-status-panel").removeClass("connected").addClass("disconnected")
     updateButtonStates(false)
@@ -1053,14 +1304,18 @@ async function disconnect() {
       oscillateIntervalId = null
     }
 
-    // Unregister function tools
-    unregisterFunctionTools()
-
     // Update prompt to show disconnection status
     updatePrompt()
   } catch (e) {
-    updateStatus(`Error disconnecting: ${e.message}`, true)
-    // Update prompt even on failure
+    const errorMsg = e?.message || String(e) || 'Unknown error'
+    updateStatus(`Error disconnecting: ${errorMsg}`, true)
+    console.error(`${NAME}: Disconnect error:`, e)
+    // Even on error, clear the state and update UI
+    devices = []
+    device = null
+    $("#intiface-devices").empty()
+    $("#intiface-status-panel").removeClass("connected").addClass("disconnected")
+    updateButtonStates(false)
     updatePrompt()
   }
 }
@@ -1180,10 +1435,10 @@ async function handleDeviceAdded(newDevice) {
           ).join('')}
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.75em;">
-          <div>Min: <input type="number" id="waveform-min-${devices.length - 1}" value="20" min="0" max="100" style="width: 50px;"></div>
-          <div>Max: <input type="number" id="waveform-max-${devices.length - 1}" value="80" min="0" max="100" style="width: 50px;"></div>
-          <div>Dur: <input type="number" id="waveform-dur-${devices.length - 1}" value="5000" min="100" style="width: 60px;"></div>
-          <div>Cycles: <input type="number" id="waveform-cycles-${devices.length - 1}" value="3" min="1" style="width: 40px;"></div>
+<div>Min: <input type="number" id="waveform-min-${devices.length - 1}" value="20" min="0" max="100" style="width: 50px; background: #000; color: #fff;"></div>
+<div>Max: <input type="number" id="waveform-max-${devices.length - 1}" value="80" min="0" max="100" style="width: 50px; background: #000; color: #fff;"></div>
+<div>Dur: <input type="number" id="waveform-dur-${devices.length - 1}" value="5000" min="100" style="width: 60px; background: #000; color: #fff;"></div>
+<div>Cycles: <input type="number" id="waveform-cycles-${devices.length - 1}" value="3" min="1" style="width: 40px; background: #000; color: #fff;"></div>
         </div>
       </div>
     `
@@ -1253,10 +1508,8 @@ function handleDeviceRemoved(removedDevice) {
 
 // Update extension prompt for AI
 function updatePrompt() {
-  if (!chatControlEnabled) {
-    setExtensionPrompt('intiface_control', '', extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM)
-    return
-  }
+  try {
+  console.log(`${NAME}: updatePrompt() called, devices.length=${devices?.length ?? 'undefined'}`)
 
   // Check if Intiface exe path is configured
   const exePath = localStorage.getItem("intiface-exe-path")
@@ -1283,32 +1536,69 @@ function updatePrompt() {
     return `${dev.displayName || dev.name} (${shorthand})`
   }).join(', ') : 'No devices connected'
 
-  const connectionStatus = client.connected ? `Currently connected with ${devices.length} device(s): ${deviceShorthands}` : 'Currently disconnected'
+  console.log(`${NAME}: Building prompt... canStartIntiface=${canStartIntiface}`)
 
-  const startCommand = canStartIntiface ? `
+  const startCommand = `
 System commands (to manage Intiface itself):
-- <intiface:START> - Start Intiface Central application ${exePath ? '(configured)' : '(not configured)'}
+${canStartIntiface ? `- <intiface:START> - Start Intiface Central application (configured: ${exePath})` : ''}
 - <intiface:CONNECT> - Connect to Intiface server
-- <intiface:DISCONNECT> - Disconnect from Intiface server` : ''
+- <intiface:DISCONNECT> - Disconnect from Intiface server`
+
+  // Build dynamic device examples based on connected devices
+  let deviceTypeExamples = ''
+  let presetExamples = ''
+  let gradientExamples = ''
+  let patternExamples = ''
+  
+  if (devices.length > 0) {
+    // Get unique device types from connected devices
+    const connectedTypes = [...new Set(devices.map(dev => getDeviceType(dev)))]
+    const firstDevice = devices[0]
+    const firstDeviceName = firstDevice.displayName || firstDevice.name
+    const firstShorthand = getDeviceShorthand(firstDevice)
+    
+    // Build device type command examples
+    const typeExamples = connectedTypes.map(type => {
+      const typeDevice = devices.find(d => getDeviceType(d) === type)
+      const shorthand = getDeviceShorthand(typeDevice)
+      if (type === 'stroker') {
+        return `- <${shorthand}:LINEAR: start=10, end=90, duration=1000> - Linear stroke for ${typeDevice.displayName || typeDevice.name}`
+      } else {
+        return `- <${shorthand}:VIBRATE: 50> - Vibrate ${typeDevice.displayName || typeDevice.name} at 50%`
+      }
+    }).join('\n')
+    
+    // Build preset examples for connected device types
+    const presetList = []
+    connectedTypes.forEach(type => {
+      const typePresets = DevicePresets[type] || DevicePresets.general
+      const presetNames = Object.keys(typePresets).slice(0, 3) // Max 3 presets per type
+      const typeDevice = devices.find(d => getDeviceType(d) === type)
+      const shorthand = getDeviceShorthand(typeDevice)
+      presetNames.forEach(presetName => {
+        presetList.push(`- <${shorthand}:PRESET: ${presetName}> - ${typePresets[presetName].description || presetName} pattern`)
+      })
+    })
+    presetExamples = presetList.join('\n')
+    
+    // Build device-specific examples
+    deviceTypeExamples = `${typeExamples}
+- <any:VIBRATE: 30> - Vibrate the first connected device at 30%
+- <any:STOP> - Stop all devices`
+    
+    // Gradient examples using first connected device type
+    gradientExamples = `- <${firstShorthand}:GRADIENT: start=0, end=90, duration=10000> - Ramp from 0% to 90% over 10 seconds`
+    
+    // Pattern examples
+    patternExamples = `- <${firstShorthand}:PATTERN: [20, 40, 60], interval=[1000, 500, 1000]> - Cycle through intensities`
+  }
 
   const deviceCommands = devices.length > 0 ? `
 Device commands:
-- <cage:VIBRATE: 50> - Vibrate the device with "cage" in its name at 50% (0-100)
-- <plug:OSCILLATE: 75> - Oscillate the device with "plug" in its name at 75%
-- <any:VIBRATE: 30> - Vibrate the first connected device at 30%
-- <solace:LINEAR: start=10, end=90, duration=1000> - Linear stroke (positions 0-100, duration in ms)
-- <any:STOP> - Stop all devices
+${deviceTypeExamples}
 
 PRESET commands (device-optimized patterns):
-- <cage:PRESET: tease> - Gentle teasing pattern for cages
-- <cage:PRESET: denial> - Build up and stop pattern
-- <cage:PRESET: edge> - Slow build to high intensity
-- <plug:PRESET: gentle> - Soft wave pattern for plugs
-- <plug:PRESET: pulse> - Rhythmic pulsing
-- <plug:PRESET: intense> - Strong stimulation
-- <stroker:PRESET: slow> - Slow stroking motion
-- <stroker:PRESET: fast> - Quick strokes
-- <stroker:PRESET: tease> - Varied teasing strokes
+${presetExamples}
 
 WAVEFORM commands (dynamic patterns):
 - <any:WAVEFORM: sine, min=10, max=80, duration=5000, cycles=3> - Smooth sine wave
@@ -1320,54 +1610,58 @@ WAVEFORM commands (dynamic patterns):
 - <any:WAVEFORM: ramp_down, min=100, max=0, duration=5000, cycles=1> - Gradual decrease
 
 GRADIENT commands (smooth transitions):
-- <cage:GRADIENT: start=0, end=90, duration=10000> - Ramp from 0% to 90% over 10 seconds
-- <cage:GRADIENT: start=20, end=80, duration=15000, hold=5000, release=3000> - Build, hold, then release
+${gradientExamples}
 
 Pattern commands:
-- <cage:PATTERN: [20, 40, 60], interval=[1000, 500, 1000]> - Cycle through intensities
-- <plug:PATTERN: [50, 100], interval=[2000, 2000], loop=3> - Loop 3 times` : ''
+${patternExamples}` : ''
 
-  const prompt = `=== DEVICE CONTROL ACTIVE ===
-${connectionStatus}.
+// Build example responses using connected devices
+let exampleResponses = ''
+if (devices.length > 0) {
+  const firstDevice = devices[0]
+  const shorthand = getDeviceShorthand(firstDevice)
+  const type = getDeviceType(firstDevice)
+  const typePresets = DevicePresets[type] || DevicePresets.general
+  const firstPreset = Object.keys(typePresets)[0] || 'tease'
+  
+  exampleResponses = `
+EXAMPLE RESPONSES:
+✓ Good: "Mmm, let me tease you slowly <${shorthand}:PRESET: ${firstPreset}>. Can you feel that gentle pulse building?"
+✓ Good: "I'll ramp it up gradually <${shorthand}:GRADIENT: start=20, end=85, duration=12000>. Feel it growing stronger..."
+✓ Good: "Wave pattern incoming <any:WAVEFORM: sine, min=15, max=65, duration=4000, cycles=5>"
+✓ Good: "Let me start the connection <intiface:CONNECT>. Now we can play."
+
+✗ Bad: "I will vibrate the device for you" (no actual command)
+✗ Bad: "Use this command: cage vibrate 50" (wrong format)`
+} else {
+  exampleResponses = `
+EXAMPLE RESPONSES:
+✓ Good: "Let me start the connection <intiface:CONNECT>. Now we can play."
+
+✗ Bad: "I will vibrate the device for you" (no actual command)`
+}
+
+const prompt = `=== DEVICE CONTROL ACTIVE ===
 
 ⚠️ CRITICAL: You are REQUIRED to include device control commands directly in your response text. These commands are HIDDEN from the user but will control their actual device.
 
 COMMAND FORMAT:
 Type the command EXACTLY like this (including the < and >):
 ${startCommand}${deviceCommands}
-
-EXAMPLE RESPONSES:
-✓ Good: "Mmm, let me tease you slowly <cage:PRESET: tease>. Can you feel that gentle pulse building?"
-✓ Good: "I'll ramp it up gradually <cage:GRADIENT: start=20, end=85, duration=12000>. Feel it growing stronger..."
-✓ Good: "Wave pattern incoming <plug:WAVEFORM: sine, min=15, max=65, duration=4000, cycles=5>"
-✓ Good: "Let me start the connection <intiface:CONNECT>. Now we can play."
-
-✗ Bad: "I will vibrate the device for you" (no actual command)
-✗ Bad: "Use this command: cage vibrate 50" (wrong format)
-
-${client.connected ? 'You ARE currently connected - include device commands naturally in your responses.\n\nDEVICE CAPABILITIES:\n' + deviceInfo.map(d => `- ${d.name}: ${d.type} (${d.capabilities.join(', ')}, ${d.motors} motor${d.motors > 1 ? 's' : ''})`).join('\n') : '⚠️ You are DISCONNECTED - you MUST include <intiface:CONNECT> or <intiface:START> in your response to establish connection BEFORE sending any device commands.'}
+${exampleResponses}
+${deviceInfo.length > 0 ? 'You ARE currently connected - include device commands naturally in your responses.\n\nDEVICE CAPABILITIES:\n' + deviceInfo.map(d => `- ${d.name}: ${d.type} (${d.capabilities.join(', ')}, ${d.motors} motor${d.motors > 1 ? 's' : ''})`).join('\n') : '⚠️ You are DISCONNECTED - you MUST include <intiface:CONNECT> or <intiface:START> in your response to establish connection BEFORE sending any device commands.'}
 
 === VIDEO & FUNSCRIPT SUPPORT ===
 You can also play videos with synchronized haptic feedback! Videos are stored in the media library and can be played with matching Funscript files.
 
-VIDEO PLAYBACK (FUNCTION CALLING):
-When Function Calling is enabled, use these function tools to control media playback:
+MEDIA COMMANDS (chat-based control):
+- <media:LIST> - List all available videos in the media library
+- <media:PLAY: filename.mp4> - Play a video with automatic funscript synchronization
+- <media:STOP> - Stop media playback and all device activity
 
-1. list_intiface_media - List all available videos and check for funscripts
-   Example: Call this first to see what videos are available
-
-2. play_intiface_media - Play a video with automatic funscript synchronization
-   Parameters:
-   - filename (required): The exact video filename (e.g., "video.mp4")
-   - intensity (optional): Scale funscript intensity 0-100% (default: 100)
-   - offset (optional): Timing adjustment in milliseconds -5000 to +5000 (default: 0)
-   - loop (optional): Whether to loop the video (default: false)
-   
-3. stop_intiface_media - Stop playback and all device activity
-
-VIDEO PLAYBACK (CHAT COMMANDS - fallback):
-- Simply mention a video filename in your response like: "Let me play that video for you: video.mp4"
-- The system will automatically detect video mentions
+VIDEO PLAYBACK (detection):
+- You can also simply mention a video filename like: "Let me play that video for you: video.mp4"
+- The system will automatically detect video mentions and load the player
 
 Videos are searched in: data/default-user/assets/intiface_media/
 Funscripts (synchronized scripts) are loaded from: data/default-user/assets/funscript/
@@ -1375,9 +1669,8 @@ Funscripts (synchronized scripts) are loaded from: data/default-user/assets/funs
 The video player will appear in the sidebar with sync controls, intensity slider, and funscript visualization.
 
 VIDEO EXAMPLES:
-✓ Function call: play_intiface_media(filename="myvideo.mp4", intensity=80)
-✓ Function call: play_intiface_media(filename="experience.mp4", loop=true)
-✓ Chat command: "Let me play something special for you - check out this video: myvideo.mp4"
+✓ Media command: <media:PLAY: myvideo.mp4>
+✓ Chat detection: "Let me play something special for you - check out this video: myvideo.mp4"
 
 === RULES ===:
 1. ALWAYS include the command literally: <deviceName:COMMAND: value>
@@ -1391,7 +1684,18 @@ VIDEO EXAMPLES:
 
 Start your response now and include the appropriate command.`
 
-  setExtensionPrompt('intiface_control', prompt, extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM)
+  console.log(`${NAME}: Setting extension prompt...`)
+  console.log(`${NAME}: Prompt length: ${prompt.length}`)
+  console.log(`${NAME}: Prompt content:\n`, prompt)
+  try {
+    setExtensionPrompt('intiface_control', prompt, extension_prompt_types.IN_PROMPT, 2, true, extension_prompt_roles.SYSTEM)
+    console.log(`${NAME}: Extension prompt set successfully`)
+  } catch (err) {
+    console.error(`${NAME}: Failed to set extension prompt:`, err)
+  }
+  } catch (e) {
+    console.error(`${NAME}: updatePrompt() crashed:`, e)
+  }
 }
 
 let strokerIntervalId = null
@@ -1399,6 +1703,7 @@ let vibrateIntervalId = null
 let oscillateIntervalId = null
 let lastProcessedMessage = null
 let isStroking = false // To control the async stroking loop
+let chatControlEnabled = false
 
 async function rescanLastMessage() {
   updateStatus("Rescanning last message...")
@@ -1481,7 +1786,7 @@ async function processMessage() {
                 loopIndex = 0
                 durationIndex = 0
                 updateStatus("Repeating pattern...")
-                strokerIntervalId = setTimeout(executeSegment, 100)
+                strokerIntervalId = setWorkerTimeout(executeSegment, 100)
                 return
               }
               updateStatus("All segments finished.")
@@ -1529,8 +1834,8 @@ async function processMessage() {
               await device.linear(targetPos / 100, duration)
               isAtStart = !isAtStart
               durationIndex++
-              if (strokerIntervalId) clearTimeout(strokerIntervalId)
-              strokerIntervalId = setTimeout(executeSegment, duration)
+              if (strokerIntervalId) clearWorkerTimeout(strokerIntervalId)
+              strokerIntervalId = setWorkerTimeout(executeSegment, duration)
             } catch (e) {
               const errorMsg = `Segment ${segmentIndex + 1} failed: ${e.message}`
               console.error(errorMsg, e)
@@ -1541,7 +1846,7 @@ async function processMessage() {
               segmentIndex++
               loopIndex = 0
               durationIndex = 0
-              strokerIntervalId = setTimeout(executeSegment, 500) // Wait 0.5s before trying next segment
+              strokerIntervalId = setWorkerTimeout(executeSegment, 500) // Wait 0.5s before trying next segment
             }
           }
           executeSegment()
@@ -1698,8 +2003,8 @@ async function processMessage() {
           const currentInterval = intervals[patternIndex % intervals.length]
           $("#intiface-interval-display").text(`Interval: ${currentInterval}ms`)
           patternIndex++
-          if (vibrateIntervalId) clearTimeout(vibrateIntervalId)
-          vibrateIntervalId = setTimeout(executeVibration, currentInterval)
+      if (vibrateIntervalId) clearWorkerTimeout(vibrateIntervalId)
+      vibrateIntervalId = setWorkerTimeout(executeVibration, currentInterval)
         }
         executeVibration()
       }
@@ -1821,8 +2126,8 @@ async function processMessage() {
           const currentInterval = intervals[patternIndex % intervals.length]
           $("#intiface-oscillate-interval-display").text(`Oscillate Interval: ${currentInterval}ms`)
           patternIndex++
-          if (oscillateIntervalId) clearTimeout(oscillateIntervalId)
-          oscillateIntervalId = setTimeout(executeOscillation, currentInterval)
+      if (oscillateIntervalId) clearWorkerTimeout(oscillateIntervalId)
+      oscillateIntervalId = setWorkerTimeout(executeOscillation, currentInterval)
         }
         executeOscillation()
       }
@@ -1844,10 +2149,15 @@ async function processMessage() {
 }
 
 async function toggleConnection() {
+  console.log(`${NAME}: toggleConnection called, client.connected = ${client?.connected}`)
   if (client.connected) {
+    console.log(`${NAME}: Calling disconnect...`)
     await disconnect()
+    console.log(`${NAME}: disconnect() completed, client.connected = ${client?.connected}`)
   } else {
+    console.log(`${NAME}: Calling connect...`)
     await connect()
+    console.log(`${NAME}: connect() completed, client.connected = ${client?.connected}`)
   }
 }
 
@@ -1877,28 +2187,28 @@ async function stopAllDeviceActions() {
       return "No devices connected"
     }
 
-    // Clear all intervals
-    if (strokerIntervalId) {
-      clearInterval(strokerIntervalId)
-      strokerIntervalId = null
-    }
-    if (vibrateIntervalId) {
-      clearTimeout(vibrateIntervalId)
-      vibrateIntervalId = null
-    }
-    if (oscillateIntervalId) {
-      clearTimeout(oscillateIntervalId)
-      oscillateIntervalId = null
-    }
+  // Clear all intervals
+  if (strokerIntervalId) {
+    clearWorkerTimeout(strokerIntervalId)
+    strokerIntervalId = null
+  }
+  if (vibrateIntervalId) {
+    clearWorkerTimeout(vibrateIntervalId)
+    vibrateIntervalId = null
+  }
+  if (oscillateIntervalId) {
+    clearWorkerTimeout(oscillateIntervalId)
+    oscillateIntervalId = null
+  }
     isStroking = false
     
-    // Clear all active patterns
-    for (const [deviceIndex, active] of activePatterns.entries()) {
-      if (active.interval) {
-        clearTimeout(active.interval)
-      }
+  // Clear all active patterns
+  for (const [deviceIndex, active] of activePatterns.entries()) {
+    if (active.interval) {
+      clearWorkerTimeout(active.interval)
     }
-    activePatterns.clear()
+  }
+  activePatterns.clear()
 
     // Stop all devices
     const results = []
@@ -1944,593 +2254,6 @@ async function stopAllDeviceActions() {
   }
 }
 
-// Get device status for function tools
-function getDeviceStatus() {
-  const deviceList = devices.map((dev, idx) => {
-    const deviceType = getDeviceType(dev)
-    return {
-      index: idx,
-      name: dev.name,
-      type: deviceType,
-      vibrateMotors: dev.vibrateAttributes?.length || 0,
-      isActive: idx === 0,
-      capabilities: {
-        vibrate: dev.vibrateAttributes?.length > 0,
-        oscillate: !!dev.messageAttributes?.OscillateCmd,
-        linear: !!dev.messageAttributes?.LinearCmd
-      }
-    }
-  })
-
-  const status = {
-    intifaceConnected: client?.connected || false,
-    deviceCount: devices.length,
-    activeDevice: device ? {
-      name: device.name,
-      type: getDeviceType(device),
-      vibrateMotors: device.vibrateAttributes?.length || 0
-    } : null,
-    allDevices: deviceList,
-    availablePresets: Object.keys(DevicePresets)
-  }
-  return status
-}
-
-// Register function tools with SillyTavern
-function registerFunctionTools() {
-  const context = getContext()
-
-  if (!context.registerFunctionTool) {
-    console.log(`${NAME}: Function tools not supported in this version of SillyTavern`)
-    return
-  }
-
-  console.log(`${NAME}: Registering function tools`)
-
-  // Tool 0: Start Intiface Central application
-  context.registerFunctionTool({
-    name: "start_intiface_central",
-    displayName: "Start Intiface Central",
-    description: "Start the Intiface Central desktop application. Use this when Intiface is not running and needs to be launched before connecting. Requires Intiface Central path to be configured in settings.",
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {},
-      required: []
-    },
-    action: async () => {
-      try {
-        const exePath = localStorage.getItem("intiface-exe-path")
-        if (!exePath) {
-          return "Error: Intiface Central path not configured. Please set the path in the extension settings."
-        }
-
-        // Try to start via backend API
-        try {
-          const response = await fetch('/api/plugins/intiface-launcher/start', {
-            method: 'POST',
-            headers: getRequestHeaders(),
-            body: JSON.stringify({ exePath })
-          })
-
-          if (response.ok) {
-            const result = await response.json()
-            if (result.success) {
-              return `Intiface Central started successfully. Waiting 3 seconds before connecting...`
-            } else {
-              return `Failed to start Intiface Central: ${result.error || 'Unknown error'}`
-            }
-          } else {
-            return "Error: Backend endpoint not available. Please start Intiface Central manually or configure the backend plugin."
-          }
-        } catch (fetchError) {
-          // Backend not available - provide instructions
-          return `Backend not available to spawn process. Please start Intiface Central manually at: ${exePath}. After it starts, you can connect to it.`
-        }
-      } catch (e) {
-        return `Failed to start Intiface Central: ${e.message}`
-      }
-    },
-    formatMessage: () => "Starting Intiface Central application...",
-    stealth: false
-  })
-
-  // Tool 1: Connect to Intiface
-  context.registerFunctionTool({
-    name: "connect_intiface",
-    displayName: "Connect to Intiface",
-    description: "Connect to Intiface Central server to control devices. Use this to establish a connection before controlling devices.",
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {},
-      required: []
-    },
-    action: async () => {
-      try {
-        if (client.connected) {
-          return "Already connected to Intiface Central"
-        }
-        await connect()
-        return `Connected to Intiface Central. Devices found: ${devices.length}`
-      } catch (e) {
-        return `Failed to connect: ${e.message}`
-      }
-    },
-    formatMessage: () => "Connecting to Intiface Central...",
-    stealth: false
-  })
-
-  // Tool 2: Disconnect from Intiface
-  context.registerFunctionTool({
-    name: "disconnect_intiface",
-    displayName: "Disconnect from Intiface",
-    description: "Disconnect from Intiface Central server and stop all device activity. Use this when done with device control.",
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {},
-      required: []
-    },
-    action: async () => {
-      try {
-        if (!client.connected) {
-          return "Not connected to Intiface Central"
-        }
-        await disconnect()
-        return "Disconnected from Intiface Central"
-      } catch (e) {
-        return `Failed to disconnect: ${e.message}`
-      }
-    },
-    formatMessage: () => "Disconnecting from Intiface Central...",
-    stealth: false
-  })
-
-  // Tool 3: Control device vibration/oscillation
-  context.registerFunctionTool({
-    name: "control_intiface_device",
-    displayName: "Control Intiface Device",
-    description: `Control a connected adult toy/device via Intiface. Use this to vibrate, oscillate, or perform linear strokes on the device.
-
-Connected devices: ${devices.length > 0 ? devices.map((d, i) => `${i}: ${d.name}`).join(', ') : 'None'}
-Use device_index to specify which device to control (0 is the active/default device).`,
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {
-        action: {
-          type: "string",
-          enum: ["vibrate", "oscillate", "linear_stroke", "preset", "waveform", "gradient"],
-          description: "The type of action to perform on the device"
-        },
-        device_index: {
-          type: "number",
-          minimum: 0,
-          description: "Index of the device to control (default: 0, the active device)"
-        },
-        intensity: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Intensity level from 0-100 for vibration or oscillation"
-        },
-        motor_index: {
-          type: "number",
-          minimum: 0,
-          maximum: 1,
-          description: "Motor index for vibration (0 or 1, default 0)"
-        },
-        start_position: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Starting position percentage (0-100) for linear stroke"
-        },
-        end_position: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Ending position percentage (0-100) for linear stroke"
-        },
-        duration: {
-          type: "number",
-          minimum: 100,
-          description: "Duration in milliseconds for linear stroke (minimum 100ms)"
-        },
-        preset_name: {
-          type: "string",
-          enum: ["tease", "denial", "pulse", "edge", "random", "gentle", "wave", "intense", "slow", "medium", "fast", "warmup", "build", "peak", "cooldown"],
-          description: "Device-specific preset pattern name"
-        },
-        waveform_pattern: {
-          type: "string",
-          enum: ["sine", "sawtooth", "square", "triangle", "pulse", "random", "ramp_up", "ramp_down"],
-          description: "Waveform pattern type for dynamic control"
-        },
-        waveform_min: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Minimum intensity for waveform (0-100)"
-        },
-        waveform_max: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Maximum intensity for waveform (0-100)"
-        },
-        waveform_cycles: {
-          type: "number",
-          minimum: 1,
-          description: "Number of waveform cycles to execute"
-        },
-        gradient_start: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Starting intensity for gradient (0-100)"
-        },
-        gradient_end: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Ending intensity for gradient (0-100)"
-        },
-        gradient_hold: {
-          type: "number",
-          minimum: 0,
-          description: "Hold time at peak intensity in milliseconds"
-        }
-      },
-      required: ["action"]
-    },
-    action: async (args) => {
-      try {
-        if (!client.connected) {
-          return "Error: Not connected to Intiface Central. Please connect first."
-        }
-        if (devices.length === 0) {
-          return "Error: No devices found. Please ensure a device is connected."
-        }
-
-        // Select device by index (default to 0)
-        const deviceIdx = args.device_index || 0
-        if (deviceIdx >= devices.length) {
-          return `Error: Device index ${deviceIdx} not found. Only ${devices.length} device(s) connected.`
-        }
-        const targetDevice = devices[deviceIdx]
-
-        switch (args.action) {
-          case "vibrate":
-            if (args.intensity === undefined) {
-              return "Error: intensity parameter required for vibrate action"
-            }
-            const motorIdx = args.motor_index || 0
-            // Use the specific device for vibration
-            const vibrateAttributes = targetDevice.vibrateAttributes
-            if (!vibrateAttributes || vibrateAttributes.length === 0) {
-              return `Error: Device ${targetDevice.name} does not support vibration`
-            }
-            const clampedIntensity = Math.max(0, Math.min(100, args.intensity))
-            const cappedIntensity = applyMaxVibrate(clampedIntensity, motorIdx)
-            const scalarCommand = new buttplug.ScalarSubcommand(
-              vibrateAttributes[motorIdx].Index,
-              cappedIntensity / 100,
-              "Vibrate"
-            )
-            await targetDevice.scalar(scalarCommand)
-            return `Vibration set to ${cappedIntensity}% on ${targetDevice.name} motor ${motorIdx + 1}`
-
-          case "oscillate":
-            if (args.intensity === undefined) {
-              return "Error: intensity parameter required for oscillate action"
-            }
-            const clampedOscIntensity = Math.max(0, Math.min(100, args.intensity))
-            const cappedOscIntensity = applyMaxOscillate(clampedOscIntensity)
-            await targetDevice.oscillate(cappedOscIntensity / 100)
-            return `Oscillation set to ${cappedOscIntensity}% on ${targetDevice.name}`
-
-          case "linear_stroke":
-            if (args.start_position === undefined || args.end_position === undefined || args.duration === undefined) {
-              return "Error: start_position, end_position, and duration parameters required for linear_stroke action"
-            }
-            const start = Math.max(0, Math.min(100, args.start_position))
-            const end = Math.max(0, Math.min(100, args.end_position))
-            const dur = Math.max(100, args.duration)
-            await targetDevice.linear(end / 100, dur)
-            return `Linear stroke on ${targetDevice.name} from ${start}% to ${end}% over ${dur}ms`
-          
-          case "preset":
-            if (!args.preset_name) {
-              return "Error: preset_name parameter required for preset action"
-            }
-            await executeWaveformPattern(deviceIdx, args.preset_name)
-            return `Applied preset '${args.preset_name}' to ${targetDevice.name}`
-          
-          case "waveform":
-            await executeWaveformPattern(deviceIdx, 'custom', {
-              pattern: args.waveform_pattern || 'sine',
-              min: args.waveform_min || 20,
-              max: args.waveform_max || 80,
-              duration: args.duration || 5000,
-              cycles: args.waveform_cycles || 3
-            })
-            return `Started ${args.waveform_pattern || 'sine'} waveform on ${targetDevice.name}`
-          
-          case "gradient":
-            await executeGradientPattern(deviceIdx, {
-              start: args.gradient_start || 0,
-              end: args.gradient_end || 100,
-              duration: args.duration || 10000,
-              hold: args.gradient_hold || 0
-            })
-            return `Started gradient on ${targetDevice.name} from ${args.gradient_start || 0}% to ${args.gradient_end || 100}%`
-
-          default:
-            return `Error: Unknown action '${args.action}'`
-        }
-      } catch (e) {
-        const errorMsg = `Device control failed: ${e.message}`
-        console.error(errorMsg, e)
-        updateStatus(errorMsg, true)
-        return errorMsg
-      }
-    },
-    formatMessage: (args) => {
-      const deviceIdx = args.device_index || 0
-      const deviceName = devices[deviceIdx]?.name || `Device ${deviceIdx}`
-      switch (args.action) {
-        case "vibrate":
-          return `Setting ${deviceName} vibration to ${args.intensity}%...`
-        case "oscillate":
-          return `Setting ${deviceName} oscillation to ${args.intensity}%...`
-        case "linear_stroke":
-          return `Performing linear stroke on ${deviceName} from ${args.start_position}% to ${args.end_position}%...`
-        case "preset":
-          return `Applying '${args.preset_name}' preset to ${deviceName}...`
-        case "waveform":
-          return `Starting ${args.waveform_pattern} waveform on ${deviceName}...`
-        case "gradient":
-          return `Starting intensity gradient on ${deviceName}...`
-        default:
-          return `Controlling ${deviceName}: ${args.action}...`
-      }
-    },
-    stealth: false
-  })
-
-  // Tool 2: Stop all device actions
-  context.registerFunctionTool({
-    name: "stop_intiface_device",
-    displayName: "Stop Intiface Device",
-    description: `Stop all actions on ALL connected devices (vibration, oscillation, linear motion). Use this when you want to immediately stop all device activity.
-
-Connected devices: ${devices.length > 0 ? devices.map((d, i) => `${i}: ${d.name}`).join(', ') : 'None'}`,
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {},
-      required: []
-    },
-    action: async () => {
-      try {
-        const result = await stopAllDeviceActions()
-        return result
-      } catch (e) {
-        return `Failed to stop devices: ${e.message}`
-      }
-    },
-    formatMessage: () => `Stopping all actions on ${devices.length} device(s)...`,
-    stealth: false
-  })
-
-  // Tool 3: Get device status
-  context.registerFunctionTool({
-    name: "get_intiface_status",
-    displayName: "Get Intiface Status",
-    description: "Get the current status of the Intiface connection and all connected devices. Returns connection status, device count, device names, and their capabilities (vibration motors, etc.). Use this to check what devices are available before controlling them.",
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {},
-      required: []
-    },
-    action: async () => {
-      const status = getDeviceStatus()
-      return JSON.stringify(status, null, 2)
-    },
-    formatMessage: () => `Checking status of ${devices.length} connected device(s)...`,
-    stealth: false
-  })
-
-  // Tool 4: List available media files
-  context.registerFunctionTool({
-    name: "list_intiface_media",
-    displayName: "List Intiface Media Files",
-    description: "List all available video media files in the Intiface media library. Returns video filenames and whether they have corresponding funscript files for synchronized haptic feedback. Use this to discover what media files are available before playing them.",
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {},
-      required: []
-    },
-    action: async () => {
-      try {
-        // Get asset paths
-        const pathsResponse = await fetch('/api/plugins/intiface-launcher/asset-paths', {
-          method: 'GET',
-          headers: getRequestHeaders()
-        })
-
-        if (!pathsResponse.ok) throw new Error('Failed to get paths')
-
-        const pathsData = await pathsResponse.json()
-        const mediaPath = pathsData.paths?.intifaceMedia
-
-        if (!mediaPath) throw new Error('No media path configured')
-
-        // Fetch media files
-        const response = await fetch(`/api/plugins/intiface-launcher/media?dir=${encodeURIComponent(mediaPath)}`, {
-          method: 'GET',
-          headers: getRequestHeaders()
-        })
-
-        if (!response.ok) throw new Error('Failed to fetch media list')
-
-        const data = await response.json()
-        if (!data.success) throw new Error(data.error || 'Unknown error')
-
-        // Get video files
-        const videoFiles = data.files?.filter(f => f.type === 'video') || []
-
-        if (videoFiles.length === 0) {
-          return "No video files found. Please add videos to the intiface_media folder."
-        }
-
-        // Format the list
-        const fileList = videoFiles.map(file => {
-          const funscriptStatus = file.hasFunscript ? "[has funscript]" : "[no funscript]"
-          const sizeMB = (file.size / 1024 / 1024).toFixed(1)
-          return `- ${file.name} ${funscriptStatus} (${sizeMB} MB)`
-        }).join('\n')
-
-        return `Available media files (${videoFiles.length} total):\n\n${fileList}\n\nUse play_intiface_media with the exact filename to play a video.`
-      } catch (e) {
-        return `Failed to list media files: ${e.message}`
-      }
-    },
-    formatMessage: () => "Scanning media library for available videos...",
-    stealth: false
-  })
-
-  // Tool 5: Play media file with funscript
-  context.registerFunctionTool({
-    name: "play_intiface_media",
-    displayName: "Play Intiface Media",
-    description: `Play a video media file from the Intiface library with optional synchronized haptic feedback via funscript. Loads the video player, auto-plays the video, and synchronizes device actions to the video timeline if a matching funscript file exists. Videos must be in the intiface_media folder. Funscripts (with matching filenames) must be in the funscript folder.`,
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {
-        filename: {
-          type: "string",
-          description: "The exact filename of the video to play (e.g., 'video.mp4', 'experience.mkv')"
-        },
-        intensity: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-          description: "Global intensity multiplier for funscript actions (0-100%, default: 100)"
-        },
-        offset: {
-          type: "number",
-          minimum: -5000,
-          maximum: 5000,
-          description: "Sync offset in milliseconds to adjust timing (-5000 to +5000, default: 0)"
-        },
-        loop: {
-          type: "boolean",
-          description: "Whether to loop the video when it ends (default: false)"
-        }
-      },
-      required: ["filename"]
-    },
-    action: async (args) => {
-      try {
-        if (!client.connected) {
-          return "Error: Not connected to Intiface. Please connect first before playing media."
-        }
-
-        if (devices.length === 0) {
-          return "Error: No devices connected. Please connect a device first."
-        }
-
-        // Set optional parameters
-        if (args.intensity !== undefined) {
-          mediaPlayer.globalIntensity = Math.max(0, Math.min(100, args.intensity))
-        }
-        if (args.offset !== undefined) {
-          mediaPlayer.syncOffset = Math.max(-5000, Math.min(5000, args.offset))
-        }
-        if (args.loop !== undefined) {
-          $("#intiface-menu-loop").prop("checked", args.loop)
-        }
-
-        // Load and play the media file
-        await loadChatMediaFile(args.filename)
-
-        // Check if funscript was loaded
-        const hasFunscript = mediaPlayer.currentFunscript !== null
-        const funscriptInfo = hasFunscript 
-          ? `Funscript loaded: ${mediaPlayer.currentFunscript.actions.length} actions`
-          : "No funscript found"
-
-        return `Playing media: ${args.filename}\n${funscriptInfo}\nIntensity: ${mediaPlayer.globalIntensity}%, Offset: ${mediaPlayer.syncOffset}ms`
-      } catch (e) {
-        return `Failed to play media: ${e.message}`
-      }
-    },
-    formatMessage: (args) => `Loading media: ${args.filename}...`,
-    stealth: false
-  })
-
-  // Tool 6: Stop media playback
-  context.registerFunctionTool({
-    name: "stop_intiface_media",
-    displayName: "Stop Intiface Media",
-    description: "Stop the currently playing video and all associated funscript/device activity. Use this when you want to end media playback immediately.",
-    parameters: {
-      $schema: "http://json-schema.org/draft-04/schema#",
-      type: "object",
-      properties: {},
-      required: []
-    },
-    action: async () => {
-      try {
-        // Stop video playback
-        if (mediaPlayer.videoElement) {
-          mediaPlayer.videoElement.pause()
-          mediaPlayer.videoElement.currentTime = 0
-          mediaPlayer.isPlaying = false
-        }
-        
-        // Stop funscript sync
-        stopFunscriptSync()
-        
-        // Stop device actions
-        await stopAllDeviceActions()
-        
-        return "Media playback stopped and all device activity halted"
-      } catch (e) {
-        return `Failed to stop media: ${e.message}`
-      }
-    },
-    formatMessage: () => "Stopping media playback and device activity...",
-    stealth: false
-  })
-
-  console.log(`${NAME}: Function tools registered successfully`)
-}
-
-// Unregister function tools
-function unregisterFunctionTools() {
-  const context = getContext()
-  if (!context.unregisterFunctionTool) return
-
-  context.unregisterFunctionTool("start_intiface_central")
-  context.unregisterFunctionTool("connect_intiface")
-  context.unregisterFunctionTool("disconnect_intiface")
-  context.unregisterFunctionTool("control_intiface_device")
-  context.unregisterFunctionTool("stop_intiface_device")
-  context.unregisterFunctionTool("get_intiface_status")
-  context.unregisterFunctionTool("list_intiface_media")
-  context.unregisterFunctionTool("play_intiface_media")
-  context.unregisterFunctionTool("stop_intiface_media")
-
-  console.log(`${NAME}: Function tools unregistered`)
-}
-
 // Dynamically load the buttplug.js library
 function loadScript(url) {
   return new Promise((resolve, reject) => {
@@ -2547,6 +2270,10 @@ $(async () => {
     await loadScript(`/scripts/extensions/third-party/${extensionName}/lib/buttplug.js`)
     // @ts-ignore
     buttplug = window.buttplug
+
+    // Initialize timer worker for background vibration (prevents throttling in hidden tabs)
+    initTimerWorker()
+
     client = new buttplug.ButtplugClient("SillyTavern Intiface Client")
 
     // Connector is now created dynamically in connect()
@@ -2573,15 +2300,16 @@ $(async () => {
       localStorage.setItem("intiface-server-ip", $(this).val())
     })
 
-    // Load and set up auto-connect toggle
-    const autoConnectEnabled = localStorage.getItem("intiface-auto-connect") === "true"
-    $("#intiface-auto-connect-toggle").prop("checked", autoConnectEnabled)
+    // Load and set up auto-connect checkbox
+    const savedAutoConnect = localStorage.getItem("intiface-auto-connect")
+    if (savedAutoConnect === "true") {
+      $("#intiface-auto-connect").prop("checked", true)
+    }
 
-    // Handle auto-connect toggle
-    $("#intiface-auto-connect-toggle").on("change", function () {
-      const enabled = $(this).prop("checked")
-      localStorage.setItem("intiface-auto-connect", enabled)
-      console.log(`${NAME}: Auto-connect ${enabled ? 'enabled' : 'disabled'}`)
+    // Save auto-connect on change
+    $("#intiface-auto-connect").on("change", function () {
+      localStorage.setItem("intiface-auto-connect", $(this).is(":checked"))
+      console.log(`${NAME}: Auto-connect set to: ${$(this).is(":checked")}`)
     })
 
     // Load and set up Intiface exe path
@@ -2678,57 +2406,11 @@ $(async () => {
       }
     })
 
-// Load and set up AI control mode (radio buttons)
-  const savedAIMode = localStorage.getItem("intiface-ai-mode") || "none"
-  chatControlEnabled = savedAIMode === "chat"
-  const functionCallingEnabled = savedAIMode === "function"
-  
-  // Set initial radio button states
-  if (savedAIMode === "chat") {
-    $("#intiface-chat-control-toggle").prop("checked", true)
-  } else if (savedAIMode === "function") {
-    $("#intiface-function-calling-toggle").prop("checked", true)
-  }
-
-  // Handle chat control radio button
-  $("#intiface-chat-control-toggle").on("change", function () {
-    if ($(this).prop("checked")) {
-      chatControlEnabled = true
-      localStorage.setItem("intiface-ai-mode", "chat")
-      localStorage.setItem("intiface-chat-control", "true")
-      localStorage.setItem("intiface-function-calling-enabled", "false")
-      
-      // Disable function calling
-      const context = getContext()
-      if (context.unregisterFunctionTool) {
-        unregisterFunctionTools()
-      }
-      
-      console.log(`${NAME}: AI mode switched to chat-based control`)
-      updatePrompt()
-    }
-  })
-
-  // Handle function calling radio button
-  $("#intiface-function-calling-toggle").on("change", function () {
-    if ($(this).prop("checked")) {
-      chatControlEnabled = false
-      localStorage.setItem("intiface-ai-mode", "function")
-      localStorage.setItem("intiface-chat-control", "false")
-      localStorage.setItem("intiface-function-calling-enabled", "true")
-      
-      // Enable function calling
-      registerFunctionTools()
-      
-      console.log(`${NAME}: AI mode switched to function calling`)
-      updatePrompt()
-    }
-  })
-  
-  // Initialize function calling if it was enabled
-  if (savedAIMode === "function") {
-    registerFunctionTools()
-  }
+// AI control is always chat-based
+    chatControlEnabled = true
+    localStorage.setItem("intiface-ai-mode", "chat")
+    localStorage.setItem("intiface-chat-control", "true")
+    console.log(`${NAME}: Chat-based AI control enabled`)
     
     // Handle preset button clicks (delegated)
     $(document).on('click', '.preset-btn', async function() {
@@ -2788,41 +2470,75 @@ $(async () => {
     updateButtonStates(client.connected)
     updateStatus("Disconnected")
 
-    // Attach device event handlers
+// Attach device event handlers
     attachDeviceEventHandlers()
 
-// Register function tools for AI control (if enabled)
-  const aiMode = localStorage.getItem("intiface-ai-mode") || "none"
-  if (aiMode === "function") {
-    registerFunctionTools()
-    console.log(`${NAME}: Function calling enabled`)
-  } else if (aiMode === "chat") {
     console.log(`${NAME}: Chat-based control enabled`)
-  } else {
-    console.log(`${NAME}: AI control disabled`)
-  }
 
-    // Set up chat-based control event listeners
-    eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived)
-    eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onStreamTokenReceived)
-    eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted)
-    eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded)
+  // Set up chat-based control event listeners
+  eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived)
+  eventSource.on(event_types.STREAM_TOKEN_RECEIVED, onStreamTokenReceived)
+  eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted)
+  eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded)
 
-    // Auto-connect if enabled
-    if (autoConnectEnabled) {
-      console.log(`${NAME}: Auto-connecting...`)
-      setTimeout(() => {
-        connect().catch(e => {
-          console.log(`${NAME}: Auto-connect failed:`, e.message)
-          // Update prompt to show disconnected status
-          updatePrompt()
-        })
-      }, 1000)
-    } else {
-      // Update prompt to show initial status (not auto-connecting)
-      updatePrompt()
+// Handle page visibility changes to prevent vibration stopping in background
+let hiddenTime = 0
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) {
+    hiddenTime = Date.now()
+    console.log(`${NAME}: Tab hidden - switching to background mode`)
+    // Switch funscript sync to timer-based when tab is hidden
+    // Check if media is actually playing (not paused), not the isPlaying flag
+    if (mediaPlayer.videoElement && mediaPlayer.currentFunscript && !mediaPlayer.videoElement.paused) {
+      console.log(`${NAME}: Starting timer sync (isPlaying was: ${mediaPlayer.isPlaying})`)
+      stopFunscriptSync() // Stop RAF loop
+      mediaPlayer.isPlaying = true // Ensure flag is correct
+      startFunscriptSyncTimer() // Start timer-based loop
     }
-  // Initialize media player functionality
+  } else {
+    const awayTime = Date.now() - hiddenTime
+    console.log(`${NAME}: Tab visible again after ${awayTime}ms`)
+    // Switch back to RAF when tab is visible
+    if (mediaPlayer.videoElement && mediaPlayer.currentFunscript) {
+      stopFunscriptSyncTimer() // Stop timer loop
+      // Only restart RAF if media is actually playing
+      if (!mediaPlayer.videoElement.paused) {
+        mediaPlayer.isPlaying = true
+        startFunscriptSync() // Restart RAF loop
+      }
+    }
+    // Resume any active patterns that might have stalled
+    if (client.connected && devices.length > 0) {
+      // Send a small pulse to "wake up" the device connection
+      for (const device of devices) {
+        if (device.vibrateAttributes && device.vibrateAttributes.length > 0) {
+          try {
+            const wakeCmd = new buttplug.ScalarSubcommand(
+              device.vibrateAttributes[0].Index,
+              0.01,
+              "Vibrate"
+            )
+            await device.scalar(wakeCmd)
+            await new Promise(resolve => setTimeout(resolve, 50))
+            await device.vibrate(0)
+          } catch (e) {
+            // Ignore wake errors
+          }
+        }
+      }
+    }
+  }
+})
+
+  // Update prompt to show initial status
+    // Call immediately and also delayed to ensure SillyTavern has loaded
+    updatePrompt()
+    setTimeout(() => {
+      console.log(`${NAME}: Delayed prompt update`)
+      updatePrompt()
+    }, 2000)
+
+    // Initialize media player functionality
   initMediaPlayer()
   
   } catch (error) {
@@ -2847,6 +2563,7 @@ let mediaPlayer = {
   globalIntensity: 100,
   lastActionIndex: 0,
   animationFrameId: null,
+  syncTimerId: null,
   currentMediaPath: null
 }
 
@@ -2965,8 +2682,9 @@ $("#intiface-funscript-menu-toggle").on("click", function () {
   
   // Handle width slider
   $("#intiface-menu-width").on("input", function() {
-    const width = parseInt($(this).val())
-    $("#intiface-menu-width-display").text(`${width}%`)
+    const width = $(this).val()
+    const scale = (width / 100).toFixed(1)
+    $("#intiface-menu-width-display").text(`${scale}x`)
     applyMediaPlayerAppearance()
     saveMediaPlayerAppearance()
   })
@@ -3007,7 +2725,7 @@ $("#intiface-funscript-menu-toggle").on("click", function () {
     $("#intiface-menu-show-border").prop("checked", true)
     $("#intiface-menu-opacity-display").text("50%")
     $("#intiface-menu-video-opacity-display").text("100%")
-    $("#intiface-menu-width-display").text("100%")
+    $("#intiface-menu-width-display").text("1.0x")
     applyMediaPlayerAppearance()
     saveMediaPlayerAppearance()
   })
@@ -3041,7 +2759,8 @@ function loadMediaPlayerAppearance() {
   
   if (savedWidth) {
     $("#intiface-menu-width").val(savedWidth)
-    $("#intiface-menu-width-display").text(`${savedWidth}%`)
+    const scale = (savedWidth / 100).toFixed(1)
+    $("#intiface-menu-width-display").text(`${scale}x`)
   }
   
   if (savedPosition) {
@@ -3165,33 +2884,35 @@ async function refreshMenuMediaList() {
     const data = await response.json()
     if (!data.success) throw new Error(data.error)
     
-    // Get video files
-    const videoFiles = data.files?.filter(f => f.type === 'video') || []
-    
-    if (videoFiles.length === 0) {
-      mediaListEl.html('<div style="color: #888; text-align: center; padding: 20px;">No videos found<br><small>Place videos in intiface_media folder</small></div>')
-      return
-    }
-    
-    // Build list
-    let html = ''
-    videoFiles.forEach(file => {
-      const funscriptIcon = file.hasFunscript ? '<i class="fa-solid fa-wave-square" style="color: #4CAF50; margin-left: 5px;" title="Has Funscript"></i>' : ''
-      const sizeMB = (file.size / 1024 / 1024).toFixed(1)
-      
-      html += `
-        <div class="menu-media-file-item" data-filename="${file.name}" 
-          style="padding: 8px; margin: 3px 0; background: rgba(255,255,255,0.05); border-radius: 3px; cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;"
-          onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+      // Get video and audio files
+      const mediaFiles = data.files?.filter(f => f.type === 'video' || f.type === 'audio') || []
+
+      if (mediaFiles.length === 0) {
+        mediaListEl.html('<div style="color: #888; text-align: center; padding: 20px;">No media files found<br><small>Place videos/audio in intiface_media folder</small></div>')
+        return
+      }
+
+      // Build list
+      let html = ''
+      mediaFiles.forEach(file => {
+        const funscriptIcon = file.hasFunscript ? '<i class="fa-solid fa-wave-square" style="color: #4CAF50; margin-left: 5px;" title="Has Funscript"></i>' : ''
+        const sizeMB = (file.size / 1024 / 1024).toFixed(1)
+        const iconClass = file.type === 'audio' ? 'fa-music' : 'fa-film'
+        const iconColor = file.type === 'audio' ? '#9C27B0' : '#64B5F6'
+
+        html += `
+        <div class="menu-media-file-item" data-filename="${file.name}"
+        style="padding: 8px; margin: 3px 0; background: rgba(255,255,255,0.05); border-radius: 3px; cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;"
+        onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
           <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-            <i class="fa-solid fa-film" style="color: #64B5F6;"></i>
+            <i class="fa-solid ${iconClass}" style="color: ${iconColor};"></i>
             <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
             ${funscriptIcon}
           </div>
           <span style="font-size: 0.75em; color: #888; white-space: nowrap;">${sizeMB} MB</span>
         </div>
       `
-    })
+      })
     
   mediaListEl.html(html)
 
@@ -3341,6 +3062,83 @@ function stopFunscriptSync() {
   if (mediaPlayer.animationFrameId) {
     cancelAnimationFrame(mediaPlayer.animationFrameId)
     mediaPlayer.animationFrameId = null
+  }
+  stopFunscriptSyncTimer()
+}
+
+// Timer-based Funscript sync for background tab operation
+function startFunscriptSyncTimer() {
+  if (!mediaPlayer.videoElement || !mediaPlayer.currentFunscript) {
+    console.log(`${NAME}: Cannot start timer sync - videoElement: ${!!mediaPlayer.videoElement}, funscript: ${!!mediaPlayer.currentFunscript}`)
+    return
+  }
+  
+  // Clear any existing timer first
+  stopFunscriptSyncTimer()
+  
+  // If media is not paused, ensure isPlaying is true
+  if (!mediaPlayer.videoElement.paused) {
+    mediaPlayer.isPlaying = true
+  }
+  
+  console.log(`${NAME}: Starting timer-based funscript sync`)
+  
+  // Store last execution time to handle browser throttling
+  let lastExecutionTime = Date.now()
+
+  const syncLoop = () => {
+    // Only run while hidden and playing
+    if (!mediaPlayer.isPlaying || !mediaPlayer.currentFunscript || !document.hidden) {
+      console.log(`${NAME}: Timer sync stopping - isPlaying: ${mediaPlayer.isPlaying}, hasFunscript: ${!!mediaPlayer.currentFunscript}, hidden: ${document.hidden}`)
+      return
+    }
+
+    const video = mediaPlayer.videoElement
+    const funscript = mediaPlayer.currentFunscript
+    const currentTime = (video.currentTime * 1000) + mediaPlayer.syncOffset
+    
+    // Calculate time delta to catch up on missed actions due to throttling
+    const now = Date.now()
+    const timeDelta = now - lastExecutionTime
+    lastExecutionTime = now
+
+    // Find and execute actions - process ALL actions up to current time
+    // to catch up if browser throttled us
+    const actions = funscript.actions
+    const targetTime = currentTime + timeDelta // Look ahead by the time that passed
+    
+    for (let i = mediaPlayer.lastActionIndex; i < actions.length; i++) {
+      const action = actions[i]
+
+      if (action.at <= targetTime) {
+        // Execute action
+        executeFunscriptAction(action)
+        mediaPlayer.lastActionIndex = i + 1
+      } else {
+        break
+      }
+    }
+
+    // Reset if video looped
+    if (currentTime < 0) {
+      mediaPlayer.lastActionIndex = 0
+    }
+
+    // Continue loop only if still hidden
+    if (document.hidden && mediaPlayer.isPlaying) {
+      // Use 50ms interval - browsers typically allow this in background
+      // and it won't be as choppy as 16ms when throttled to 1000ms
+      mediaPlayer.syncTimerId = setTimeout(syncLoop, 50)
+    }
+  }
+
+  syncLoop()
+}
+
+function stopFunscriptSyncTimer() {
+  if (mediaPlayer.syncTimerId) {
+    clearTimeout(mediaPlayer.syncTimerId)
+    mediaPlayer.syncTimerId = null
   }
 }
 
@@ -3564,6 +3362,12 @@ function setupChatVideoEventListeners() {
   }
   
   video.onpause = () => {
+    // Don't stop if tab is hidden - let visibility handler manage background mode
+    if (document.hidden) {
+      console.log(`${NAME}: Video/audio paused but tab is hidden - continuing in background mode`)
+      // Keep isPlaying true so background sync can work
+      return
+    }
     mediaPlayer.isPlaying = false
     stopFunscriptSync()
     $("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
@@ -3610,14 +3414,15 @@ function updateChatFunscriptUI(funscript) {
 function drawMenuFunscriptVisualizer(funscript) {
   const canvas = document.getElementById('intiface-menu-funscript-canvas')
   if (!canvas || !funscript) return
-  
+
   const ctx = canvas.getContext('2d')
-  const width = canvas.width = canvas.offsetWidth
-  const height = canvas.height = canvas.offsetHeight
-  
+  // Use fixed dimensions since the canvas might be in a hidden section
+  const width = canvas.width = 400
+  const height = canvas.height = 80
+
   const actions = funscript.actions
   if (actions.length === 0) return
-  
+
   const duration = funscript.duration || 1
   
   // Clear
@@ -3710,3 +3515,42 @@ function checkForVideoMentions(text) {
 // ==========================================
 // END FUNSCRIPT AND MEDIA PLAYER MODULE
 // ==========================================
+
+// ==========================================
+// AUTO-CONNECT (MUST BE LAST)
+// ==========================================
+
+// Auto-connect on extension load - runs after everything else is initialized
+async function autoConnectOnLoad() {
+  // Check if auto-connect is enabled
+  const autoConnect = localStorage.getItem("intiface-auto-connect") === "true"
+  
+  if (!autoConnect) {
+    console.log(`${NAME}: Auto-connect disabled`)
+    return
+  }
+  
+  console.log(`${NAME}: Auto-connect enabled, attempting connection...`)
+  
+  // Wait a bit to ensure everything is fully loaded
+  await new Promise(resolve => setTimeout(resolve, 2000))
+  
+  // Only connect if not already connected
+  if (!client.connected) {
+    try {
+      await connect()
+      updateStatus(`Auto-connected to Intiface`)
+      console.log(`${NAME}: Auto-connected successfully`)
+    } catch (e) {
+      console.log(`${NAME}: Auto-connect failed:`, e.message)
+      updateStatus(`Auto-connect failed: ${e.message}`, true)
+    }
+  } else {
+    console.log(`${NAME}: Already connected, skipping auto-connect`)
+  }
+}
+
+// Run auto-connect as the very last thing
+autoConnectOnLoad().catch(e => {
+  console.error(`${NAME}: Auto-connect error:`, e)
+})

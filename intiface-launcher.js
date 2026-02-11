@@ -191,9 +191,11 @@ async function init(router) {
           else if (funscriptExtensions.includes(ext)) type = 'funscript';
           else if (audioExtensions.includes(ext)) type = 'audio';
           
-          // Check for matching funscript
+          // Check for matching funscript in both media directory and dedicated funscript directory
           const baseName = path.basename(item.name, ext);
-          const hasFunscript = fs.existsSync(path.join(requestedPath, `${baseName}.funscript`));
+          const funscriptInMediaDir = fs.existsSync(path.join(requestedPath, `${baseName}.funscript`));
+          const funscriptInFunscriptDir = fs.existsSync(path.join(assetPaths.funscript, `${baseName}.funscript`));
+          const hasFunscript = funscriptInMediaDir || funscriptInFunscriptDir;
           
           return {
             name: item.name,
@@ -265,15 +267,23 @@ async function init(router) {
         });
       }
 
-      // Read and parse the file
+      // Read and parse the file - check requested path first, then funscript directory
+      let fileToRead = requestedPath;
       if (!fs.existsSync(requestedPath)) {
-        return res.status(404).json({
-          success: false,
-          error: 'File not found'
-        });
+        // Try the dedicated funscript directory
+        const baseName = path.basename(requestedPath, '.funscript');
+        const funscriptDirPath = path.join(assetPaths.funscript, `${baseName}.funscript`);
+        if (fs.existsSync(funscriptDirPath)) {
+          fileToRead = funscriptDirPath;
+        } else {
+          return res.status(404).json({
+            success: false,
+            error: 'File not found'
+          });
+        }
       }
 
-      const content = fs.readFileSync(requestedPath, 'utf8');
+      const content = fs.readFileSync(fileToRead, 'utf8');
       const funscript = JSON.parse(content);
 
       // Validate funscript format
