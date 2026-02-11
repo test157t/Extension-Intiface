@@ -41,7 +41,8 @@ let modeSettings = {
   roboticRuination: true,
   evilEdgingMistress: true,
   frustrationFairy: true,
-  hypnoHelper: true
+  hypnoHelper: true,
+  chastityCaretaker: true
 }
 
 // Initialize timer worker
@@ -573,6 +574,95 @@ const WaveformPatterns = {
     const tranceBase = Math.sin(phaseProgress * Math.PI * 2) * 0.4 + 0.45;
     const stageMod = 0.6 + (trancePhase / 10) * 0.25;
     return Math.min(tranceBase * stageMod, 0.85) * intensity * 0.75;
+  },
+  // Chastity Caretaker patterns
+  gentle_checkup: (phase, intensity) => {
+    const checkPhase = (phase * 8) % 1;
+    if (checkPhase < 0.2) {
+      return intensity * 0.15;
+    } else if (checkPhase < 0.4) {
+      return intensity * 0.08;
+    } else {
+      return intensity * 0.02;
+    }
+  },
+  caring_tap: (phase, intensity) => {
+    const tapPhase = Math.floor(phase * 20);
+    if (tapPhase % 5 === 0) {
+      return intensity * 0.25;
+    } else if (tapPhase % 3 === 0) {
+      return intensity * 0.1;
+    } else {
+      return intensity * 0.03;
+    }
+  },
+  tender_flutter: (phase, intensity) => {
+    const flutter = Math.sin(phase * Math.PI * 6) * 0.5 + 0.5;
+    const caring = flutter < 0.6 ? flutter * 0.2 : flutter * 0.05;
+    return caring * intensity * 0.3;
+  },
+  nurturing_pulse: (phase, intensity) => {
+    const pulseCycle = (phase * 5) % 1;
+    if (pulseCycle < 0.5) {
+      const build = Math.sin(pulseCycle * Math.PI * 2);
+      return build * intensity * 0.25;
+    } else {
+      return intensity * 0.05;
+    }
+  },
+  cage_nurse: (phase, intensity) => {
+    const nursePhase = Math.floor(phase * 12);
+    const checkIn = nursePhase % 4 === 0 ? 0.2 : 0.05;
+    const care = nursePhase % 3 === 0 ? 0.15 : 0.03;
+    return Math.max(checkIn, care) * intensity * 0.3;
+  },
+  gentle_denial: (phase, intensity) => {
+    const denialPhase = Math.sin(phase * Math.PI * 1.5);
+    const sweet = denialPhase > 0 ? denialPhase * 0.2 : 0;
+    return Math.abs(sweet) * intensity * 0.25;
+  },
+  tender_torment: (phase, intensity) => {
+    const torment = Math.random() > 0.85 ? intensity * 0.3 : (Math.random() > 0.6 ? intensity * 0.1 : intensity * 0.02);
+    const growth = Math.min(phase * 1.2, 1);
+    return torment * growth * 0.4;
+  },
+  loving_check: (phase, intensity) => {
+    const lovePhase = (phase * 10) % 1;
+    if (lovePhase < 0.25) {
+      return intensity * 0.18;
+    } else if (lovePhase < 0.4) {
+      return intensity * 0.06;
+    } else {
+      return intensity * 0.01;
+    }
+  },
+  caretaker_hums: (phase, intensity) => {
+    const hum = Math.sin(phase * Math.PI * 3) * 0.4 + 0.5;
+    const gentle = Math.pow(hum, 0.7) * 0.5;
+    return gentle * intensity * 0.3;
+  },
+  sweet_frustration: (phase, intensity) => {
+    const sweetPhase = (phase * 6) % 1;
+    if (sweetPhase < 0.3) {
+      return intensity * 0.2;
+    } else if (sweetPhase < 0.6) {
+      return intensity * 0.05;
+    } else if (sweetPhase < 0.75) {
+      return intensity * 0.15;
+    } else {
+      return intensity * 0.02;
+    }
+  },
+  daily_routine: (phase, intensity) => {
+    const routine = Math.floor(phase * 8);
+    const stage = routine % 4;
+    switch (stage) {
+      case 0: return intensity * 0.25;
+      case 1: return intensity * 0.05;
+      case 2: return intensity * 0.15;
+      case 3: return intensity * 0.03;
+      default: return intensity * 0.02;
+    }
   }
 }
 
@@ -1687,6 +1777,119 @@ const HypnoHelperMode = {
   }
 }
 
+const ChastityCaretakerMode = {
+  gentle_checkup: {
+    description: 'Gentle checkup on the cage',
+    sequence: [
+      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 5000 },
+      { pattern: 'loving_check', min: 1, max: 12, duration: 12000, pause: 6000 },
+      { pattern: 'caring_tap', min: 3, max: 18, duration: 8000, pause: 4000 },
+      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 5000 }
+    ],
+    repeat: true
+  },
+  daily_care: {
+    description: 'Daily caretaker routine',
+    sequence: [
+      { pattern: 'daily_routine', min: 3, max: 20, duration: 15000, pause: 6000 },
+      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 12000, pause: 5000 },
+      { pattern: 'cage_nurse', min: 3, max: 18, duration: 10000, pause: 7000 },
+      { pattern: 'caretaker_hums', min: 2, max: 16, duration: 14000, pause: 6000 }
+    ],
+    repeat: true
+  },
+  denial_with_love: {
+    description: 'Denial with loving care',
+    sequence: [
+      { pattern: 'gentle_denial', min: 3, max: 18, duration: 12000, pause: 5000 },
+      { pattern: 'tender_flutter', min: 2, max: 15, duration: 10000, pause: 6000 },
+      { pattern: 'gentle_checkup', min: 4, max: 20, duration: 14000, pause: 7000 },
+      { pattern: 'loving_check', min: 3, max: 18, duration: 12000, pause: 8000 }
+    ],
+    repeat: true
+  },
+  tender_torment: {
+    description: 'Sweet torment with care',
+    sequence: [
+      { pattern: 'tender_torment', min: 2, max: 20, duration: 16000, pause: 7000 },
+      { pattern: 'sweet_frustration', min: 3, max: 18, duration: 14000, pause: 6000 },
+      { pattern: 'caring_tap', min: 4, max: 22, duration: 12000, pause: 5000 },
+      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 8000 }
+    ],
+    repeat: true
+  },
+  gentle_edges: {
+    description: 'Gentle edging with care',
+    sequence: [
+      { pattern: 'gentle_denial', min: 4, max: 20, duration: 13000, pause: 6000 },
+      { pattern: 'tender_flutter', min: 3, max: 18, duration: 11000, pause: 5000 },
+      { pattern: 'nurturing_pulse', min: 5, max: 22, duration: 10000, pause: 7000 },
+      { pattern: 'caretaker_hums', min: 4, max: 20, duration: 12000, pause: 8000 }
+    ],
+    repeat: true
+  },
+  good_cage: {
+    description: 'Good cage check and care',
+    sequence: [
+      { pattern: 'cage_nurse', min: 3, max: 18, duration: 12000, pause: 6000 },
+      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 5000 },
+      { pattern: 'loving_check', min: 4, max: 20, duration: 14000, pause: 7000 },
+      { pattern: 'caring_tap', min: 3, max: 18, duration: 11000, pause: 6000 }
+    ],
+    repeat: true
+  },
+  caretaker_love: {
+    description: 'Loving caretaker mode',
+    sequence: [
+      { pattern: 'caretaker_hums', min: 2, max: 15, duration: 14000, pause: 7000 },
+      { pattern: 'gentle_checkup', min: 3, max: 18, duration: 12000, pause: 6000 },
+      { pattern: 'tender_flutter', min: 4, max: 20, duration: 10000, pause: 5000 },
+      { pattern: 'loving_check', min: 3, max: 18, duration: 13000, pause: 8000 }
+    ],
+    repeat: true
+  },
+  sweet_frustration: {
+    description: 'Sweetly frustrating',
+    sequence: [
+      { pattern: 'sweet_frustration', min: 3, max: 18, duration: 15000, pause: 7000 },
+      { pattern: 'tender_torment', min: 4, max: 20, duration: 13000, pause: 6000 },
+      { pattern: 'gentle_denial', min: 5, max: 22, duration: 11000, pause: 5000 },
+      { pattern: 'caring_tap', min: 4, max: 20, duration: 12000, pause: 8000 }
+    ],
+    repeat: true
+  },
+  nurturing_build: {
+    description: 'Slow nurturing build',
+    sequence: [
+      { pattern: 'tender_flutter', min: 2, max: 15, duration: 14000, pause: 7000 },
+      { pattern: 'gentle_denial', min: 3, max: 18, duration: 12000, pause: 6000 },
+      { pattern: 'caretaker_hums', min: 4, max: 20, duration: 10000, pause: 5000 },
+      { pattern: 'gentle_checkup', min: 5, max: 22, duration: 11000, pause: 7000 }
+    ],
+    repeat: true
+  },
+  caring_check: {
+    description: 'Caring check-in session',
+    sequence: [
+      { pattern: 'loving_check', min: 2, max: 15, duration: 13000, pause: 7000 },
+      { pattern: 'gentle_checkup', min: 3, max: 18, duration: 11000, pause: 6000 },
+      { pattern: 'cage_nurse', min: 4, max: 20, duration: 10000, pause: 5000 },
+      { pattern: 'tender_flutter', min: 3, max: 18, duration: 12000, pause: 8000 }
+    ],
+    repeat: true
+  },
+  gentle_denial_session: {
+    description: 'Gentle denial session',
+    sequence: [
+      { pattern: 'gentle_denial', min: 4, max: 20, duration: 14000, pause: 7000 },
+      { pattern: 'sweet_frustration', min: 5, max: 22, duration: 12000, pause: 6000 },
+      { pattern: 'tender_torment', min: 6, max: 25, duration: 10000, pause: 5000 },
+      { pattern: 'gentle_checkup', min: 4, max: 20, duration: 11000, pause: 8000 }
+    ],
+    repeat: true
+  }
+}
+
 function applyMaxVibrate(value, motorIndex = 0) {
   // No max limit anymore, just return the value clamped to 0-100
   return Math.min(value, 100)
@@ -1872,7 +2075,7 @@ async function executeTeaseAndDenialMode(deviceIndex, modeName) {
     return
   }
 
-  const mode = DenialDominaMode[modeName] || MilkMaidMode[modeName] || PetTrainingMode[modeName] || SissySurrenderMode[modeName] || PrejacPrincessMode[modeName] || RoboticRuinationMode[modeName] || EvilEdgingMistressMode[modeName] || FrustrationFairyMode[modeName] || HypnoHelperMode[modeName]
+  const mode = DenialDominaMode[modeName] || MilkMaidMode[modeName] || PetTrainingMode[modeName] || SissySurrenderMode[modeName] || PrejacPrincessMode[modeName] || RoboticRuinationMode[modeName] || EvilEdgingMistressMode[modeName] || FrustrationFairyMode[modeName] || HypnoHelperMode[modeName] || ChastityCaretakerMode[modeName]
   if (!mode) {
     console.error(`${NAME}: Unknown mode: ${modeName}`)
     return
@@ -2204,6 +2407,19 @@ function parseDeviceCommands(text) {
       continue
     }
 
+    // Parse CHASTITY_CARETAKER command
+    // Format: CHASTITY_CARETAKER: gentle_checkup or CHASTITY_CARETAKER daily_care
+    const chastityCaretakerMatch = commandText.match(/CHASTITY_CARETAKER[\s:]+(\w+)/i)
+    if (chastityCaretakerMatch && modeSettings.chastityCaretaker) {
+      const modeName = chastityCaretakerMatch[1].toLowerCase()
+      commands.push({
+        type: 'chastity_caretaker',
+        modeName: modeName,
+        deviceIndex: targetDeviceIndex
+      })
+      continue
+    }
+
     // Parse WAVEFORM command
     // Format: WAVEFORM: sine, min=10, max=80, duration=5000, cycles=3
     const waveformMatch = commandText.match(/WAVEFORM[\s:]+(\w+)(?:[\s,]+min[=:]?(\d+))?(?:[\s,]+max[=:]?(\d+))?(?:[\s,]+duration[=:]?(\d+))?(?:[\s,]+cycles[=:]?(\d+))?/i)
@@ -2514,6 +2730,7 @@ async function executeCommand(cmd) {
       case 'evil_edging_mistress':
       case 'frustration_fairy':
       case 'hypno_helper':
+      case 'chastity_caretaker':
         await executeTeaseAndDenialMode(cmd.deviceIndex, cmd.modeName)
         updateStatus(`${deviceName}: Mode - ${cmd.modeName}`)
         break
@@ -3445,6 +3662,24 @@ async function handleDeviceAdded(newDevice) {
       `
       deviceDiv.append(hypnoHtml)
     }
+
+    const chastityModes = ChastityCaretakerMode
+    const chastityModeNames = Object.keys(chastityModes)
+
+    if (chastityModeNames.length > 0 && modeSettings.chastityCaretaker) {
+      const chastityHtml = `
+        <div style="margin-top: 10px; padding: 8px; background: rgba(255,192,203,0.15); border-radius: 4px; border: 1px solid rgba(255,192,203,0.4);">
+          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ffc0cb;">Chastity Caretaker Modes:</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+            ${chastityModeNames.map(mode =>
+              `<button class="menu_button chastity-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
+                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(255,192,203,0.2); border: 1px solid rgba(255,192,203,0.5);">${mode.replace(/_/g, ' ')}</button>`
+            ).join('')}
+          </div>
+        </div>
+      `
+      deviceDiv.append(chastityHtml)
+    }
   }
 
   devicesEl.append(deviceDiv)
@@ -3712,6 +3947,19 @@ HYPNO_HELPER MODE (hypnotize, entrance, slow arousal build that never peaks):
 - <any:HYPNO_HELPER: hypnotic_sustain> - Sustain hypnotic arousal without peaking
 - <any:HYPNO_HELPER: dreamy_edging> - Dreamy edging that never releases
 - <any:HYPNO_HELPER: hypnotic_loop> - Hypnotic loop of endless build
+` : ''}${modeSettings.chastityCaretaker ? `
+CHASTITY_CARETAKER MODE (gentle care with loving denial for chastity):
+- <any:CHASTITY_CARETAKER: gentle_checkup> - Gentle checkup on the cage
+- <any:CHASTITY_CARETAKER: daily_care> - Daily caretaker routine
+- <any:CHASTITY_CARETAKER: denial_with_love> - Denial with loving care
+- <any:CHASTITY_CARETAKER: tender_torment> - Sweet torment with care
+- <any:CHASTITY_CARETAKER: gentle_edges> - Gentle edging with care
+- <any:CHASTITY_CARETAKER: good_cage> - Good cage check and care
+- <any:CHASTITY_CARETAKER: caretaker_love> - Loving caretaker mode
+- <any:CHASTITY_CARETAKER: sweet_frustration> - Sweetly frustrating
+- <any:CHASTITY_CARETAKER: nurturing_build> - Slow nurturing build
+- <any:CHASTITY_CARETAKER: caring_check> - Caring check-in session
+- <any:CHASTITY_CARETAKER: gentle_denial_session> - Gentle denial session
 ` : ''}
 
 WAVEFORM commands (dynamic patterns):
@@ -4574,6 +4822,7 @@ $(async () => {
     $("#intiface-mode-evil-edging-mistress").prop("checked", modeSettings.evilEdgingMistress)
     $("#intiface-mode-frustration-fairy").prop("checked", modeSettings.frustrationFairy)
     $("#intiface-mode-hypno-helper").prop("checked", modeSettings.hypnoHelper)
+    $("#intiface-mode-chastity-caretaker").prop("checked", modeSettings.chastityCaretaker)
 
     // Save mode settings on change and refresh UI
     const saveModeSettings = () => {
@@ -4586,7 +4835,8 @@ $(async () => {
         roboticRuination: $("#intiface-mode-robotic-ruination").is(":checked"),
         evilEdgingMistress: $("#intiface-mode-evil-edging-mistress").is(":checked"),
         frustrationFairy: $("#intiface-mode-frustration-fairy").is(":checked"),
-        hypnoHelper: $("#intiface-mode-hypno-helper").is(":checked")
+        hypnoHelper: $("#intiface-mode-hypno-helper").is(":checked"),
+        chastityCaretaker: $("#intiface-mode-chastity-caretaker").is(":checked")
       }
       localStorage.setItem("intiface-mode-settings", JSON.stringify(modeSettings))
       console.log(`${NAME}: Mode settings saved`, modeSettings)
@@ -4605,6 +4855,7 @@ $(async () => {
     $("#intiface-mode-evil-edging-mistress").on("change", saveModeSettings)
     $("#intiface-mode-frustration-fairy").on("change", saveModeSettings)
     $("#intiface-mode-hypno-helper").on("change", saveModeSettings)
+    $("#intiface-mode-chastity-caretaker").on("change", saveModeSettings)
 
     // Load and set up Intiface exe path
     const savedExePath = localStorage.getItem("intiface-exe-path")
@@ -4839,6 +5090,15 @@ $(async () => {
       const deviceIndex = $(this).data('device') || 0
 
       console.log(`${NAME}: Hypno Helper mode button clicked - ${modeName}`)
+      await executeTeaseAndDenialMode(deviceIndex, modeName)
+    })
+
+    // Handle chastity caretaker mode button clicks (delegated)
+    $(document).on('click', '.chastity-mode-btn', async function() {
+      const modeName = $(this).data('mode')
+      const deviceIndex = $(this).data('device') || 0
+
+      console.log(`${NAME}: Chastity Caretaker mode button clicked - ${modeName}`)
       await executeTeaseAndDenialMode(deviceIndex, modeName)
     })
 
