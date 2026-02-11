@@ -2,99 +2,320 @@
 // Place this file in: SillyTavern/plugins/intiface-launcher.js
 
 const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const express = require('express');
 
 const info = {
-    id: 'intiface-launcher',
-    name: 'Intiface Central Launcher',
-    description: 'Allows starting Intiface Central from the browser extension'
+  id: 'intiface-launcher',
+  name: 'Intiface Central Launcher',
+  description: 'Allows starting Intiface Central from the browser extension and browsing media assets'
+};
+
+// Get user's home directory for constructing default paths
+function getUserHome() {
+  return process.env.HOME || process.env.USERPROFILE;
+}
+
+// Asset directories for media serving
+let assetPaths = {
+  intifaceMedia: null,
+  funscript: null
 };
 
 async function init(router) {
   console.log('[Intiface Launcher Plugin] Initializing...');
+
+  // Setup asset paths
+  const basePath = process.cwd();
+  assetPaths.intifaceMedia = path.join(basePath, 'data', 'default-user', 'assets', 'intiface_media');
+  assetPaths.funscript = path.join(basePath, 'data', 'default-user', 'assets', 'funscript');
   
+  // Create asset directories if they don't exist
+  [assetPaths.intifaceMedia, assetPaths.funscript].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`[Intiface Launcher] Created directory: ${dir}`);
+      } catch (e) {
+        console.error(`[Intiface Launcher] Failed to create directory: ${dir}`, e);
+      }
+    }
+  });
+
   // Middleware to log all requests
   router.use((req, res, next) => {
     console.log(`[Intiface Launcher] ${req.method} ${req.path}`);
     next();
   });
   
+  // Serve static files from asset directories
+  // This allows the browser to access videos directly
+  router.use('/assets/intiface_media', express.static(assetPaths.intifaceMedia));
+  router.use('/assets/funscript', express.static(assetPaths.funscript));
+  
+  console.log(`[Intiface Launcher] Serving static files from:`);
+  console.log(`  /assets/intiface_media -> ${assetPaths.intifaceMedia}`);
+  console.log(`  /assets/funscript -> ${assetPaths.funscript}`);
+
   // Test endpoint - just returns success
   router.get('/test', (req, res) => {
     console.log('[Intiface Launcher] Test endpoint called');
     res.json({ success: true, message: 'Plugin is working' });
   });
-  
+
   // Endpoint to start Intiface Central
   router.post('/start', async (req, res) => {
-        try {
-            const { exePath } = req.body;
-            
-            if (!exePath) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: 'No executable path provided' 
-                });
-            }
+    try {
+      const { exePath } = req.body;
 
-            // Validate it's an executable
-            if (!exePath.endsWith('.exe') && !exePath.endsWith('.app')) {
-                return res.status(400).json({ 
-                    success: false, 
-                    error: 'Path must point to an executable file' 
-                });
-            }
+      if (!exePath) {
+        return res.status(400).json({
+          success: false,
+          error: 'No executable path provided'
+        });
+      }
 
-            console.log(`[Intiface Launcher] Starting: ${exePath}`);
+      // Validate it's an executable
+      if (!exePath.endsWith('.exe') && !exePath.endsWith('.app')) {
+        return res.status(400).json({
+          success: false,
+          error: 'Path must point to an executable file'
+        });
+      }
 
-            // Spawn Intiface Central
-            const intifaceProcess = spawn(exePath, [], {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true
-            });
+      console.log(`[Intiface Launcher] Starting: ${exePath}`);
 
-            // Handle errors
-            intifaceProcess.on('error', (err) => {
-                console.error(`[Intiface Launcher] Failed to start: ${err.message}`);
-            });
+      // Spawn Intiface Central
+      const intifaceProcess = spawn(exePath, [], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true
+      });
 
-            intifaceProcess.on('exit', (code) => {
-                if (code !== 0 && code !== null) {
-                    console.error(`[Intiface Launcher] Process exited with code ${code}`);
-                }
-            });
+      // Handle errors
+      intifaceProcess.on('error', (err) => {
+        console.error(`[Intiface Launcher] Failed to start: ${err.message}`);
+      });
 
-            // Unref so Node doesn't wait for this process
-            intifaceProcess.unref();
-
-            // Give it a moment to start
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Check if it started
-            if (intifaceProcess.pid && !intifaceProcess.killed) {
-                console.log(`[Intiface Launcher] Started with PID ${intifaceProcess.pid}`);
-                return res.json({ 
-                    success: true, 
-                    message: 'Intiface Central started',
-                    pid: intifaceProcess.pid 
-                });
-            } else {
-                return res.status(500).json({ 
-                    success: false, 
-                    error: 'Process failed to start' 
-                });
-            }
-
-        } catch (error) {
-            console.error('[Intiface Launcher] Error:', error);
-            return res.status(500).json({ 
-                success: false, 
-                error: error.message 
-            });
+      intifaceProcess.on('exit', (code) => {
+        if (code !== 0 && code !== null) {
+          console.error(`[Intiface Launcher] Process exited with code ${code}`);
         }
-    });
+      });
 
-    console.log('[Intiface Launcher Plugin] Initialized - endpoint: POST /api/plugins/intiface-launcher/start');
+      // Unref so Node doesn't wait for this process
+      intifaceProcess.unref();
+
+      // Give it a moment to start
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Check if it started
+      if (intifaceProcess.pid && !intifaceProcess.killed) {
+        console.log(`[Intiface Launcher] Started with PID ${intifaceProcess.pid}`);
+        return res.json({
+          success: true,
+          message: 'Intiface Central started',
+          pid: intifaceProcess.pid
+        });
+      } else {
+        return res.status(500).json({
+          success: false,
+          error: 'Process failed to start'
+        });
+      }
+
+    } catch (error) {
+      console.error('[Intiface Launcher] Error:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Endpoint to list media files in asset directories
+  router.get('/media', async (req, res) => {
+    try {
+      const { dir } = req.query;
+      
+      // Validate directory path
+      if (!dir) {
+        return res.status(400).json({
+          success: false,
+          error: 'No directory specified'
+        });
+      }
+
+      // Security: Ensure the path is within allowed directories
+      const allowedPaths = [
+        path.join(process.cwd(), 'data', 'default-user', 'assets', 'funscript'),
+        path.join(process.cwd(), 'data', 'default-user', 'assets', 'intiface_media'),
+        path.join(process.cwd(), 'public', 'assets', 'funscript'),
+        path.join(process.cwd(), 'public', 'assets', 'intiface_media')
+      ];
+      
+      const requestedPath = path.resolve(dir);
+      const isAllowed = allowedPaths.some(allowed => requestedPath.startsWith(allowed));
+      
+      if (!isAllowed) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied: Path not in allowed directories'
+        });
+      }
+
+      // Check if directory exists
+      if (!fs.existsSync(requestedPath)) {
+        return res.json({
+          success: true,
+          files: [],
+          directories: [],
+          message: 'Directory does not exist yet'
+        });
+      }
+
+      // Read directory contents
+      const items = fs.readdirSync(requestedPath, { withFileTypes: true });
+      
+      const videoExtensions = ['.mp4', '.webm', '.ogv', '.mkv', '.avi', '.mov'];
+      const funscriptExtensions = ['.funscript', '.json'];
+      const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a'];
+      
+      const files = items
+        .filter(item => item.isFile())
+        .map(item => {
+          const ext = path.extname(item.name).toLowerCase();
+          let type = 'unknown';
+          if (videoExtensions.includes(ext)) type = 'video';
+          else if (funscriptExtensions.includes(ext)) type = 'funscript';
+          else if (audioExtensions.includes(ext)) type = 'audio';
+          
+          // Check for matching funscript
+          const baseName = path.basename(item.name, ext);
+          const hasFunscript = fs.existsSync(path.join(requestedPath, `${baseName}.funscript`));
+          
+          return {
+            name: item.name,
+            type: type,
+            size: fs.statSync(path.join(requestedPath, item.name)).size,
+            hasFunscript: hasFunscript
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const directories = items
+        .filter(item => item.isDirectory())
+        .map(item => ({
+          name: item.name,
+          type: 'directory'
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      res.json({
+        success: true,
+        path: requestedPath,
+        files: files,
+        directories: directories
+      });
+
+    } catch (error) {
+      console.error('[Intiface Launcher] Media listing error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Endpoint to read Funscript file
+  router.get('/funscript', async (req, res) => {
+    try {
+      const { path: filePath } = req.query;
+      
+      if (!filePath) {
+        return res.status(400).json({
+          success: false,
+          error: 'No file path specified'
+        });
+      }
+
+      // Security: Ensure the path is within allowed directories
+      const allowedPaths = [
+        path.join(process.cwd(), 'data', 'default-user', 'assets'),
+        path.join(process.cwd(), 'public', 'assets')
+      ];
+      
+      const requestedPath = path.resolve(filePath);
+      const isAllowed = allowedPaths.some(allowed => requestedPath.startsWith(allowed));
+      
+      if (!isAllowed) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied: Path not in allowed directories'
+        });
+      }
+
+      // Check file extension
+      const ext = path.extname(requestedPath).toLowerCase();
+      if (ext !== '.funscript' && ext !== '.json') {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid file type. Must be .funscript or .json'
+        });
+      }
+
+      // Read and parse the file
+      if (!fs.existsSync(requestedPath)) {
+        return res.status(404).json({
+          success: false,
+          error: 'File not found'
+        });
+      }
+
+      const content = fs.readFileSync(requestedPath, 'utf8');
+      const funscript = JSON.parse(content);
+
+      // Validate funscript format
+      if (!funscript.actions || !Array.isArray(funscript.actions)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid Funscript format: missing actions array'
+        });
+      }
+
+      res.json({
+        success: true,
+        funscript: funscript
+      });
+
+    } catch (error) {
+      console.error('[Intiface Launcher] Funscript reading error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Endpoint to get default asset paths
+  router.get('/asset-paths', (req, res) => {
+    const basePath = process.cwd();
+    res.json({
+      success: true,
+      paths: {
+        funscript: path.join(basePath, 'data', 'default-user', 'assets', 'funscript'),
+        intifaceMedia: path.join(basePath, 'data', 'default-user', 'assets', 'intiface_media')
+      }
+    });
+  });
+
+  console.log('[Intiface Launcher Plugin] Initialized');
+  console.log('[Intiface Launcher] Endpoints:');
+  console.log('  POST /api/plugins/intiface-launcher/start');
+  console.log('  GET  /api/plugins/intiface-launcher/media');
+  console.log('  GET  /api/plugins/intiface-launcher/funscript');
+  console.log('  GET  /api/plugins/intiface-launcher/asset-paths');
 }
 
 module.exports = { info, init };

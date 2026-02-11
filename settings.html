@@ -17,6 +17,14 @@
       <input type="text" id="intiface-ip-input" class="text_pole" value="127.0.0.1:12345" placeholder="127.0.0.1:12345" style="flex-grow: 1;">
     </div>
     <div class="flex-container alignitemscenter" style="margin-top: 10px;">
+      <button id="intiface-connect-action-button" class="menu_button connect-button" style="flex-grow: 1;">
+        <i class="fa-solid fa-power-off"></i> Connect
+      </button>
+      <button id="intiface-rescan-button" class="menu_button" style="display: none; margin-left: 8px;">
+        <i class="fa-solid fa-rotate"></i>
+      </button>
+    </div>
+    <div class="flex-container alignitemscenter" style="margin-top: 10px;">
       <input type="checkbox" id="intiface-auto-connect-toggle" style="margin-right: 8px;">
       <label for="intiface-auto-connect-toggle">Auto-connect on load</label>
     </div>
@@ -29,7 +37,130 @@
       <label for="intiface-function-calling-toggle">Enable AI Function Calling</label>
     </div>
     <div style="margin-top: 10px; font-size: 0.85em; color: #888; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
-      <strong>AI Control:</strong> Use function calls or chat commands to control devices
+      <strong>AI Control:</strong> Use function calls or chat commands to control devices and media playback
+    </div>
+    
+    <!-- Debug Tools Section -->
+    <div style="margin-top: 15px;">
+      <div id="intiface-debug-menu-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;">
+          <span><i class="fa-solid fa-bug"></i> Debug Tools</span>
+          <span id="intiface-debug-menu-arrow" style="transition: transform 0.3s;">▼</span>
+        </span>
+      </div>
+      <div id="intiface-debug-menu-content" style="display: none; margin-top: 10px;">
+        <!-- Show Chat Player Button -->
+        <div style="margin-bottom: 10px;">
+          <button id="intiface-show-chat-player-btn" class="menu_button" style="width: 100%; background: rgba(76, 175, 80, 0.2);">
+            <i class="fa-solid fa-eye"></i> Show Chat Player
+          </button>
+          <div style="font-size: 0.7em; color: #666; margin-top: 3px; text-align: center;">
+            Opens the video player sidebar for testing
+          </div>
+        </div>
+
+        <!-- Test Backend Connection Button -->
+        <div style="margin-bottom: 10px;">
+          <button id="intiface-test-backend-btn" class="menu_button" style="width: 100%;">
+            <i class="fa-solid fa-plug"></i> Test Backend Connection
+          </button>
+          <div id="intiface-test-backend-status" style="margin-top: 5px; font-size: 0.75em; text-align: center;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Media Player Section in Menu -->
+    <div style="margin-top: 15px;">
+      <div id="intiface-media-menu-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;">
+          <span><i class="fa-solid fa-film"></i> Media Library</span>
+          <span id="intiface-media-menu-arrow" style="transition: transform 0.3s;">▼</span>
+        </span>
+      </div>
+      <div id="intiface-media-menu-content" style="display: none; margin-top: 10px;">
+        <!-- Refresh Button -->
+        <button id="intiface-menu-refresh-media-btn" class="menu_button" style="width: 100%; margin-bottom: 10px;">
+          <i class="fa-solid fa-rotate"></i> Refresh Media List
+        </button>
+        
+        <!-- Media List -->
+        <div id="intiface-menu-media-list" style="max-height: 250px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 5px;">
+          <div style="color: #888; font-size: 0.85em; text-align: center; padding: 20px;">
+            Click refresh to load media files
+          </div>
+        </div>
+        
+        <!-- Help Text -->
+        <div style="margin-top: 10px; padding: 8px; background: rgba(100,100,100,0.1); border-radius: 4px; font-size: 0.75em; color: #888;">
+          <strong>Folders:</strong><br>
+          Videos: <code>data/default-user/assets/intiface_media/</code><br>
+          Funscripts: <code>data/default-user/assets/funscript/</code><br>
+          <em>Funscripts must match video filenames</em>
+        </div>
+      </div>
+    </div>
+
+    <!-- Funscript Settings Section -->
+    <div style="margin-top: 15px;">
+      <div id="intiface-funscript-menu-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;">
+          <span><i class="fa-solid fa-chart-line"></i> Funscript Settings</span>
+          <span id="intiface-funscript-menu-arrow" style="transition: transform 0.3s;">▼</span>
+        </span>
+      </div>
+      <div id="intiface-funscript-menu-content" style="display: none; margin-top: 10px;">
+        <!-- Funscript Visualizer -->
+        <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+            <i class="fa-solid fa-chart-area"></i> Funscript Preview
+          </div>
+          <canvas id="intiface-menu-funscript-canvas" style="width: 100%; height: 80px; background: rgba(0,0,0,0.2); border-radius: 4px;"></canvas>
+          <div style="display: flex; justify-content: space-between; font-size: 0.7em; color: #666; margin-top: 3px;">
+            <span>0s</span>
+            <span id="intiface-menu-funscript-duration">--</span>
+          </div>
+          <div id="intiface-menu-funscript-info" style="font-size: 0.75em; color: #888; margin-top: 5px; text-align: center;"></div>
+        </div>
+
+        <!-- Sync Settings -->
+        <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+            <i class="fa-solid fa-sliders"></i> Sync Settings
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 5px;">
+              <span>Sync Offset</span>
+              <span id="intiface-menu-sync-display" style="color: #64B5F6;">0ms</span>
+            </div>
+            <input type="range" id="intiface-menu-sync-offset" min="-5000" max="5000" value="0" style="width: 100%;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.65em; color: #666; margin-top: 2px;">
+              <span>-5s</span>
+              <span>+5s</span>
+            </div>
+          </div>
+
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 5px;">
+              <span>Intensity</span>
+              <span id="intiface-menu-intensity-display" style="color: #4CAF50;">100%</span>
+            </div>
+            <input type="range" id="intiface-menu-intensity" min="0" max="100" value="100" style="width: 100%;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.65em; color: #666; margin-top: 2px;">
+              <span>0%</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer;">
+              <input type="checkbox" id="intiface-menu-loop" style="margin-right: 8px;">
+              <i class="fa-solid fa-repeat" style="margin-right: 5px; color: #888;"></i>
+              Loop video
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Advanced Configuration (Collapsed by default) -->
@@ -48,11 +179,56 @@
           <input type="text" id="intiface-exe-path" class="text_pole" placeholder="C:\Program Files\Intiface\IntifaceCentral.exe" style="flex-grow: 1;">
         </div>
         <div id="intiface-exe-status" style="margin-top: 5px; font-size: 0.75em; color: #888;">Not configured</div>
-        <div style="margin-top: 5px; font-size: 0.7em; color: #666; font-style: italic;">
-          Type the full path to IntifaceCentral.exe
+      <div style="margin-top: 5px; font-size: 0.7em; color: #666; font-style: italic;">
+        Type the full path to IntifaceCentral.exe
+      </div>
+
+      <!-- Player Appearance Settings -->
+      <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+          <i class="fa-solid fa-palette"></i> Player Appearance
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
+            <span>Video Opacity</span>
+            <span id="intiface-menu-video-opacity-display" style="color: #64B5F6;">100%</span>
+          </div>
+          <input type="range" id="intiface-menu-video-opacity" min="20" max="100" value="100" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.65em; color: #666; margin-top: 2px;">
+            <span>20%</span>
+            <span>100%</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
+            <span>Player Width</span>
+            <span id="intiface-menu-width-display" style="color: #64B5F6;">100%</span>
+          </div>
+          <input type="range" id="intiface-menu-width" min="20" max="100" value="100" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.65em; color: #666; margin-top: 2px;">
+            <span>20%</span>
+            <span>100%</span>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <div style="font-size: 0.75em; margin-bottom: 5px;">Player Position</div>
+          <select id="intiface-menu-position" style="width: 100%; padding: 4px; font-size: 0.8em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 3px; color: inherit;">
+            <option value="top">Top of chat</option>
+            <option value="center">Center screen</option>
+          </select>
+        </div>
+
+        <div>
+          <button id="intiface-reset-appearance-btn" class="menu_button" style="width: 100%; font-size: 0.75em; padding: 5px;">
+            <i class="fa-solid fa-rotate-left"></i> Reset to defaults
+          </button>
         </div>
       </div>
     </div>
-
   </div>
+
+</div>
 </div>
