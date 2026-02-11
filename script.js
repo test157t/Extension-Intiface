@@ -2990,6 +2990,11 @@ $("#intiface-funscript-menu-toggle").on("click", function () {
   })
 
   console.log(`${NAME}: Media player initialized`)
+
+// Auto-load media list on startup
+refreshMenuMediaList().catch(e => {
+  console.log(`${NAME}: Failed to auto-load media list:`, e.message)
+})
 }
 
 // Load saved appearance settings
