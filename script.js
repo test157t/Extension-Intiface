@@ -335,11 +335,17 @@ async function stopDevicePattern(deviceIndex) {
   const targetDevice = devices[deviceIndex]
   if (targetDevice) {
     try {
-      const vibrateAttributes = targetDevice.vibrateAttributes
-      if (vibrateAttributes && vibrateAttributes.length > 0) {
-        for (let i = 0; i < vibrateAttributes.length; i++) {
-          const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, 0, "Vibrate")
-          await targetDevice.scalar(scalarCommand)
+      // Try simple vibrate method first (better for Lovense), fallback to scalar
+      try {
+        await targetDevice.vibrate(0)
+      } catch (e) {
+        // Fallback to scalar command
+        const vibrateAttributes = targetDevice.vibrateAttributes
+        if (vibrateAttributes && vibrateAttributes.length > 0) {
+          for (let i = 0; i < vibrateAttributes.length; i++) {
+            const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, 0, "Vibrate")
+            await targetDevice.scalar(scalarCommand)
+          }
         }
       }
       await targetDevice.oscillate(0)
@@ -397,8 +403,8 @@ function parseDeviceCommands(text) {
       continue
     }
     
-// Check for INTIFACE system commands (start, connect, disconnect)
-    if (deviceType === 'intiface' || deviceType === 'system') {
+    // Check for INTERFACE system commands (start, connect, disconnect)
+    if (deviceType === 'interface' || deviceType === 'system') {
       if (commandText === 'START') {
         commands.push({ type: 'intiface_start' })
         continue
@@ -671,12 +677,19 @@ async function executeCommand(cmd) {
       case 'vibrate':
         const vibrateAttrs = targetDevice.vibrateAttributes
         if (vibrateAttrs && vibrateAttrs[cmd.motorIndex]) {
-          const scalarCmd = new buttplug.ScalarSubcommand(
-            vibrateAttrs[cmd.motorIndex].Index,
-            cmd.intensity / 100,
-            "Vibrate"
-          )
-          await targetDevice.scalar(scalarCmd)
+          const intensity = cmd.intensity / 100
+          // Try simple vibrate method first (better for Lovense), fallback to scalar
+          try {
+            await targetDevice.vibrate(intensity)
+          } catch (e) {
+            // Fallback to scalar command
+            const scalarCmd = new buttplug.ScalarSubcommand(
+              vibrateAttrs[cmd.motorIndex].Index,
+              intensity,
+              "Vibrate"
+            )
+            await targetDevice.scalar(scalarCmd)
+          }
           updateStatus(`${deviceName} vibrating at ${cmd.intensity}%`)
         }
         break
@@ -998,18 +1011,25 @@ async function executePattern(cmd, actionType, deviceIndex = 0) {
 // Process command queue sequentially
 async function processCommandQueue() {
   if (isExecutingCommands || messageCommands.length === 0) return
-  
+
   isExecutingCommands = true
-  
+
   while (messageCommands.length > 0) {
     const cmd = messageCommands.shift()
-    
+
     // Skip system commands - they should have been handled immediately
     if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
       console.log(`${NAME}: Skipping system command in queue (should have been executed immediately): ${cmd.type}`)
       continue
     }
-    
+
+    // Skip AI device commands when media player is open (funscript/media has priority until player is closed)
+    const playerPanel = $("#intiface-chat-media-panel")
+    if (playerPanel.length > 0 && playerPanel.is(":visible")) {
+      console.log(`${NAME}: Skipping AI command - media player is open: ${cmd.type}`)
+      continue
+    }
+
     // Device commands require connection
     if (client.connected) {
       await executeCommand(cmd)
@@ -1017,7 +1037,7 @@ async function processCommandQueue() {
       console.log(`${NAME}: Skipping device command - not connected`)
     }
   }
-  
+
   isExecutingCommands = false
 }
 
@@ -1509,14 +1529,17 @@ function handleDeviceRemoved(removedDevice) {
 // Update extension prompt for AI
 function updatePrompt() {
   try {
-  console.log(`${NAME}: updatePrompt() called, devices.length=${devices?.length ?? 'undefined'}`)
+    console.log(`${NAME}: updatePrompt() called, devices.length=${devices?.length ?? 'undefined'}, client.connected=${client?.connected ?? 'undefined'}`)
 
-  // Check if Intiface exe path is configured
-  const exePath = localStorage.getItem("intiface-exe-path")
-  const canStartIntiface = !!exePath
+    // Check if Intiface exe path is configured
+    const exePath = localStorage.getItem("intiface-exe-path")
+    const canStartIntiface = !!exePath
 
-  // Build device info (only if connected)
-  const deviceInfo = devices.map((dev, idx) => {
+    // Only show devices if actually connected
+    const connectedDevices = client?.connected ? devices : []
+
+    // Build device info (only if connected)
+    const deviceInfo = connectedDevices.map((dev, idx) => {
     const caps = []
     if (dev.vibrateAttributes?.length > 0) caps.push('vibrate')
     if (dev.messageAttributes?.OscillateCmd) caps.push('oscillate')
@@ -1531,30 +1554,30 @@ function updatePrompt() {
     }
   })
 
-  const deviceShorthands = devices.length > 0 ? devices.map((dev, idx) => {
-    const shorthand = getDeviceShorthand(dev)
-    return `${dev.displayName || dev.name} (${shorthand})`
-  }).join(', ') : 'No devices connected'
+    const deviceShorthands = connectedDevices.length > 0 ? connectedDevices.map((dev, idx) => {
+      const shorthand = getDeviceShorthand(dev)
+      return `${dev.displayName || dev.name} (${shorthand})`
+    }).join(', ') : 'No devices connected'
 
-  console.log(`${NAME}: Building prompt... canStartIntiface=${canStartIntiface}`)
+    console.log(`${NAME}: Building prompt... canStartIntiface=${canStartIntiface}, connectedDevices=${connectedDevices.length}`)
 
-  const startCommand = `
+    const startCommand = `
 System commands (to manage Intiface itself):
-${canStartIntiface ? `- <intiface:START> - Start Intiface Central application (configured: ${exePath})` : ''}
-- <intiface:CONNECT> - Connect to Intiface server
-- <intiface:DISCONNECT> - Disconnect from Intiface server`
+${canStartIntiface ? `- <interface:START> - Start Intiface Central application (configured: ${exePath})` : ''}
+- <interface:CONNECT> - Connect to Intiface server
+- <interface:DISCONNECT> - Disconnect from Intiface server`
 
-  // Build dynamic device examples based on connected devices
-  let deviceTypeExamples = ''
-  let presetExamples = ''
-  let gradientExamples = ''
-  let patternExamples = ''
-  
-  if (devices.length > 0) {
-    // Get unique device types from connected devices
-    const connectedTypes = [...new Set(devices.map(dev => getDeviceType(dev)))]
-    const firstDevice = devices[0]
-    const firstDeviceName = firstDevice.displayName || firstDevice.name
+    // Build dynamic device examples based on connected devices
+    let deviceTypeExamples = ''
+    let presetExamples = ''
+    let gradientExamples = ''
+    let patternExamples = ''
+
+    if (connectedDevices.length > 0) {
+      // Get unique device types from connected devices
+      const connectedTypes = [...new Set(connectedDevices.map(dev => getDeviceType(dev)))]
+      const firstDevice = connectedDevices[0]
+      const firstDeviceName = firstDevice.displayName || firstDevice.name
     const firstShorthand = getDeviceShorthand(firstDevice)
     
     // Build device type command examples
@@ -1624,19 +1647,19 @@ if (devices.length > 0) {
   const typePresets = DevicePresets[type] || DevicePresets.general
   const firstPreset = Object.keys(typePresets)[0] || 'tease'
   
-  exampleResponses = `
+    exampleResponses = `
 EXAMPLE RESPONSES:
 ✓ Good: "Mmm, let me tease you slowly <${shorthand}:PRESET: ${firstPreset}>. Can you feel that gentle pulse building?"
 ✓ Good: "I'll ramp it up gradually <${shorthand}:GRADIENT: start=20, end=85, duration=12000>. Feel it growing stronger..."
 ✓ Good: "Wave pattern incoming <any:WAVEFORM: sine, min=15, max=65, duration=4000, cycles=5>"
-✓ Good: "Let me start the connection <intiface:CONNECT>. Now we can play."
+✓ Good: "Let me start the connection <interface:CONNECT>. Now we can play."
 
 ✗ Bad: "I will vibrate the device for you" (no actual command)
 ✗ Bad: "Use this command: cage vibrate 50" (wrong format)`
 } else {
-  exampleResponses = `
+    exampleResponses = `
 EXAMPLE RESPONSES:
-✓ Good: "Let me start the connection <intiface:CONNECT>. Now we can play."
+✓ Good: "Let me start the connection <interface:CONNECT>. Now we can play."
 
 ✗ Bad: "I will vibrate the device for you" (no actual command)`
 }
@@ -1649,7 +1672,7 @@ COMMAND FORMAT:
 Type the command EXACTLY like this (including the < and >):
 ${startCommand}${deviceCommands}
 ${exampleResponses}
-${deviceInfo.length > 0 ? 'You ARE currently connected - include device commands naturally in your responses.\n\nDEVICE CAPABILITIES:\n' + deviceInfo.map(d => `- ${d.name}: ${d.type} (${d.capabilities.join(', ')}, ${d.motors} motor${d.motors > 1 ? 's' : ''})`).join('\n') : '⚠️ You are DISCONNECTED - you MUST include <intiface:CONNECT> or <intiface:START> in your response to establish connection BEFORE sending any device commands.'}
+${deviceInfo.length > 0 ? 'You ARE currently connected - include device commands naturally in your responses.\n\nDEVICE CAPABILITIES:\n' + deviceInfo.map(d => `- ${d.name}: ${d.type} (${d.capabilities.join(', ')}, ${d.motors} motor${d.motors > 1 ? 's' : ''})`).join('\n') : '⚠️ You are DISCONNECTED - you MUST include <interface:CONNECT> or <interface:START> in your response to establish connection BEFORE sending any device commands.'}
 
 === VIDEO & FUNSCRIPT SUPPORT ===
 You can also play videos with synchronized haptic feedback! Videos are stored in the media library and can be played with matching Funscript files.
@@ -1911,24 +1934,27 @@ async function processMessage() {
           $(`#vibrate-slider-${index}`).val(speed)
         })
 
-        const vibrateAttributes = device.vibrateAttributes
-        if (vibrateAttributes && vibrateAttributes.length >= normalizedSpeeds.length) {
-          // Asynchronous execution with a delay
-          for (let i = 0; i < normalizedSpeeds.length; i++) {
-            const speed = normalizedSpeeds[i]
-            // @ts-ignore
-            const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, speed / 100, "Vibrate")
-            await device.scalar(scalarCommand)
-            await new Promise((resolve) => setTimeout(resolve, 50)) // 50ms delay
+          // Try simple vibrate method first (better for Lovense), fallback to scalar
+          try {
+            const speeds = normalizedSpeeds.map((s) => s / 100)
+            for (const speed of speeds) {
+              await device.vibrate(speed)
+              await new Promise((resolve) => setTimeout(resolve, 50)) // 50ms delay
+            }
+          } catch (e) {
+            // Fallback to scalar command
+            const vibrateAttributes = device.vibrateAttributes
+            if (vibrateAttributes && vibrateAttributes.length >= normalizedSpeeds.length) {
+              // Asynchronous execution with a delay
+              for (let i = 0; i < normalizedSpeeds.length; i++) {
+                const speed = normalizedSpeeds[i]
+                // @ts-ignore
+                const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, speed / 100, "Vibrate")
+                await device.scalar(scalarCommand)
+                await new Promise((resolve) => setTimeout(resolve, 50)) // 50ms delay
+              }
+            }
           }
-        } else {
-          // Fallback to the original method if something is off, also async
-          const speeds = normalizedSpeeds.map((s) => s / 100)
-          for (const speed of speeds) {
-            await device.vibrate(speed)
-            await new Promise((resolve) => setTimeout(resolve, 50)) // 50ms delay
-          }
-        }
         updateStatus(`Vibrating with pattern: [${normalizedSpeeds.join(", ")}]%`)
       }
     } catch (e) {
@@ -1971,22 +1997,25 @@ async function processMessage() {
               $(`#vibrate-slider-${index}`).val(speed)
             })
 
-            const vibrateAttributes = device.vibrateAttributes
-            if (vibrateAttributes && vibrateAttributes.length >= normalizedSpeeds.length) {
-              // Asynchronous execution with a delay
-              for (let i = 0; i < normalizedSpeeds.length; i++) {
-                const speed = normalizedSpeeds[i]
-                // @ts-ignore
-                const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, speed / 100, "Vibrate")
-                await device.scalar(scalarCommand)
-                await new Promise((resolve) => setTimeout(resolve, 50)) // 50ms delay
-              }
-            } else {
-              // Fallback to the original method if something is off, also async
+            // Try simple vibrate method first (better for Lovense), fallback to scalar
+            try {
               const speeds = normalizedSpeeds.map((s) => s / 100)
               for (const speed of speeds) {
                 await device.vibrate(speed)
                 await new Promise((resolve) => setTimeout(resolve, 50)) // 50ms delay
+              }
+            } catch (e) {
+              // Fallback to scalar command
+              const vibrateAttributes = device.vibrateAttributes
+              if (vibrateAttributes && vibrateAttributes.length >= normalizedSpeeds.length) {
+                // Asynchronous execution with a delay
+                for (let i = 0; i < normalizedSpeeds.length; i++) {
+                  const speed = normalizedSpeeds[i]
+                  // @ts-ignore
+                  const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, speed / 100, "Vibrate")
+                  await device.scalar(scalarCommand)
+                  await new Promise((resolve) => setTimeout(resolve, 50)) // 50ms delay
+                }
               }
             }
             updateStatus(`Vibrating with pattern: [${normalizedSpeeds.join(", ")}]%`)
@@ -2214,13 +2243,18 @@ async function stopAllDeviceActions() {
     const results = []
     for (const dev of devices) {
       try {
-        // Stop vibration
-        const vibrateAttributes = dev.vibrateAttributes
-        if (vibrateAttributes && vibrateAttributes.length > 0) {
-          for (let i = 0; i < vibrateAttributes.length; i++) {
-            const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, 0, "Vibrate")
-            await dev.scalar(scalarCommand)
-            await new Promise((resolve) => setTimeout(resolve, 50))
+        // Stop vibration - try simple method first, fallback to scalar
+        try {
+          await dev.vibrate(0)
+        } catch (e) {
+          // Fallback to scalar command
+          const vibrateAttributes = dev.vibrateAttributes
+          if (vibrateAttributes && vibrateAttributes.length > 0) {
+            for (let i = 0; i < vibrateAttributes.length; i++) {
+              const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, 0, "Vibrate")
+              await dev.scalar(scalarCommand)
+              await new Promise((resolve) => setTimeout(resolve, 50))
+            }
           }
         }
 
@@ -2245,6 +2279,8 @@ async function stopAllDeviceActions() {
     $("#intiface-oscillate-interval-display").text("Oscillate Interval: N/A")
 
     updateStatus(`Stopped ${results.length} device(s)`)
+    // Update prompt to reflect stopped state
+    updatePrompt()
     return `Stopped ${results.length} device(s): ${results.join(', ')}`
   } catch (e) {
     const errorMsg = `Failed to stop device actions: ${e.message}`
@@ -2274,10 +2310,46 @@ $(async () => {
     // Initialize timer worker for background vibration (prevents throttling in hidden tabs)
     initTimerWorker()
 
-    client = new buttplug.ButtplugClient("SillyTavern Intiface Client")
+  client = new buttplug.ButtplugClient("SillyTavern Intiface Client")
+
+  // Clear any stale device data on initialization
+  console.log(`${NAME}: Clearing stale device data on init`)
+  devices = []
+  device = null
+  
+  // Ensure any lingering patterns are cleared
+  activePatterns.clear()
+  if (vibrateIntervalId) {
+    clearTimeout(vibrateIntervalId)
+    vibrateIntervalId = null
+  }
+  if (oscillateIntervalId) {
+    clearTimeout(oscillateIntervalId)
+    oscillateIntervalId = null
+  }
+  if (strokerIntervalId) {
+    clearInterval(strokerIntervalId)
+    strokerIntervalId = null
+  }
+  
+  // Reset media player state
+  mediaPlayer.isPlaying = false
+  mediaPlayer.currentFunscript = null
+  mediaPlayer.videoElement = null
+  stopFunscriptSync()
+
+    // Reset UI status
+    updateStatus("Disconnected")
+    updateButtonStates(false)
+    $("#intiface-devices").empty()
+    
+    // Update prompt with cleared state
+    updatePrompt()
+    
+    console.log(`${NAME}: Initialization cleanup complete`)
 
     // Connector is now created dynamically in connect()
-    // connector = new buttplug.ButtplugBrowserWebsocketClientConnector("ws://127.0.0.1:12345");
+  // connector = new buttplug.ButtplugBrowserWebsocketClientConnector("ws://127.0.0.1:12345");
 
     // Initial attachment of event handlers
     attachDeviceEventHandlers()
@@ -2481,6 +2553,15 @@ $(async () => {
   eventSource.on(event_types.GENERATION_STARTED, onGenerationStarted)
   eventSource.on(event_types.GENERATION_ENDED, onGenerationEnded)
 
+  // Handle chat change - update prompt and stop media
+  eventSource.on(event_types.CHAT_CHANGED, async () => {
+    console.log(`${NAME}: Chat changed - updating prompt and stopping media`)
+    // Update the prompt for the new chat context
+    updatePrompt()
+    // Stop any media playback and hide the player
+    hideChatMediaPanel()
+  })
+
 // Handle page visibility changes to prevent vibration stopping in background
 let hiddenTime = 0
 document.addEventListener('visibilitychange', async () => {
@@ -2540,6 +2621,12 @@ document.addEventListener('visibilitychange', async () => {
 
     // Initialize media player functionality
   initMediaPlayer()
+
+  // Additional delayed prompt update after media player init
+  setTimeout(() => {
+    console.log(`${NAME}: Final prompt update after init`)
+    updatePrompt()
+  }, 3000)
   
   } catch (error) {
     console.error(`${NAME}: Failed to initialize.`, error)
@@ -3347,36 +3434,56 @@ async function loadChatMediaFile(filename) {
 // Setup video event listeners for chat panel
 function setupChatVideoEventListeners() {
   const video = mediaPlayer.videoElement
-  if (!video) return
-  
+  if (!video) {
+    console.log(`${NAME}: No video element found, cannot setup event listeners`)
+    return
+  }
+
+  console.log(`${NAME}: Setting up video event listeners`)
+
   // Remove old listeners
   video.onplay = null
   video.onpause = null
   video.onended = null
-  
+
   // Add new listeners
   video.onplay = () => {
+    console.log(`${NAME}: Video onplay event fired`)
     mediaPlayer.isPlaying = true
     startFunscriptSync()
     $("#intiface-chat-funscript-info").text("Playing - Funscript active").css("color", "#4CAF50")
   }
-  
+
   video.onpause = () => {
+    console.log(`${NAME}: Video onpause triggered - hidden: ${document.hidden}, devices: ${devices.length}, connected: ${client.connected}`)
     // Don't stop if tab is hidden - let visibility handler manage background mode
     if (document.hidden) {
       console.log(`${NAME}: Video/audio paused but tab is hidden - continuing in background mode`)
       // Keep isPlaying true so background sync can work
       return
     }
+    console.log(`${NAME}: Video/audio paused - stopping funscript sync and device`)
     mediaPlayer.isPlaying = false
     stopFunscriptSync()
-    $("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
+    // Stop device when paused - don't keep running
+    if (devices.length > 0 && client.connected) {
+      console.log(`${NAME}: Calling stopAllDeviceActions...`)
+      stopAllDeviceActions().then(() => {
+        console.log(`${NAME}: Device stopped on pause`)
+      }).catch((e) => {
+        console.error(`${NAME}: Failed to stop device on pause:`, e)
+      })
+    } else {
+      console.log(`${NAME}: Not stopping device - devices: ${devices.length}, connected: ${client.connected}`)
+    }
+    $("#intiface-chat-funscript-info").text("Paused - Device stopped").css("color", "#FFA500")
   }
-  
+
   video.onended = () => {
+    console.log(`${NAME}: Video onended event fired`)
     mediaPlayer.isPlaying = false
     stopFunscriptSync()
-    
+
     if ($("#intiface-menu-loop").is(":checked")) {
       video.currentTime = 0
       mediaPlayer.lastActionIndex = 0
@@ -3386,6 +3493,8 @@ function setupChatVideoEventListeners() {
       stopAllDeviceActions()
     }
   }
+
+  console.log(`${NAME}: Video event listeners setup complete`)
 }
 
 // Update Funscript UI in chat panel
@@ -3489,17 +3598,27 @@ function clearChatFunscriptVisualizer() {
 function checkForVideoMentions(text) {
   // Match various patterns:
   // - "plays filename.mp4"
-  // - "filename.mp4"
+  // - "filename.mp4" (no spaces in filename)
   // - <video:filename.mp4>
+  // - <media:PLAY: filename with spaces.mp4>
   // - "playing filename.mp4"
   // - "load filename.mp4"
-  
+
   const patterns = [
+    // Match <media:PLAY: filename.mp4> format (handles spaces in filename)
+    /<media:PLAY:\s*([^>]+\.mp4)>/i,
+    // Match <video:filename.mp4> format
+    /<video:\s*([^>]+\.mp4)>/i,
+    // Match play/load commands with quoted filenames (handles spaces)
+    /(?:play|playing|loads?|show|watch)\s+(?:the\s+)?(?:video\s+)?["']([^"']+\.mp4)["']/i,
+    // Match play commands with unquoted filenames (no spaces)
     /(?:play|playing|loads?|show|watch)\s+(?:the\s+)?(?:video\s+)?["']?([^"'\s<>]+\.mp4)["']?/i,
-    /["']?([^"'\s<>]+\.mp4)["']?/i,
-    /<video[:\s]+([^>]+\.mp4)>/i
+    // Match standalone quoted filenames
+    /["']([^"']+\.mp4)["']/i,
+    // Match standalone unquoted filenames (no spaces, no angle brackets)
+    /\b([^"'\s<>]+\.mp4)\b/i
   ]
-  
+
   for (const pattern of patterns) {
     const match = text.match(pattern)
     if (match) {
@@ -3508,7 +3627,7 @@ function checkForVideoMentions(text) {
       return filename
     }
   }
-  
+
   return null
 }
 
