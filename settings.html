@@ -23,18 +23,28 @@
       <button id="intiface-rescan-button" class="menu_button" style="display: none; margin-left: 8px;">
         <i class="fa-solid fa-rotate"></i>
       </button>
+      <div style="display: flex; align-items: center; margin-left: 15px;">
+        <input type="checkbox" id="intiface-auto-connect-toggle" style="margin-right: 8px;">
+        <label for="intiface-auto-connect-toggle" style="font-size: 0.9em;">Auto-connect</label>
+      </div>
     </div>
-    <div class="flex-container alignitemscenter" style="margin-top: 10px;">
-      <input type="checkbox" id="intiface-auto-connect-toggle" style="margin-right: 8px;">
-      <label for="intiface-auto-connect-toggle">Auto-connect on load</label>
-    </div>
-    <div class="flex-container alignitemscenter" style="margin-top: 5px; margin-left: 24px;">
-      <input type="checkbox" id="intiface-chat-control-toggle" style="margin-right: 8px;">
-      <label for="intiface-chat-control-toggle" style="font-size: 0.9em;">Enable chat-based device control</label>
-    </div>
-    <div class="flex-container alignitemscenter" style="margin-top: 10px;">
-      <input type="checkbox" id="intiface-function-calling-toggle" style="margin-right: 8px;">
-      <label for="intiface-function-calling-toggle">Enable AI Function Calling</label>
+
+    <!-- AI Control Mode Selection -->
+    <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 4px;">
+      <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+        <i class="fa-solid fa-robot"></i> AI Control Mode
+      </div>
+      <div class="flex-container alignitemscenter" style="margin-top: 5px;">
+        <input type="radio" name="intiface-ai-mode" id="intiface-chat-control-toggle" value="chat" style="margin-right: 8px;">
+        <label for="intiface-chat-control-toggle" style="font-size: 0.9em;">Chat-based device control</label>
+      </div>
+      <div class="flex-container alignitemscenter" style="margin-top: 8px;">
+        <input type="radio" name="intiface-ai-mode" id="intiface-function-calling-toggle" value="function" style="margin-right: 8px;">
+        <label for="intiface-function-calling-toggle" style="font-size: 0.9em;">AI Function Calling</label>
+      </div>
+      <div style="margin-top: 8px; font-size: 0.75em; color: #888; padding: 6px; background: rgba(0,0,0,0.1); border-radius: 3px;">
+        Select one mode to enable AI control over devices and media playback
+      </div>
     </div>
     <div style="margin-top: 10px; font-size: 0.85em; color: #888; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
       <strong>AI Control:</strong> Use function calls or chat commands to control devices and media playback

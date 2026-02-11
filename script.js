@@ -975,8 +975,8 @@ async function connect() {
     attachDeviceEventHandlers()
 
     // Re-register function tools after connection (if enabled)
-    const functionCallingEnabled = localStorage.getItem("intiface-function-calling-enabled") !== "false"
-    if (functionCallingEnabled) {
+    const aiMode = localStorage.getItem("intiface-ai-mode") || "none"
+    if (aiMode === "function") {
       registerFunctionTools()
     }
 
@@ -2678,37 +2678,57 @@ $(async () => {
       }
     })
 
-    // Load and set up chat control toggle
-    chatControlEnabled = localStorage.getItem("intiface-chat-control") === "true"
-    $("#intiface-chat-control-toggle").prop("checked", chatControlEnabled)
+// Load and set up AI control mode (radio buttons)
+  const savedAIMode = localStorage.getItem("intiface-ai-mode") || "none"
+  chatControlEnabled = savedAIMode === "chat"
+  const functionCallingEnabled = savedAIMode === "function"
+  
+  // Set initial radio button states
+  if (savedAIMode === "chat") {
+    $("#intiface-chat-control-toggle").prop("checked", true)
+  } else if (savedAIMode === "function") {
+    $("#intiface-function-calling-toggle").prop("checked", true)
+  }
 
-    // Handle chat control toggle
-    $("#intiface-chat-control-toggle").on("change", function () {
-      chatControlEnabled = $(this).prop("checked")
-      localStorage.setItem("intiface-chat-control", chatControlEnabled)
-      console.log(`${NAME}: Chat-based control ${chatControlEnabled ? 'enabled' : 'disabled'}`)
-      updatePrompt()
-    })
-
-    // Load and set up function calling toggle
-    const functionCallingEnabled = localStorage.getItem("intiface-function-calling-enabled") !== "false"
-    $("#intiface-function-calling-toggle").prop("checked", functionCallingEnabled)
-
-    // Handle function calling toggle
-    $("#intiface-function-calling-toggle").on("change", function () {
-      const enabled = $(this).prop("checked")
-      localStorage.setItem("intiface-function-calling-enabled", enabled)
+  // Handle chat control radio button
+  $("#intiface-chat-control-toggle").on("change", function () {
+    if ($(this).prop("checked")) {
+      chatControlEnabled = true
+      localStorage.setItem("intiface-ai-mode", "chat")
+      localStorage.setItem("intiface-chat-control", "true")
+      localStorage.setItem("intiface-function-calling-enabled", "false")
+      
+      // Disable function calling
       const context = getContext()
-      if (enabled) {
-        registerFunctionTools()
-        console.log(`${NAME}: Function calling enabled`)
-      } else {
-        if (context.unregisterFunctionTool) {
-          unregisterFunctionTools()
-        }
-        console.log(`${NAME}: Function calling disabled`)
+      if (context.unregisterFunctionTool) {
+        unregisterFunctionTools()
       }
-    })
+      
+      console.log(`${NAME}: AI mode switched to chat-based control`)
+      updatePrompt()
+    }
+  })
+
+  // Handle function calling radio button
+  $("#intiface-function-calling-toggle").on("change", function () {
+    if ($(this).prop("checked")) {
+      chatControlEnabled = false
+      localStorage.setItem("intiface-ai-mode", "function")
+      localStorage.setItem("intiface-chat-control", "false")
+      localStorage.setItem("intiface-function-calling-enabled", "true")
+      
+      // Enable function calling
+      registerFunctionTools()
+      
+      console.log(`${NAME}: AI mode switched to function calling`)
+      updatePrompt()
+    }
+  })
+  
+  // Initialize function calling if it was enabled
+  if (savedAIMode === "function") {
+    registerFunctionTools()
+  }
     
     // Handle preset button clicks (delegated)
     $(document).on('click', '.preset-btn', async function() {
@@ -2771,13 +2791,16 @@ $(async () => {
     // Attach device event handlers
     attachDeviceEventHandlers()
 
-    // Register function tools for AI control (if enabled)
-    const initialFunctionCalling = localStorage.getItem("intiface-function-calling-enabled") !== "false"
-    if (initialFunctionCalling) {
-      registerFunctionTools()
-    } else {
-      console.log(`${NAME}: Function calling disabled by user`)
-    }
+// Register function tools for AI control (if enabled)
+  const aiMode = localStorage.getItem("intiface-ai-mode") || "none"
+  if (aiMode === "function") {
+    registerFunctionTools()
+    console.log(`${NAME}: Function calling enabled`)
+  } else if (aiMode === "chat") {
+    console.log(`${NAME}: Chat-based control enabled`)
+  } else {
+    console.log(`${NAME}: AI control disabled`)
+  }
 
     // Set up chat-based control event listeners
     eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived)
