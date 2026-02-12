@@ -6301,24 +6301,6 @@ $("#intiface-use-internal-proxy").on("change", function() {
     saveMediaPlayerAppearance()
 })
   
-<<<<<<< Updated upstream
-    // Handle reset button
-    $("#intiface-reset-appearance-btn").on("click", function() {
-        $("#intiface-menu-opacity").val(50)
-        $("#intiface-menu-video-opacity").val(100)
-        $("#intiface-menu-width").val(100)
-        $("#intiface-menu-position").val("top")
-        $("#intiface-menu-zindex").val(1)
-        $("#intiface-menu-show-filename").prop("checked", true)
-        $("#intiface-menu-show-border").prop("checked", true)
-        $("#intiface-menu-opacity-display").text("50%")
-        $("#intiface-menu-video-opacity-display").text("100%")
-        $("#intiface-menu-width-display").text("1.0x")
-        $("#intiface-menu-zindex-display").text("1")
-        applyMediaPlayerAppearance()
-        saveMediaPlayerAppearance()
-    })
-=======
 // Handle reset button
 $("#intiface-reset-appearance-btn").on("click", function() {
     $("#intiface-menu-opacity").val(50)
@@ -6338,7 +6320,6 @@ $("#intiface-reset-appearance-btn").on("click", function() {
     applyMediaPlayerAppearance()
     saveMediaPlayerAppearance()
 })
->>>>>>> Stashed changes
 
   console.log(`${NAME}: Media player initialized`)
 
@@ -6357,10 +6338,7 @@ function loadMediaPlayerAppearance() {
     const savedZIndex = localStorage.getItem("intiface-player-zindex")
     const savedShowFilename = localStorage.getItem("intiface-player-show-filename")
     const savedShowBorder = localStorage.getItem("intiface-player-show-border")
-<<<<<<< Updated upstream
-=======
     const savedUseProxy = localStorage.getItem("intiface-player-use-proxy")
->>>>>>> Stashed changes
 
     if (savedOpacity) {
         $("#intiface-menu-opacity").val(savedOpacity)
@@ -6394,8 +6372,6 @@ function loadMediaPlayerAppearance() {
     if (savedShowBorder !== null) {
         $("#intiface-menu-show-border").prop("checked", savedShowBorder === "true")
     }
-<<<<<<< Updated upstream
-=======
 
     if (savedUseProxy === "true") {
         $("#intiface-use-internal-proxy").prop("checked", true)
@@ -6405,7 +6381,6 @@ function loadMediaPlayerAppearance() {
             $("#intiface-use-internal-proxy").prop("checked", false)
         })
     }
->>>>>>> Stashed changes
 }
 
 // Save appearance settings
@@ -6417,10 +6392,7 @@ function saveMediaPlayerAppearance() {
     const zindex = $("#intiface-menu-zindex").val()
     const showFilename = $("#intiface-menu-show-filename").is(":checked")
     const showBorder = $("#intiface-menu-show-border").is(":checked")
-<<<<<<< Updated upstream
-=======
     const useProxy = $("#intiface-use-internal-proxy").is(":checked")
->>>>>>> Stashed changes
 
     localStorage.setItem("intiface-player-opacity", opacity)
     localStorage.setItem("intiface-player-video-opacity", videoOpacity)
@@ -6429,10 +6401,7 @@ function saveMediaPlayerAppearance() {
     localStorage.setItem("intiface-player-zindex", zindex)
     localStorage.setItem("intiface-player-show-filename", showFilename)
     localStorage.setItem("intiface-player-show-border", showBorder)
-<<<<<<< Updated upstream
-=======
     localStorage.setItem("intiface-player-use-proxy", useProxy)
->>>>>>> Stashed changes
 }
 
 // Apply appearance settings to media player
@@ -6495,15 +6464,6 @@ function applyMediaPlayerAppearance() {
         videoPlayer.css("opacity", videoOpacity)
     }
   
-<<<<<<< Updated upstream
-  // Apply filename visibility
-  const filenameDiv = $("#intiface-chat-video-filename")
-  if (filenameDiv.length > 0) {
-    if (showFilename) {
-      filenameDiv.show()
-    } else {
-      filenameDiv.hide()
-=======
 // Apply filename visibility
     const filenameDiv = $("#intiface-chat-video-filename")
     if (filenameDiv.length > 0) {
@@ -6595,7 +6555,6 @@ function updateProxyStatus(running, errorMessage = null) {
         statusEl.html(`<i class="fa-solid fa-circle-exclamation" style="color: #f44336; font-size: 0.6em; margin-right: 5px;"></i>Error: ${errorMessage}`)
     } else {
         statusEl.hide()
->>>>>>> Stashed changes
     }
 }
 
