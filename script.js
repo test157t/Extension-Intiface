@@ -3874,8 +3874,10 @@ function updateButtonStates(isConnected) {
 async function connect() {
   console.log(`${NAME}: connect() called`)
   try {
-    const serverIp = $("#intiface-ip-input").val()
-    const serverUrl = `ws://${serverIp}`
+    const serverIp = $("#intiface-ip-input").val().replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '')
+    // Use wss:// for HTTPS pages, ws:// for HTTP pages (browser security requirement)
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://'
+    const serverUrl = `${protocol}${serverIp}`
     console.log(`${NAME}: Connecting to ${serverUrl}`)
     localStorage.setItem("intiface-server-ip", serverIp) // Save on connect
     connector = new buttplug.ButtplugBrowserWebsocketClientConnector(serverUrl)
