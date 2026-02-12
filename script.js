@@ -6254,11 +6254,19 @@ $("#intiface-menu-intensity").on("input", function() {
     saveMediaPlayerAppearance()
   })
   
-  // Handle position dropdown
-  $("#intiface-menu-position").on("change", function() {
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-  })
+    // Handle position dropdown
+    $("#intiface-menu-position").on("change", function() {
+        applyMediaPlayerAppearance()
+        saveMediaPlayerAppearance()
+    })
+
+    // Handle z-index slider
+    $("#intiface-menu-zindex").on("input", function() {
+        const zindex = parseInt($(this).val())
+        $("#intiface-menu-zindex-display").text(zindex)
+        applyMediaPlayerAppearance()
+        saveMediaPlayerAppearance()
+    })
   
   // Handle video opacity slider
   $("#intiface-menu-video-opacity").on("input", function() {
@@ -6280,20 +6288,22 @@ $("#intiface-menu-intensity").on("input", function() {
     saveMediaPlayerAppearance()
   })
   
-  // Handle reset button
-  $("#intiface-reset-appearance-btn").on("click", function() {
-    $("#intiface-menu-opacity").val(50)
-    $("#intiface-menu-video-opacity").val(100)
-    $("#intiface-menu-width").val(100)
-    $("#intiface-menu-position").val("top")
-    $("#intiface-menu-show-filename").prop("checked", true)
-    $("#intiface-menu-show-border").prop("checked", true)
-    $("#intiface-menu-opacity-display").text("50%")
-    $("#intiface-menu-video-opacity-display").text("100%")
-    $("#intiface-menu-width-display").text("1.0x")
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-  })
+    // Handle reset button
+    $("#intiface-reset-appearance-btn").on("click", function() {
+        $("#intiface-menu-opacity").val(50)
+        $("#intiface-menu-video-opacity").val(100)
+        $("#intiface-menu-width").val(100)
+        $("#intiface-menu-position").val("top")
+        $("#intiface-menu-zindex").val(1)
+        $("#intiface-menu-show-filename").prop("checked", true)
+        $("#intiface-menu-show-border").prop("checked", true)
+        $("#intiface-menu-opacity-display").text("50%")
+        $("#intiface-menu-video-opacity-display").text("100%")
+        $("#intiface-menu-width-display").text("1.0x")
+        $("#intiface-menu-zindex-display").text("1")
+        applyMediaPlayerAppearance()
+        saveMediaPlayerAppearance()
+    })
 
   console.log(`${NAME}: Media player initialized`)
 
@@ -6305,67 +6315,76 @@ refreshMenuMediaList().catch(e => {
 
 // Load saved appearance settings
 function loadMediaPlayerAppearance() {
-  const savedOpacity = localStorage.getItem("intiface-player-opacity")
-  const savedVideoOpacity = localStorage.getItem("intiface-player-video-opacity")
-  const savedWidth = localStorage.getItem("intiface-player-width")
-  const savedPosition = localStorage.getItem("intiface-player-position")
-  const savedShowFilename = localStorage.getItem("intiface-player-show-filename")
-  const savedShowBorder = localStorage.getItem("intiface-player-show-border")
-  
-  if (savedOpacity) {
-    $("#intiface-menu-opacity").val(savedOpacity)
-    $("#intiface-menu-opacity-display").text(`${savedOpacity}%`)
-  }
-  
-  if (savedVideoOpacity) {
-    $("#intiface-menu-video-opacity").val(savedVideoOpacity)
-    $("#intiface-menu-video-opacity-display").text(`${savedVideoOpacity}%`)
-  }
-  
-  if (savedWidth) {
-    $("#intiface-menu-width").val(savedWidth)
-    const scale = (savedWidth / 100).toFixed(1)
-    $("#intiface-menu-width-display").text(`${scale}x`)
-  }
-  
-  if (savedPosition) {
-    $("#intiface-menu-position").val(savedPosition)
-  }
-  
-  if (savedShowFilename !== null) {
-    $("#intiface-menu-show-filename").prop("checked", savedShowFilename === "true")
-  }
-  
-  if (savedShowBorder !== null) {
-    $("#intiface-menu-show-border").prop("checked", savedShowBorder === "true")
-  }
+    const savedOpacity = localStorage.getItem("intiface-player-opacity")
+    const savedVideoOpacity = localStorage.getItem("intiface-player-video-opacity")
+    const savedWidth = localStorage.getItem("intiface-player-width")
+    const savedPosition = localStorage.getItem("intiface-player-position")
+    const savedZIndex = localStorage.getItem("intiface-player-zindex")
+    const savedShowFilename = localStorage.getItem("intiface-player-show-filename")
+    const savedShowBorder = localStorage.getItem("intiface-player-show-border")
+
+    if (savedOpacity) {
+        $("#intiface-menu-opacity").val(savedOpacity)
+        $("#intiface-menu-opacity-display").text(`${savedOpacity}%`)
+    }
+
+    if (savedVideoOpacity) {
+        $("#intiface-menu-video-opacity").val(savedVideoOpacity)
+        $("#intiface-menu-video-opacity-display").text(`${savedVideoOpacity}%`)
+    }
+
+    if (savedWidth) {
+        $("#intiface-menu-width").val(savedWidth)
+        const scale = (savedWidth / 100).toFixed(1)
+        $("#intiface-menu-width-display").text(`${scale}x`)
+    }
+
+    if (savedPosition) {
+        $("#intiface-menu-position").val(savedPosition)
+    }
+
+    if (savedZIndex) {
+        $("#intiface-menu-zindex").val(savedZIndex)
+        $("#intiface-menu-zindex-display").text(savedZIndex)
+    }
+
+    if (savedShowFilename !== null) {
+        $("#intiface-menu-show-filename").prop("checked", savedShowFilename === "true")
+    }
+
+    if (savedShowBorder !== null) {
+        $("#intiface-menu-show-border").prop("checked", savedShowBorder === "true")
+    }
 }
 
 // Save appearance settings
 function saveMediaPlayerAppearance() {
-  const opacity = $("#intiface-menu-opacity").val()
-  const videoOpacity = $("#intiface-menu-video-opacity").val()
-  const width = $("#intiface-menu-width").val()
-  const position = $("#intiface-menu-position").val()
-  const showFilename = $("#intiface-menu-show-filename").is(":checked")
-  const showBorder = $("#intiface-menu-show-border").is(":checked")
-  
-  localStorage.setItem("intiface-player-opacity", opacity)
-  localStorage.setItem("intiface-player-video-opacity", videoOpacity)
-  localStorage.setItem("intiface-player-width", width)
-  localStorage.setItem("intiface-player-position", position)
-  localStorage.setItem("intiface-player-show-filename", showFilename)
-  localStorage.setItem("intiface-player-show-border", showBorder)
+    const opacity = $("#intiface-menu-opacity").val()
+    const videoOpacity = $("#intiface-menu-video-opacity").val()
+    const width = $("#intiface-menu-width").val()
+    const position = $("#intiface-menu-position").val()
+    const zindex = $("#intiface-menu-zindex").val()
+    const showFilename = $("#intiface-menu-show-filename").is(":checked")
+    const showBorder = $("#intiface-menu-show-border").is(":checked")
+
+    localStorage.setItem("intiface-player-opacity", opacity)
+    localStorage.setItem("intiface-player-video-opacity", videoOpacity)
+    localStorage.setItem("intiface-player-width", width)
+    localStorage.setItem("intiface-player-position", position)
+    localStorage.setItem("intiface-player-zindex", zindex)
+    localStorage.setItem("intiface-player-show-filename", showFilename)
+    localStorage.setItem("intiface-player-show-border", showBorder)
 }
 
 // Apply appearance settings to media player
 function applyMediaPlayerAppearance() {
-  const opacity = parseInt($("#intiface-menu-opacity").val()) / 100
-  const videoOpacity = parseInt($("#intiface-menu-video-opacity").val()) / 100
-  const width = parseInt($("#intiface-menu-width").val())
-  const position = $("#intiface-menu-position").val()
-  const showFilename = $("#intiface-menu-show-filename").is(":checked")
-  const showBorder = $("#intiface-menu-show-border").is(":checked")
+    const opacity = parseInt($("#intiface-menu-opacity").val()) / 100
+    const videoOpacity = parseInt($("#intiface-menu-video-opacity").val()) / 100
+    const width = parseInt($("#intiface-menu-width").val())
+    const position = $("#intiface-menu-position").val()
+    const zindex = parseInt($("#intiface-menu-zindex").val())
+    const showFilename = $("#intiface-menu-show-filename").is(":checked")
+    const showBorder = $("#intiface-menu-show-border").is(":checked")
   
   const panel = $("#intiface-chat-media-panel")
   if (panel.length === 0) return
@@ -6399,7 +6418,7 @@ function applyMediaPlayerAppearance() {
         panel.css("top", "50%")
         panel.css("left", "50%")
         panel.css("transform", "translate(-50%, -50%)")
-        panel.css("z-index", "9999")
+        panel.css("z-index", Math.max(9999, zindex))
         panel.css("max-height", "80vh")
         panel.css("margin-bottom", "0")
     } else {
@@ -6407,7 +6426,7 @@ function applyMediaPlayerAppearance() {
         panel.css("top", "")
         panel.css("left", "")
         panel.css("transform", "")
-        panel.css("z-index", "")
+        panel.css("z-index", zindex)
         panel.css("max-height", "")
         panel.css("margin-bottom", "10px")
     }

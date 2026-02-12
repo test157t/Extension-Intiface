@@ -341,13 +341,28 @@ Chastity Caretaker Modes
 </div>
 </div>
 
-        <div style="margin-bottom: 10px;">
-          <div style="font-size: 0.75em; margin-bottom: 5px;">Player Position</div>
-          <select id="intiface-menu-position" style="width: 100%; padding: 4px; font-size: 0.8em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 3px; color: inherit;">
-            <option value="top">Top of chat</option>
-            <option value="center">Center screen</option>
-          </select>
-        </div>
+<div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.75em; margin-bottom: 5px;">Player Position</div>
+                    <select id="intiface-menu-position" style="width: 100%; padding: 4px; font-size: 0.8em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 3px; color: inherit;">
+                        <option value="top">Top of chat</option>
+                        <option value="center">Center screen</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
+                        <span>Z-Index (stacking order)</span>
+                        <span id="intiface-menu-zindex-display" style="color: #64B5F6;">1</span>
+                    </div>
+                    <input type="range" id="intiface-menu-zindex" min="1" max="100" value="1" style="width: 100%;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.65em; color: #666; margin-top: 2px;">
+                        <span>1</span>
+                        <span>100</span>
+                    </div>
+                    <div style="font-size: 0.65em; color: #888; margin-top: 3px; font-style: italic;">
+                        Higher values appear above other elements
+                    </div>
+                </div>
 
         <div>
           <button id="intiface-reset-appearance-btn" class="menu_button" style="width: 100%; font-size: 0.75em; padding: 5px;">
