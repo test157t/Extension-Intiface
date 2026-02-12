@@ -3128,7 +3128,7 @@ updateStatus(`Disconnect failed: ${e.message}`, true)
 }
 }
 
-// Handle device scan command
+// Handle device scan command - appends device list to the last message
 async function handleDeviceScan() {
 if (!client.connected) {
 updateStatus('Cannot scan - not connected to Intiface', true)
@@ -3138,25 +3138,139 @@ return
 
 try {
 updateStatus('Scanning for devices...')
-console.log(`${NAME}: Starting device scan`)
+console.log(`${NAME}: === DEVICE SCAN STARTED ===`)
+console.log(`${NAME}: Client connected: ${client.connected}`)
+console.log(`${NAME}: Current device count before scan: ${devices.length}`)
+
+// Set scanning flag
+isScanningForDevices = true
 
 // Start scanning
+console.log(`${NAME}: Calling client.startScanning()...`)
 await client.startScanning()
+console.log(`${NAME}: client.startScanning() completed`)
 
 // Scan for 5 seconds then stop
 setTimeout(async () => {
 try {
+console.log(`${NAME}: === DEVICE SCAN STOPPING ===`)
+console.log(`${NAME}: Current device count before stop: ${devices.length}`)
+console.log(`${NAME}: Is scanning flag: ${isScanningForDevices}`)
+
 await client.stopScanning()
+console.log(`${NAME}: client.stopScanning() completed`)
+
+// Clear scanning flag
+isScanningForDevices = false
+
+// Wait a moment for devices to be added to the devices array
+console.log(`${NAME}: Waiting for device events to process...`)
+await new Promise(resolve => setTimeout(resolve, 800))
+
 const deviceCount = devices.length
+console.log(`${NAME}: === DEVICE SCAN COMPLETE ===`)
+console.log(`${NAME}: Final device count: ${deviceCount}`)
 if (deviceCount > 0) {
-updateStatus(`Scan complete - ${deviceCount} device(s) found`)
+console.log(`${NAME}: Devices:`, devices.map(d => d.name).join(', '))
+}
+
+// Build device list block for the AI
+let deviceListBlock
+if (deviceCount === 0) {
+deviceListBlock = `
+
+---
+**Device Scan Results** (0 devices found)
+
+\`\`\`
+No devices detected. Make sure your device is:
+- Turned on and in pairing mode
+- Within Bluetooth range
+- Not connected to another app
+\`\`\``
 } else {
-updateStatus('Scan complete - no devices found')
+const deviceInfoList = devices.map((dev, idx) => {
+const devType = getDeviceType(dev)
+const hasVibe = dev.vibrateAttributes && dev.vibrateAttributes.length > 0
+const vibeCount = hasVibe ? dev.vibrateAttributes.length : 0
+const hasLinear = dev.messageAttributes?.LinearCmd !== undefined
+const hasOscillate = dev.messageAttributes?.OscillateCmd !== undefined
+
+let capabilities = []
+if (hasVibe) capabilities.push(`${vibeCount}x vibrate`)
+if (hasLinear) capabilities.push('linear')
+if (hasOscillate) capabilities.push('oscillate')
+
+return `${idx + 1}. ${dev.name} [${devType}] - ${capabilities.join(', ') || 'unknown'}`
+}).join('\n')
+
+deviceListBlock = `
+
+---
+**Device Scan Results** (${deviceCount} device${deviceCount > 1 ? 's' : ''} connected)
+
+\`\`\`
+${deviceInfoList}
+\`\`\`
+
+Use device commands to control:
+- <deviceName:VIBRATE: 50> - Set vibration intensity (0-100)
+- <deviceName:OSCILLATE: 75> - Set oscillation (0-100)
+- <deviceName:LINEAR: start=0, end=100, duration=1000> - Linear motion
+- <deviceName:PRESET: tease> - Use preset patterns
+- <deviceName:WAVEFORM: sine, min=10, max=80, duration=5000> - Waveform patterns`}
+
+// Get the last message in chat and append the device list
+const context = getContext()
+const chat = context.chat
+if (chat && chat.length > 0) {
+// Find the last message (from the AI, not user)
+let lastMessageIndex = chat.length - 1
+while (lastMessageIndex >= 0 && chat[lastMessageIndex].is_user) {
+lastMessageIndex--
+}
+
+if (lastMessageIndex >= 0) {
+const lastMessage = chat[lastMessageIndex]
+// Check if device list was already appended to avoid duplicates
+if (lastMessage.mes && lastMessage.mes.includes('**Device Scan Results**')) {
+updateStatus(`Device list already exists in message`)
+console.log(`${NAME}: Device list already appended to message ${lastMessageIndex}`)
+return
+}
+
+// Append device list to the message
+lastMessage.mes = (lastMessage.mes || '') + deviceListBlock
+
+// Update the message UI directly following SillyTavern's pattern
+const messageElement = $(`.mes[mesid="${lastMessageIndex}"]`)
+console.log(`${NAME}: Looking for message element with mesid=${lastMessageIndex}, found:`, messageElement.length > 0)
+if (messageElement.length) {
+const mesBlock = messageElement.find('.mes_block')
+console.log(`${NAME}: Found mes_block:`, mesBlock.length > 0)
+const formattedText = messageFormatting(lastMessage.mes, lastMessage.name, lastMessage.is_system, lastMessage.is_user, lastMessageIndex, {}, false)
+const mesText = mesBlock.find('.mes_text')
+console.log(`${NAME}: Found mes_text:`, mesText.length > 0, 'Message length:', lastMessage.mes.length)
+mesText.empty().append(formattedText)
+addCopyToCodeBlocks(messageElement)
+console.log(`${NAME}: Device list UI updated successfully`)
+}
+
+updateStatus(`Scan complete - ${deviceCount} device(s) found`)
+console.log(`${NAME}: Device list appended to message ${lastMessageIndex}`)
+} else {
+updateStatus('No assistant message to append device list to', true)
+}
+} else {
+updateStatus('No chat messages found', true)
 }
 } catch (e) {
 console.log(`${NAME}: Stop scanning failed:`, e)
+updateStatus(`Scan error: ${e.message}`, true)
 }
 }, 5000)
+
+console.log(`${NAME}: Device scan timer set for 5000ms`)
 
 } catch (e) {
 updateStatus(`Scan failed: ${e.message}`, true)
@@ -5243,11 +5357,11 @@ function attachDeviceEventHandlers() {
   client.removeAllListeners("deviceadded")
   client.removeAllListeners("deviceremoved")
 
-  // Wrap device event handlers with logging
-  client.on("deviceadded", (newDevice) => {
-    console.log(`${NAME}: Device added event - ${newDevice.name} (index: ${newDevice.index})`)
-    handleDeviceAdded(newDevice)
-  })
+// Wrap device event handlers with logging
+client.on("deviceadded", (newDevice) => {
+console.log(`${NAME}: Device added event - ${newDevice.name} (index: ${newDevice.index}, scanning: ${isScanningForDevices})`)
+handleDeviceAdded(newDevice)
+})
   client.on("deviceremoved", (removedDevice) => {
     console.log(`${NAME}: Device removed event - ${removedDevice.name} (index: ${removedDevice.index})`)
     handleDeviceRemoved(removedDevice)
@@ -5255,6 +5369,9 @@ function attachDeviceEventHandlers() {
 
   console.log(`${NAME}: Device event handlers attached`)
 }
+
+// Flag to track if we're currently scanning
+let isScanningForDevices = false
 
 // Stop all device actions immediately
 async function stopAllDeviceActions() {
@@ -6263,33 +6380,42 @@ function applyMediaPlayerAppearance() {
     panel.css("border", "none")
   }
   
-  // Apply width
-  panel.css("width", `${width}%`)
+// Apply scale to both width and height
+    panel.css("width", `${width}%`)
+    
+    // Scale the video player - width controls the size
+    const videoPlayer = $("#intiface-chat-video-player")
+    const videoContainer = $("#intiface-chat-video-container")
+    if (videoContainer.length > 0) {
+        // Scale the container width
+        videoContainer.css("width", `${width}%`)
+        videoContainer.css("margin", "0 auto")
+    }
+    // Video will scale naturally with height: auto
   
-  // Apply position
-  if (position === "center") {
-    panel.css("position", "fixed")
-    panel.css("top", "50%")
-    panel.css("left", "50%")
-    panel.css("transform", "translate(-50%, -50%)")
-    panel.css("z-index", "9999")
-    panel.css("max-height", "80vh")
-    panel.css("margin-bottom", "0")
-  } else {
-    panel.css("position", "")
-    panel.css("top", "")
-    panel.css("left", "")
-    panel.css("transform", "")
-    panel.css("z-index", "")
-    panel.css("max-height", "")
-    panel.css("margin-bottom", "10px")
-  }
-  
-  // Apply video opacity
-  const videoPlayer = $("#intiface-chat-video-player")
-  if (videoPlayer.length > 0) {
-    videoPlayer.css("opacity", videoOpacity)
-  }
+    // Apply position
+    if (position === "center") {
+        panel.css("position", "fixed")
+        panel.css("top", "50%")
+        panel.css("left", "50%")
+        panel.css("transform", "translate(-50%, -50%)")
+        panel.css("z-index", "9999")
+        panel.css("max-height", "80vh")
+        panel.css("margin-bottom", "0")
+    } else {
+        panel.css("position", "")
+        panel.css("top", "")
+        panel.css("left", "")
+        panel.css("transform", "")
+        panel.css("z-index", "")
+        panel.css("max-height", "")
+        panel.css("margin-bottom", "10px")
+    }
+
+    // Apply video opacity (videoPlayer already declared above)
+    if (videoPlayer.length > 0) {
+        videoPlayer.css("opacity", videoOpacity)
+    }
   
   // Apply filename visibility
   const filenameDiv = $("#intiface-chat-video-filename")
@@ -6666,20 +6792,21 @@ function createChatSidebarPanel() {
     return
   }
   
-  // Create panel HTML
-  const panelHtml = `
-    <div id="intiface-chat-media-panel" style="display: none; width: 100%; position: relative; margin-bottom: 10px;">
-      <!-- Video Player -->
-      <div id="intiface-chat-video-container" style="position: relative; display: inline-block; width: 100%;">
-        <video id="intiface-chat-video-player" style="width: 100%; max-height: 350px; border-radius: 4px; background: #000;" controls></video>
-        
-        <!-- Close button - appears on hover -->
-        <button id="intiface-close-chat-media" class="menu_button" style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; font-size: 0.8em; opacity: 0; transition: opacity 0.2s; z-index: 10;" title="Close">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
+    // Create panel HTML
+    const panelHtml = `
+    <div id="intiface-chat-media-panel" style="display: none; width: 100%; position: relative; margin-bottom: 10px; padding: 0;">
+        <!-- Video Player -->
+        <div id="intiface-chat-video-container" style="position: relative; width: 100%; line-height: 0;">
+            <video id="intiface-chat-video-player" style="width: 100%; height: auto; border-radius: 4px; background: #000; display: block;" controls>
+                Your browser does not support the video tag.
+            </video>
+            <!-- Close button - appears on hover -->
+            <button id="intiface-close-chat-media" class="menu_button" style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; font-size: 0.8em; opacity: 0; transition: opacity 0.2s; z-index: 10;" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
     </div>
-  `
+    `
   
   // Insert BEFORE chat element (outside of it) so it remains visible when VoiceForge hides chat in call mode
   const chatElement = $("#chat")
