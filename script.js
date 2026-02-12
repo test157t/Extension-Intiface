@@ -5553,16 +5553,16 @@ $(async () => {
 
     $("#intiface-rescan-button").on("click", rescanLastMessage)
 
-    // Load saved IP address
-    const savedIp = localStorage.getItem("intiface-server-ip")
-    if (savedIp) {
-      $("#intiface-ip-input").val(savedIp)
-    }
+// Load saved IP address
+const savedIp = localStorage.getItem("intiface-server-ip")
+if (savedIp) {
+  $("#intiface-ip-input").val(savedIp)
+}
 
-    // Save IP on change
-    $("#intiface-ip-input").on("input", function () {
-      localStorage.setItem("intiface-server-ip", $(this).val())
-    })
+// Save IP on change
+$("#intiface-ip-input").on("input", function () {
+  localStorage.setItem("intiface-server-ip", $(this).val())
+})
 
     // Load and set up auto-connect checkbox
     const savedAutoConnect = localStorage.getItem("intiface-auto-connect")
@@ -6496,17 +6496,12 @@ async function startInternalProxy() {
         })
 
         const data = await response.json()
-        if (data.success) {
-            console.log(`${NAME}: Proxy started on port ${data.port}`)
-            proxyProcess = { pid: data.pid, port: data.port }
-            updateProxyStatus(true)
-            
-            // Update connection to use proxy
-            const proxyUrl = `127.0.0.1:${data.port}`
-            $("#intiface-ip-input").val(proxyUrl)
-        } else {
-            throw new Error(data.error || 'Unknown error')
-        }
+    if (data.success) {
+      console.log(`${NAME}: Proxy started on port ${data.port}`)
+      proxyProcess = { pid: data.pid, port: data.port }
+      updateProxyStatus(true)
+      // Note: The IP input field is NOT changed - proxy runs internally
+    }
     } catch (err) {
         console.error(`${NAME}: Failed to start proxy:`, err)
         updateProxyStatus(false, err.message)
@@ -6528,20 +6523,20 @@ async function stopInternalProxy() {
             headers: getRequestHeaders()
         })
 
-        const data = await response.json()
-        if (data.success) {
-            console.log(`${NAME}: Proxy stopped`)
-            proxyProcess = null
-            updateProxyStatus(false)
-        } else {
-            throw new Error(data.error || 'Unknown error')
-        }
-    } catch (err) {
-        console.error(`${NAME}: Failed to stop proxy:`, err)
-        // Force reset even if error
-        proxyProcess = null
-        updateProxyStatus(false)
+    const data = await response.json()
+    if (data.success) {
+      console.log(`${NAME}: Proxy stopped`)
+      proxyProcess = null
+      updateProxyStatus(false)
+      // Note: The IP input field is NOT changed - proxy runs internally
     }
+  } catch (err) {
+    console.error(`${NAME}: Failed to stop proxy:`, err)
+    // Force reset even if error
+    proxyProcess = null
+    updateProxyStatus(false)
+    // Note: The IP input field is NOT changed - proxy runs internally
+  }
 }
 
 // Update the proxy status display
