@@ -1,7 +1,7 @@
 // SillyTavern Server Plugin for Intiface Central Launcher
 // Place this file in: SillyTavern/plugins/intiface-launcher.js
 
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
@@ -19,12 +19,109 @@ function getUserHome() {
 
 // Asset directories for media serving
 let assetPaths = {
-  intifaceMedia: null,
-  funscript: null
+    intifaceMedia: null,
+    funscript: null
 };
 
+// WebSocket Proxy process tracking
+let proxyProcess = null;
+const PROXY_PORT = 12346;
+const INFACE_PORT = 12345;
+
+// Start the internal WebSocket proxy
+async function startProxy() {
+    if (proxyProcess) {
+        console.log('[Intiface Launcher] Proxy already running');
+        return { success: true, port: PROXY_PORT, pid: proxyProcess.pid };
+    }
+
+    const proxyScriptPath = path.join(__dirname, 'intiface-proxy.js');
+    
+    if (!fs.existsSync(proxyScriptPath)) {
+        throw new Error('Proxy script not found: ' + proxyScriptPath);
+    }
+
+    return new Promise((resolve, reject) => {
+        try {
+            console.log(`[Intiface Launcher] Starting proxy: ${proxyScriptPath}`);
+            
+            proxyProcess = spawn('node', [proxyScriptPath], {
+                detached: false,
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proxyProcess.stdout.on('data', (data) => {
+                stdout += data.toString();
+                console.log(`[Intiface Proxy] ${data.toString().trim()}`);
+            });
+
+            proxyProcess.stderr.on('data', (data) => {
+                stderr += data.toString();
+                console.error(`[Intiface Proxy Error] ${data.toString().trim()}`);
+            });
+
+            proxyProcess.on('error', (err) => {
+                console.error('[Intiface Launcher] Proxy process error:', err);
+                proxyProcess = null;
+                reject(err);
+            });
+
+            proxyProcess.on('exit', (code) => {
+                if (code !== 0) {
+                    console.error(`[Intiface Launcher] Proxy exited with code ${code}`);
+                }
+                proxyProcess = null;
+            });
+
+            // Wait a moment for the proxy to start
+            setTimeout(() => {
+                if (proxyProcess && proxyProcess.pid) {
+                    console.log(`[Intiface Launcher] Proxy started with PID ${proxyProcess.pid}`);
+                    resolve({ success: true, port: PROXY_PORT, pid: proxyProcess.pid });
+                } else {
+                    reject(new Error('Proxy failed to start'));
+                }
+            }, 1000);
+
+        } catch (err) {
+            reject(err);
+        }
+    });
+}
+
+// Stop the internal WebSocket proxy
+async function stopProxy() {
+    if (!proxyProcess) {
+        console.log('[Intiface Launcher] Proxy not running');
+        return { success: true, message: 'Proxy not running' };
+    }
+
+    return new Promise((resolve) => {
+        console.log(`[Intiface Launcher] Stopping proxy (PID ${proxyProcess.pid})`);
+        
+        // Try graceful kill first
+        proxyProcess.kill('SIGTERM');
+        
+        // Force kill after 2 seconds if still running
+        setTimeout(() => {
+            if (proxyProcess) {
+                try {
+                    proxyProcess.kill('SIGKILL');
+                } catch (e) {
+                    // Process might already be dead
+                }
+                proxyProcess = null;
+            }
+            resolve({ success: true, message: 'Proxy stopped' });
+        }, 2000);
+    });
+}
+
 async function init(router) {
-  console.log('[Intiface Launcher Plugin] Initializing...');
+    console.log('[Intiface Launcher Plugin] Initializing...');
 
   // Setup asset paths
   const basePath = process.cwd();
@@ -58,13 +155,44 @@ async function init(router) {
   console.log(`  /assets/intiface_media -> ${assetPaths.intifaceMedia}`);
   console.log(`  /assets/funscript -> ${assetPaths.funscript}`);
 
-  // Test endpoint - just returns success
-  router.get('/test', (req, res) => {
-    console.log('[Intiface Launcher] Test endpoint called');
-    res.json({ success: true, message: 'Plugin is working' });
-  });
+// Test endpoint - just returns success
+    router.get('/test', (req, res) => {
+        console.log('[Intiface Launcher] Test endpoint called');
+        res.json({ success: true, message: 'Plugin is working' });
+    });
 
-  // Endpoint to start Intiface Central
+    // Endpoint to start WebSocket proxy
+    router.post('/proxy/start', async (req, res) => {
+        try {
+            const result = await startProxy();
+            res.json(result);
+        } catch (error) {
+            console.error('[Intiface Launcher] Proxy start error:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
+    });
+
+    // Endpoint to stop WebSocket proxy
+    router.post('/proxy/stop', async (req, res) => {
+        try {
+            const result = await stopProxy();
+            res.json(result);
+        } catch (error) {
+            console.error('[Intiface Launcher] Proxy stop error:', error);
+            res.status(500).json({ success: false, error: error.message });
+        }
+    });
+
+    // Endpoint to get proxy status
+    router.get('/proxy/status', (req, res) => {
+        res.json({
+            success: true,
+            running: proxyProcess !== null,
+            port: PROXY_PORT
+        });
+    });
+
+    // Endpoint to start Intiface Central
   router.post('/start', async (req, res) => {
     try {
       const { exePath } = req.body;
@@ -320,12 +448,15 @@ async function init(router) {
     });
   });
 
-  console.log('[Intiface Launcher Plugin] Initialized');
-  console.log('[Intiface Launcher] Endpoints:');
-  console.log('  POST /api/plugins/intiface-launcher/start');
-  console.log('  GET  /api/plugins/intiface-launcher/media');
-  console.log('  GET  /api/plugins/intiface-launcher/funscript');
-  console.log('  GET  /api/plugins/intiface-launcher/asset-paths');
+    console.log('[Intiface Launcher Plugin] Initialized');
+    console.log('[Intiface Launcher] Endpoints:');
+    console.log(' POST /api/plugins/intiface-launcher/start');
+    console.log(' POST /api/plugins/intiface-launcher/proxy/start');
+    console.log(' POST /api/plugins/intiface-launcher/proxy/stop');
+    console.log(' GET  /api/plugins/intiface-launcher/proxy/status');
+    console.log(' GET  /api/plugins/intiface-launcher/media');
+    console.log(' GET  /api/plugins/intiface-launcher/funscript');
+    console.log(' GET  /api/plugins/intiface-launcher/asset-paths');
 }
 
 module.exports = { info, init };

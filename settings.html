@@ -307,9 +307,28 @@ Chastity Caretaker Modes
           <input type="text" id="intiface-exe-path" class="text_pole" placeholder="C:\Program Files\Intiface\IntifaceCentral.exe" style="flex-grow: 1;">
         </div>
         <div id="intiface-exe-status" style="margin-top: 5px; font-size: 0.75em; color: #888;">Not configured</div>
-      <div style="margin-top: 5px; font-size: 0.7em; color: #666; font-style: italic;">
-        Type the full path to IntifaceCentral.exe
-      </div>
+                <div style="margin-top: 5px; font-size: 0.7em; color: #666; font-style: italic;">
+                    Type the full path to IntifaceCentral.exe
+                </div>
+
+                <!-- WebSocket Proxy Settings -->
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+                        <i class="fa-solid fa-network-wired"></i> WebSocket Proxy
+                    </div>
+                    <label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
+                        <input type="checkbox" id="intiface-use-internal-proxy" style="margin-right: 8px;">
+                        <i class="fa-solid fa-server" style="margin-right: 5px; color: #64B5F6;"></i>
+                        Use Internal Proxy (for HTTPS access)
+                    </label>
+                    <div style="font-size: 0.7em; color: #888; margin-top: 5px; font-style: italic;">
+                        Forwards local Intiface connection through secure WebSocket proxy. Required when accessing SillyTavern via HTTPS.
+                    </div>
+                    <div id="intiface-proxy-status" style="font-size: 0.75em; color: #888; margin-top: 8px; display: none;">
+                        <i class="fa-solid fa-circle" style="color: #4CAF50; font-size: 0.6em; margin-right: 5px;"></i>
+                        Proxy running on port 12346
+                    </div>
+                </div>
 
       <!-- Player Appearance Settings -->
       <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">

@@ -6284,12 +6284,24 @@ $("#intiface-menu-intensity").on("input", function() {
     saveMediaPlayerAppearance()
   })
   
-  // Handle show border checkbox
-  $("#intiface-menu-show-border").on("change", function() {
+// Handle show border checkbox
+$("#intiface-menu-show-border").on("change", function() {
     applyMediaPlayerAppearance()
     saveMediaPlayerAppearance()
-  })
+})
+
+// Handle internal proxy checkbox
+$("#intiface-use-internal-proxy").on("change", function() {
+    const useProxy = $(this).is(":checked")
+    if (useProxy) {
+        startInternalProxy()
+    } else {
+        stopInternalProxy()
+    }
+    saveMediaPlayerAppearance()
+})
   
+<<<<<<< Updated upstream
     // Handle reset button
     $("#intiface-reset-appearance-btn").on("click", function() {
         $("#intiface-menu-opacity").val(50)
@@ -6306,6 +6318,27 @@ $("#intiface-menu-intensity").on("input", function() {
         applyMediaPlayerAppearance()
         saveMediaPlayerAppearance()
     })
+=======
+// Handle reset button
+$("#intiface-reset-appearance-btn").on("click", function() {
+    $("#intiface-menu-opacity").val(50)
+    $("#intiface-menu-video-opacity").val(100)
+    $("#intiface-menu-width").val(100)
+    $("#intiface-menu-position").val("top")
+    $("#intiface-menu-zindex").val(1)
+    $("#intiface-menu-show-filename").prop("checked", true)
+    $("#intiface-menu-show-border").prop("checked", true)
+    $("#intiface-use-internal-proxy").prop("checked", false)
+    $("#intiface-menu-opacity-display").text("50%")
+    $("#intiface-menu-video-opacity-display").text("100%")
+    $("#intiface-menu-width-display").text("1.0x")
+    $("#intiface-menu-zindex-display").text("1")
+    // Stop proxy if running
+    stopInternalProxy()
+    applyMediaPlayerAppearance()
+    saveMediaPlayerAppearance()
+})
+>>>>>>> Stashed changes
 
   console.log(`${NAME}: Media player initialized`)
 
@@ -6324,6 +6357,10 @@ function loadMediaPlayerAppearance() {
     const savedZIndex = localStorage.getItem("intiface-player-zindex")
     const savedShowFilename = localStorage.getItem("intiface-player-show-filename")
     const savedShowBorder = localStorage.getItem("intiface-player-show-border")
+<<<<<<< Updated upstream
+=======
+    const savedUseProxy = localStorage.getItem("intiface-player-use-proxy")
+>>>>>>> Stashed changes
 
     if (savedOpacity) {
         $("#intiface-menu-opacity").val(savedOpacity)
@@ -6357,6 +6394,18 @@ function loadMediaPlayerAppearance() {
     if (savedShowBorder !== null) {
         $("#intiface-menu-show-border").prop("checked", savedShowBorder === "true")
     }
+<<<<<<< Updated upstream
+=======
+
+    if (savedUseProxy === "true") {
+        $("#intiface-use-internal-proxy").prop("checked", true)
+        // Auto-start proxy on load if enabled
+        startInternalProxy().catch(e => {
+            console.log(`${NAME}: Failed to auto-start proxy:`, e.message)
+            $("#intiface-use-internal-proxy").prop("checked", false)
+        })
+    }
+>>>>>>> Stashed changes
 }
 
 // Save appearance settings
@@ -6368,6 +6417,10 @@ function saveMediaPlayerAppearance() {
     const zindex = $("#intiface-menu-zindex").val()
     const showFilename = $("#intiface-menu-show-filename").is(":checked")
     const showBorder = $("#intiface-menu-show-border").is(":checked")
+<<<<<<< Updated upstream
+=======
+    const useProxy = $("#intiface-use-internal-proxy").is(":checked")
+>>>>>>> Stashed changes
 
     localStorage.setItem("intiface-player-opacity", opacity)
     localStorage.setItem("intiface-player-video-opacity", videoOpacity)
@@ -6376,6 +6429,10 @@ function saveMediaPlayerAppearance() {
     localStorage.setItem("intiface-player-zindex", zindex)
     localStorage.setItem("intiface-player-show-filename", showFilename)
     localStorage.setItem("intiface-player-show-border", showBorder)
+<<<<<<< Updated upstream
+=======
+    localStorage.setItem("intiface-player-use-proxy", useProxy)
+>>>>>>> Stashed changes
 }
 
 // Apply appearance settings to media player
@@ -6438,6 +6495,7 @@ function applyMediaPlayerAppearance() {
         videoPlayer.css("opacity", videoOpacity)
     }
   
+<<<<<<< Updated upstream
   // Apply filename visibility
   const filenameDiv = $("#intiface-chat-video-filename")
   if (filenameDiv.length > 0) {
@@ -6445,8 +6503,100 @@ function applyMediaPlayerAppearance() {
       filenameDiv.show()
     } else {
       filenameDiv.hide()
+=======
+// Apply filename visibility
+    const filenameDiv = $("#intiface-chat-video-filename")
+    if (filenameDiv.length > 0) {
+        if (showFilename) {
+            filenameDiv.show()
+        } else {
+            filenameDiv.hide()
+        }
     }
-  }
+}
+
+// ==========================================
+// WEBSOCKET PROXY MANAGEMENT
+// ==========================================
+
+let proxyProcess = null // Track the proxy subprocess
+
+// Start the internal WebSocket proxy
+async function startInternalProxy() {
+    if (proxyProcess) {
+        console.log(`${NAME}: Proxy already running`)
+        updateProxyStatus(true)
+        return
+    }
+
+    try {
+        const response = await fetch('/api/plugins/intiface-launcher/proxy/start', {
+            method: 'POST',
+            headers: getRequestHeaders()
+        })
+
+        const data = await response.json()
+        if (data.success) {
+            console.log(`${NAME}: Proxy started on port ${data.port}`)
+            proxyProcess = { pid: data.pid, port: data.port }
+            updateProxyStatus(true)
+            
+            // Update connection to use proxy
+            const proxyUrl = `127.0.0.1:${data.port}`
+            $("#intiface-ip-input").val(proxyUrl)
+        } else {
+            throw new Error(data.error || 'Unknown error')
+        }
+    } catch (err) {
+        console.error(`${NAME}: Failed to start proxy:`, err)
+        updateProxyStatus(false, err.message)
+        throw err
+    }
+}
+
+// Stop the internal WebSocket proxy
+async function stopInternalProxy() {
+    if (!proxyProcess) {
+        console.log(`${NAME}: Proxy not running`)
+        updateProxyStatus(false)
+        return
+    }
+
+    try {
+        const response = await fetch('/api/plugins/intiface-launcher/proxy/stop', {
+            method: 'POST',
+            headers: getRequestHeaders()
+        })
+
+        const data = await response.json()
+        if (data.success) {
+            console.log(`${NAME}: Proxy stopped`)
+            proxyProcess = null
+            updateProxyStatus(false)
+        } else {
+            throw new Error(data.error || 'Unknown error')
+        }
+    } catch (err) {
+        console.error(`${NAME}: Failed to stop proxy:`, err)
+        // Force reset even if error
+        proxyProcess = null
+        updateProxyStatus(false)
+    }
+}
+
+// Update the proxy status display
+function updateProxyStatus(running, errorMessage = null) {
+    const statusEl = $("#intiface-proxy-status")
+    if (running) {
+        statusEl.show()
+        statusEl.html('<i class="fa-solid fa-circle" style="color: #4CAF50; font-size: 0.6em; margin-right: 5px;"></i>Proxy running on port 12346')
+    } else if (errorMessage) {
+        statusEl.show()
+        statusEl.html(`<i class="fa-solid fa-circle-exclamation" style="color: #f44336; font-size: 0.6em; margin-right: 5px;"></i>Error: ${errorMessage}`)
+    } else {
+        statusEl.hide()
+>>>>>>> Stashed changes
+    }
 }
 
 // Refresh media list for menu
