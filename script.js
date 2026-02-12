@@ -45,6 +45,43 @@ let modeSettings = {
   chastityCaretaker: true
 }
 
+// Global intensity scale (affects ALL playback, not just funscripts)
+// AI can override this via INTENSITY command
+let globalIntensityScale = 100 // Default 100% (no scaling)
+
+// Mode-specific intensity multipliers (stacked on top of global intensity)
+// These add slight variations based on the mode's character
+// User can adjust these per mode (50%-150% range)
+let modeIntensityMultipliers = {
+  denialDomina: 1.0,
+  milkMaid: 1.0,
+  petTraining: 1.0,
+  sissySurrender: 1.0,
+  prejacPrincess: 1.0,
+  roboticRuination: 1.0,
+  evilEdgingMistress: 1.0,
+  frustrationFairy: 1.0,
+  hypnoHelper: 1.0,
+  chastityCaretaker: 1.0
+}
+
+// Apply global intensity to values with optional mode scaling
+function applyIntensityScale(values, modeName = null) {
+  // Get base scale from global intensity (default 100%)
+  let scale = globalIntensityScale / 100
+  
+  // Apply mode-specific multiplier if provided
+  if (modeName && modeIntensityMultipliers[modeName]) {
+    scale *= modeIntensityMultipliers[modeName]
+  }
+  
+  // Scale values around neutral point (50) to preserve dynamic range
+  return values.map(v => {
+    const scaled = 50 + (v - 50) * scale
+    return Math.min(100, Math.max(0, Math.round(scaled)))
+  })
+}
+
 // Initialize timer worker
 function initTimerWorker() {
   try {
@@ -1914,7 +1951,35 @@ function generateWaveformValues(pattern, steps, min, max) {
   return values
 }
 
-// Execute waveform pattern on device
+// Generate dual motor waveform values with phase offset for motor 2
+function generateDualMotorWaveform(pattern, steps, min, max) {
+  const motor1Values = []
+  const motor2Values = []
+  const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
+  const range = max - min
+
+  for (let i = 0; i < steps; i++) {
+    // Motor 1: Normal phase
+    const phase1 = i / steps
+    const normalized1 = generator(phase1, 1)
+    const value1 = min + (normalized1 * range)
+    motor1Values.push(Math.max(0, Math.min(100, Math.round(value1))))
+
+    // Motor 2: Phase offset by 0.5 (opposite timing) for diversity
+    const phase2 = ((i / steps) + 0.5) % 1
+    const normalized2 = generator(phase2, 1)
+    const value2 = min + (normalized2 * range)
+    motor2Values.push(Math.max(0, Math.min(100, Math.round(value2))))
+  }
+
+  return { motor1: motor1Values, motor2: motor2Values }
+}
+
+// Check if device has multiple motors
+function getMotorCount(device) {
+  if (!device || !device.vibrateAttributes) return 1
+  return device.vibrateAttributes.length || 1
+}
 async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
   const targetDevice = devices[deviceIndex] || devices[0]
   if (!targetDevice) {
@@ -1943,16 +2008,38 @@ async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
   
   if (config.type === 'waveform') {
     const steps = Math.floor(config.duration / 100) // 100ms resolution
-    const values = generateWaveformValues(config.pattern, steps, config.min, config.max)
     const intervals = Array(steps).fill(100)
-
-    const patternResult = await executePattern({
-      pattern: values,
-      intervals: intervals,
-      loop: config.cycles || 1
-    }, 'vibrate', deviceIndex)
-
-    updateStatus(`${deviceName}: ${presetName} pattern (${config.pattern})`)
+    
+    // Check if device has multiple motors
+    const motorCount = getMotorCount(targetDevice)
+    let patternData
+    
+    if (motorCount >= 2) {
+      // Generate dual motor pattern with phase offset
+      const dualValues = generateDualMotorWaveform(config.pattern, steps, config.min, config.max)
+      // Apply global intensity scaling
+      dualValues.motor1 = applyIntensityScale(dualValues.motor1)
+      dualValues.motor2 = applyIntensityScale(dualValues.motor2)
+      patternData = {
+        pattern: dualValues,
+        intervals: intervals,
+        loop: config.cycles || 1
+      }
+      updateStatus(`${deviceName}: ${presetName} dual-motor pattern (${config.pattern}) [${globalIntensityScale}%]`)
+    } else {
+      // Single motor - traditional approach
+      const values = generateWaveformValues(config.pattern, steps, config.min, config.max)
+      // Apply global intensity scaling
+      const scaledValues = applyIntensityScale(values)
+      patternData = {
+        pattern: scaledValues,
+        intervals: intervals,
+        loop: config.cycles || 1
+      }
+      updateStatus(`${deviceName}: ${presetName} pattern (${config.pattern}) [${globalIntensityScale}%]`)
+    }
+    
+    const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
   } else if (config.type === 'gradient') {
     await executeGradientPattern(deviceIndex, config)
     updateStatus(`${deviceName}: ${presetName} gradient`)
@@ -1969,36 +2056,62 @@ async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
 async function executeGradientPattern(deviceIndex, config) {
   const { start, end, duration, hold = 0, release = 0 } = config
   const steps = Math.floor(duration / 50) // 50ms steps
-  const values = []
+  const motor1Values = []
+  const motor2Values = []
   const intervals = []
-  
+
   // Ramp up
   for (let i = 0; i < steps; i++) {
     const progress = i / steps
-    values.push(Math.round(start + (end - start) * progress))
+    const value = Math.round(start + (end - start) * progress)
+    motor1Values.push(value)
+    // Motor 2: Inverted gradient for diversity
+    motor2Values.push(Math.round(start + (end - start) * (1 - progress)))
     intervals.push(50)
   }
-  
+
   // Hold
   if (hold > 0) {
     const holdSteps = Math.floor(hold / 100)
     for (let i = 0; i < holdSteps; i++) {
-      values.push(end)
+      motor1Values.push(end)
+      motor2Values.push(end)
       intervals.push(100)
     }
   }
-  
+
   // Release
   if (release > 0) {
     const releaseSteps = Math.floor(release / 50)
     for (let i = 0; i < releaseSteps; i++) {
       const progress = i / releaseSteps
-      values.push(Math.round(end - (end * progress)))
+      const value = Math.round(end - (end * progress))
+      motor1Values.push(value)
+      // Motor 2: Inverted release
+      motor2Values.push(Math.round(end * progress))
       intervals.push(50)
     }
   }
 
-  const patternResult = await executePattern({ pattern: values, intervals }, 'vibrate', deviceIndex)
+  // Check if device has multiple motors
+  const targetDevice = devices[deviceIndex] || devices[0]
+  const motorCount = getMotorCount(targetDevice)
+
+  // Apply global intensity scaling to gradient values
+  const scaledMotor1Values = applyIntensityScale(motor1Values)
+  const scaledMotor2Values = applyIntensityScale(motor2Values)
+
+  let patternData
+  if (motorCount >= 2) {
+    patternData = {
+      pattern: { motor1: scaledMotor1Values, motor2: scaledMotor2Values },
+      intervals
+    }
+  } else {
+    patternData = { pattern: scaledMotor1Values, intervals }
+  }
+  
+  const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
   return patternResult
 }
 
@@ -2100,19 +2213,34 @@ async function executeTeaseAndDenialMode(deviceIndex, modeName) {
     const { pattern, min, max, duration, pause } = step
 
     try {
-      const stepConfig = {
-        pattern: pattern,
-        min: min,
-        max: max,
-        duration: duration,
-        cycles: 1
+      const steps = Math.floor(duration / 100)
+      const motorCount = getMotorCount(targetDevice)
+      let patternData
+      
+      if (motorCount >= 2) {
+        // Use dual motor patterns with phase offset
+        const dualValues = generateDualMotorWaveform(pattern, steps, min, max)
+        // Apply global intensity with mode-specific scaling
+        dualValues.motor1 = applyIntensityScale(dualValues.motor1, modeName)
+        dualValues.motor2 = applyIntensityScale(dualValues.motor2, modeName)
+        patternData = {
+          pattern: dualValues,
+          intervals: Array(steps).fill(100),
+          loop: 1
+        }
+      } else {
+        // Single motor
+        const values = generateWaveformValues(pattern, steps, min, max)
+        // Apply global intensity with mode-specific scaling
+        const scaledValues = applyIntensityScale(values, modeName)
+        patternData = {
+          pattern: scaledValues,
+          intervals: Array(steps).fill(100),
+          loop: 1
+        }
       }
-
-      const patternResult = await executePattern({
-        pattern: generateWaveformValues(pattern, Math.floor(duration / 100), min, max),
-        intervals: Array(Math.floor(duration / 100)).fill(100),
-        loop: 1
-      }, 'vibrate', deviceIndex)
+      
+      const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
 
       if (pause && pause > 0) {
         updateStatus(`${deviceName}: Pausing for ${pause}ms...`)
@@ -2420,7 +2548,24 @@ function parseDeviceCommands(text) {
       continue
     }
 
-    // Parse WAVEFORM command
+    // Parse DUAL command (independent motor patterns)
+  // Format: DUAL: pattern1=sine, pattern2=sawtooth, min=10, max=80, duration=5000, cycles=3
+  const dualMatch = commandText.match(/DUAL[\s:]+pattern1[=:]?(\w+)(?:[\s,]+pattern2[=:]?(\w+))?(?:[\s,]+min[=:]?(\d+))?(?:[\s,]+max[=:]?(\d+))?(?:[\s,]+duration[=:]?(\d+))?(?:[\s,]+cycles[=:]?(\d+))?/i)
+  if (dualMatch) {
+    commands.push({
+      type: 'dual_waveform',
+      pattern1: dualMatch[1].toLowerCase(),
+      pattern2: dualMatch[2] ? dualMatch[2].toLowerCase() : dualMatch[1].toLowerCase(),
+      min: dualMatch[3] ? parseInt(dualMatch[3]) : 20,
+      max: dualMatch[4] ? parseInt(dualMatch[4]) : 80,
+      duration: dualMatch[5] ? parseInt(dualMatch[5]) : 5000,
+      cycles: dualMatch[6] ? parseInt(dualMatch[6]) : 3,
+      deviceIndex: targetDeviceIndex
+    })
+    continue
+  }
+
+  // Parse WAVEFORM command
     // Format: WAVEFORM: sine, min=10, max=80, duration=5000, cycles=3
     const waveformMatch = commandText.match(/WAVEFORM[\s:]+(\w+)(?:[\s,]+min[=:]?(\d+))?(?:[\s,]+max[=:]?(\d+))?(?:[\s,]+duration[=:]?(\d+))?(?:[\s,]+cycles[=:]?(\d+))?/i)
     if (waveformMatch) {
@@ -2452,7 +2597,19 @@ function parseDeviceCommands(text) {
       continue
     }
     
-    // Parse VIBRATE command
+    // Parse INTENSITY command for AI to set global intensity
+  // Format: INTENSITY: 150 or INTENSITY 150 (can be 0-400)
+  const intensityMatch = commandText.match(/INTENSITY[\s:]+(\d+)/i)
+  if (intensityMatch) {
+    commands.push({
+      type: 'set_intensity',
+      intensity: Math.max(0, Math.min(400, parseInt(intensityMatch[1]))),
+      deviceIndex: targetDeviceIndex
+    })
+    continue
+  }
+
+  // Parse VIBRATE command
     // Format: VIBRATE: 50 or VIBRATE 50
     const vibrateMatch = commandText.match(/VIBRATE[:\s]+(\d+)/i)
     if (vibrateMatch) {
@@ -2579,7 +2736,10 @@ function parseDeviceCommands(text) {
 
 // Execute a single command
 async function executeCommand(cmd) {
-  console.log(`${NAME}: Executing command type: ${cmd.type}`)
+  // Only log non-vibrate commands or vibrate commands without motorIndex/motorIndex 0
+  if (cmd.type !== 'vibrate' || cmd.motorIndex === undefined || cmd.motorIndex === 0) {
+    console.log(`${NAME}: Executing command type: ${cmd.type}`)
+  }
   
 // System commands can run without connection
   if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
@@ -2639,9 +2799,15 @@ async function executeCommand(cmd) {
   try {
     const deviceName = targetDevice?.displayName || targetDevice?.name || `Device ${deviceIndex}`
     
-    switch (cmd.type) {
-      
-      case 'vibrate':
+  switch (cmd.type) {
+
+  case 'set_intensity':
+    // AI sets global intensity scale (0-400%)
+    globalIntensityScale = cmd.intensity
+    updateStatus(`Global intensity set to ${cmd.intensity}% by AI`)
+    break
+
+  case 'vibrate':
         const vibrateAttrs = targetDevice.vibrateAttributes
         if (vibrateAttrs && vibrateAttrs[cmd.motorIndex]) {
           const intensity = cmd.intensity / 100
@@ -2699,16 +2865,47 @@ async function executeCommand(cmd) {
         await executeWaveformPattern(deviceIndex, cmd.presetName)
         break
       
-      case 'waveform':
-        await executeWaveformPattern(deviceIndex, 'custom', {
-          pattern: cmd.pattern,
-          min: cmd.min,
-          max: cmd.max,
-          duration: cmd.duration,
-          cycles: cmd.cycles
-        })
-        updateStatus(`${deviceName}: ${cmd.pattern} waveform (${cmd.min}-${cmd.max}%)`)
-        break
+    case 'waveform':
+      await executeWaveformPattern(deviceIndex, 'custom', {
+        pattern: cmd.pattern,
+        min: cmd.min,
+        max: cmd.max,
+        duration: cmd.duration,
+        cycles: cmd.cycles
+      })
+      updateStatus(`${deviceName}: ${cmd.pattern} waveform (${cmd.min}-${cmd.max}%)`)
+      break
+
+    case 'dual_waveform':
+      // Generate independent patterns for each motor
+      // targetDevice already declared at function scope
+      const motorCountDual = getMotorCount(targetDevice)
+      const stepsDual = Math.floor(cmd.duration / 100)
+      const intervalsDual = Array(stepsDual).fill(100)
+      
+      let patternDataDual
+      if (motorCountDual >= 2) {
+        // Generate different patterns for each motor
+        const motor1Values = generateWaveformValues(cmd.pattern1, stepsDual, cmd.min, cmd.max)
+        const motor2Values = generateWaveformValues(cmd.pattern2, stepsDual, cmd.min, cmd.max)
+        patternDataDual = {
+          pattern: { motor1: motor1Values, motor2: motor2Values },
+          intervals: intervalsDual,
+          loop: cmd.cycles || 3
+        }
+        updateStatus(`${deviceName}: dual waveform (${cmd.pattern1}/${cmd.pattern2})`)
+      } else {
+        // Single motor - use pattern1 only
+        const values = generateWaveformValues(cmd.pattern1, stepsDual, cmd.min, cmd.max)
+        patternDataDual = {
+          pattern: values,
+          intervals: intervalsDual,
+          loop: cmd.cycles || 3
+        }
+        updateStatus(`${deviceName}: ${cmd.pattern1} waveform (${cmd.min}-${cmd.max}%)`)
+      }
+      await executePattern(patternDataDual, 'vibrate', deviceIndex)
+      break
       
       case 'gradient':
         await executeGradientPattern(deviceIndex, {
@@ -2859,71 +3056,86 @@ async function handleMediaList() {
     const data = await response.json()
     if (!data.success) throw new Error(data.error || 'Unknown error')
 
-      // Get video and audio files
-      const mediaFiles = data.files?.filter(f => f.type === 'video' || f.type === 'audio') || []
+// Get video and audio files
+const mediaFiles = data.files?.filter(f => f.type === 'video' || f.type === 'audio') || []
 
-      // Build the media list for display
-      let mediaListBlock
-      if (mediaFiles.length === 0) {
-        mediaListBlock = `\n\n---\n**Media Library** (0 media files found)\n\n\`\`\`\nNo media files available in the media library.\nPlace videos/audio in: ${mediaPath}\n\`\`\``
-      } else {
-        const fileList = mediaFiles.map(file => {
-          const funscriptStatus = file.hasFunscript ? '[has funscript]' : '[no funscript]'
-          const typeLabel = file.type === 'audio' ? '[audio]' : '[video]'
-          return `${file.name} ${typeLabel} ${funscriptStatus}`
-        }).join('\n')
+// Build the media list for display
+let mediaListBlock
+if (mediaFiles.length === 0) {
+mediaListBlock = `
 
-        mediaListBlock = `\n\n---\n**Media Library** (${mediaFiles.length} media files available)\n\n\`\`\`\n${fileList}\n\`\`\`\n\nUse <media:PLAY: filename.ext> to play media with funscript sync (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg).`
-      }
+---
+**Media Library** (0 media files found)
 
-    // Get the last message in chat and append the media list
-    const context = getContext()
-    const chat = context.chat
-    if (chat && chat.length > 0) {
-      // Find the last message (from the AI, not user)
-      let lastMessageIndex = chat.length - 1
-      while (lastMessageIndex >= 0 && chat[lastMessageIndex].is_user) {
-        lastMessageIndex--
-      }
+\`\`\`
+No media files available in the media library.
+Place videos/audio in: ${mediaPath}
+\`\`\``
+} else {
+const fileList = mediaFiles.map(file => {
+const funscriptStatus = file.hasFunscript ? '[has funscript]' : '[no funscript]'
+const typeLabel = file.type === 'audio' ? '[audio]' : '[video]'
+return `${file.name} ${typeLabel} ${funscriptStatus}`
+}).join('\n')
 
-      if (lastMessageIndex >= 0) {
-        const lastMessage = chat[lastMessageIndex]
-        // Check if media list was already appended to avoid duplicates
-        if (lastMessage.mes && lastMessage.mes.includes('**Media Library**')) {
-          updateStatus(`Media list already exists in message`)
-          console.log(`${NAME}: Media list already appended to message ${lastMessageIndex}`)
-          return
-        }
-        // Append the media list to the message
-        lastMessage.mes = (lastMessage.mes || '') + mediaListBlock
-        // Save chat
-        context.saveChat()
-        // Update the message UI directly following SillyTavern's pattern
-        const messageElement = $(`.mes[mesid="${lastMessageIndex}"]`)
-        console.log(`${NAME}: Looking for message element with mesid=${lastMessageIndex}, found:`, messageElement.length > 0)
-        if (messageElement.length) {
-          const mesBlock = messageElement.find('.mes_block')
-          console.log(`${NAME}: Found mes_block:`, mesBlock.length > 0)
-          const formattedText = messageFormatting(lastMessage.mes, lastMessage.name, lastMessage.is_system, lastMessage.is_user, lastMessageIndex, {}, false)
-          const mesText = mesBlock.find('.mes_text')
-          console.log(`${NAME}: Found mes_text:`, mesText.length > 0, 'Message length:', lastMessage.mes.length)
-          mesText.empty().append(formattedText)
-          appendMediaToMessage(lastMessage, messageElement)
-          addCopyToCodeBlocks(messageElement)
-          console.log(`${NAME}: Message UI updated successfully`)
-        }
-        updateStatus(`Media list appended to last message (${mediaFiles.length} files)`)
-        console.log(`${NAME}: Media list appended to message ${lastMessageIndex}`)
-      } else {
-        updateStatus('No AI message found to append media list')
-      }
-    } else {
-      updateStatus('No chat messages found')
+mediaListBlock = `
+
+---
+**Media Library** (${mediaFiles.length} media files available)
+
+\`\`\`
+${fileList}
+\`\`\`
+
+Use <media:PLAY: filename.ext> to play media with funscript sync (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg).`
+}
+
+// Get the last message in chat and append the media list
+const context = getContext()
+const chat = context.chat
+if (chat && chat.length > 0) {
+// Find the last message (from the AI, not user)
+let lastMessageIndex = chat.length - 1
+while (lastMessageIndex >= 0 && chat[lastMessageIndex].is_user) {
+lastMessageIndex--
+}
+
+if (lastMessageIndex >= 0) {
+const lastMessage = chat[lastMessageIndex]
+// Check if media list was already appended to avoid duplicates
+if (lastMessage.mes && lastMessage.mes.includes('**Media Library**')) {
+updateStatus(`Media list already exists in message`)
+console.log(`${NAME}: Media list already appended to message ${lastMessageIndex}`)
+return
+}
+
+// Append the media list to the message
+lastMessage.mes = (lastMessage.mes || '') + mediaListBlock
+// Update the message UI directly following SillyTavern's pattern
+const messageElement = $(`.mes[mesid="${lastMessageIndex}"]`)
+console.log(`${NAME}: Looking for message element with mesid=${lastMessageIndex}, found:`, messageElement.length > 0)
+if (messageElement.length) {
+const mesBlock = messageElement.find('.mes_block')
+console.log(`${NAME}: Found mes_block:`, mesBlock.length > 0)
+const formattedText = messageFormatting(lastMessage.mes, lastMessage.name, lastMessage.is_system, lastMessage.is_user, lastMessageIndex, {}, false)
+const mesText = mesBlock.find('.mes_text')
+console.log(`${NAME}: Found mes_text:`, mesText.length > 0, 'Message length:', lastMessage.mes.length)
+mesText.empty().append(formattedText)
+addCopyToCodeBlocks(messageElement)
+console.log(`${NAME}: Message UI updated successfully`)
     }
-  } catch (e) {
-    updateStatus(`Failed to list media: ${e.message}`, true)
-    console.error(`${NAME}: Media list error:`, e)
+    updateStatus(`Media list appended to last message (${mediaFiles.length} files)`)
+    console.log(`${NAME}: Media list appended to message ${lastMessageIndex}`)
+  } else {
+    updateStatus('No AI message found to append media list')
   }
+} else {
+  updateStatus('No chat messages found')
+}
+} catch (e) {
+  updateStatus(`Failed to list media: ${e.message}`, true)
+  console.error(`${NAME}: Media list error:`, e)
+}
 }
 
 // Handle media play command
@@ -2971,6 +3183,16 @@ async function executePattern(cmd, actionType, deviceIndex = 0) {
   const intervals = cmd.intervals || [1000]
   const loopCount = cmd.loop || 1
 
+  // Check if this is a dual motor pattern
+  const isDualMotor = pattern && typeof pattern === 'object' && pattern.motor1 && pattern.motor2
+  const motor1Pattern = isDualMotor ? pattern.motor1 : pattern
+  const motor2Pattern = isDualMotor ? pattern.motor2 : null
+
+  // Get device motor count
+  const targetDevice = devices[deviceIndex] || devices[0]
+  const motorCount = getMotorCount(targetDevice)
+  const shouldUseDual = isDualMotor && motorCount >= 2
+
   let currentLoop = 0
   let patternIndex = 0
   let patternIntervalId = null
@@ -2986,17 +3208,24 @@ async function executePattern(cmd, actionType, deviceIndex = 0) {
       return
     }
 
-    const intensity = pattern[patternIndex % pattern.length]
+    const intensity = motor1Pattern[patternIndex % motor1Pattern.length]
     const interval = intervals[patternIndex % intervals.length]
 
     if (actionType === 'vibrate') {
+      // Always send to motor 1
       await executeCommand({ type: 'vibrate', intensity, motorIndex: 0, deviceIndex })
+      
+      // Send to motor 2 if available and dual pattern provided
+      if (shouldUseDual && motor2Pattern) {
+        const intensity2 = motor2Pattern[patternIndex % motor2Pattern.length]
+        await executeCommand({ type: 'vibrate', intensity: intensity2, motorIndex: 1, deviceIndex })
+      }
     } else if (actionType === 'oscillate') {
       await executeCommand({ type: 'oscillate', intensity, deviceIndex })
     }
 
     patternIndex++
-    if (patternIndex >= pattern.length) {
+    if (patternIndex >= motor1Pattern.length) {
       patternIndex = 0
       currentLoop++
     }
@@ -3431,49 +3660,120 @@ async function handleDeviceAdded(newDevice) {
     deviceDiv.append(featuresHtml)
   }
   
-  // Add device-specific presets panel
-  if (hasVibration || hasOscillate) {
-    const presets = DevicePresets[deviceType] || DevicePresets.general
-    const presetNames = Object.keys(presets)
-    
-    if (presetNames.length > 0) {
-      const presetsHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px;">Quick Presets:</div>
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${presetNames.map(preset => 
-              `<button class="menu_button preset-btn" data-preset="${preset}" data-device="${devices.length - 1}" 
-                style="padding: 4px 8px; font-size: 0.75em; border-radius: 3px;">${preset}</button>`
-            ).join('')}
-          </div>
+// Add device-specific presets panel
+if (hasVibration || hasOscillate) {
+  const presets = DevicePresets[deviceType] || DevicePresets.general
+  const presetNames = Object.keys(presets)
+
+  if (presetNames.length > 0) {
+    const deviceIndex = devices.length - 1
+    const presetsHtml = `
+    <div style="margin-top: 10px;">
+      <div id="intiface-presets-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85em; font-weight: bold;">Quick Presets</span>
+          <span id="intiface-presets-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+        </span>
+      </div>
+      <div id="intiface-presets-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+          ${presetNames.map(preset =>
+            `<button class="menu_button preset-btn" data-preset="${preset}" data-device="${deviceIndex}"
+            style="padding: 4px 8px; font-size: 0.75em; border-radius: 3px;">${preset}</button>`
+          ).join('')}
         </div>
-      `
-      deviceDiv.append(presetsHtml)
-    }
+      </div>
+    </div>
+    `
+    deviceDiv.append(presetsHtml)
   }
+}
+
+// Handle presets toggle click (delegated for dynamically added devices)
+$(document).on("click", "[id^='intiface-presets-toggle-']", function() {
+  const toggleId = $(this).attr("id")
+  const deviceIndex = toggleId.replace("intiface-presets-toggle-", "")
+  const content = $(`#intiface-presets-content-${deviceIndex}`)
+  const arrow = $(`#intiface-presets-arrow-${deviceIndex}`)
+  
+  if (content.is(":visible")) {
+    content.slideUp(200)
+    arrow.css("transform", "rotate(0deg)")
+  } else {
+    content.slideDown(200)
+    arrow.css("transform", "rotate(180deg)")
+  }
+})
+
+// Handle motors toggle click (delegated for dynamically added devices)
+$(document).on("click", "[id^='intiface-motors-toggle-']", function() {
+  const toggleId = $(this).attr("id")
+  const deviceIndex = toggleId.replace("intiface-motors-toggle-", "")
+  const content = $(`#intiface-motors-content-${deviceIndex}`)
+  const arrow = $(`#intiface-motors-arrow-${deviceIndex}`)
+  
+  if (content.is(":visible")) {
+    content.slideUp(200)
+    arrow.css("transform", "rotate(0deg)")
+  } else {
+    content.slideDown(200)
+    arrow.css("transform", "rotate(180deg)")
+  }
+})
+
+// Handle waveform toggle click (delegated for dynamically added devices)
+$(document).on("click", "[id^='intiface-waveform-toggle-']", function() {
+  const toggleId = $(this).attr("id")
+  const deviceIndex = toggleId.replace("intiface-waveform-toggle-", "")
+  const content = $(`#intiface-waveform-content-${deviceIndex}`)
+  const arrow = $(`#intiface-waveform-arrow-${deviceIndex}`)
+  
+  if (content.is(":visible")) {
+    content.slideUp(200)
+    arrow.css("transform", "rotate(0deg)")
+  } else {
+    content.slideDown(200)
+    arrow.css("transform", "rotate(180deg)")
+  }
+})
   
   // Add per-motor controls if multiple motors
   if (hasVibration && device.vibrateAttributes.length > 1) {
+    const deviceIndex = devices.length - 1
     const motorsHtml = `
-      <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
-        <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px;">Individual Motor Control:</div>
+    <div style="margin-top: 10px;">
+      <div id="intiface-motors-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85em; font-weight: bold;">Individual Motor Control</span>
+          <span id="intiface-motors-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+        </span>
+      </div>
+      <div id="intiface-motors-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
         ${device.vibrateAttributes.map((attr, idx) => `
-          <div style="margin: 5px 0;">
-            <label style="font-size: 0.8em;">Motor ${idx + 1}:</label>
-            <input type="range" class="motor-slider" data-device="${devices.length - 1}" data-motor="${idx}" 
-              min="0" max="100" value="0" style="width: 100%; margin-top: 3px;">
-          </div>
+        <div style="margin: 5px 0;">
+          <label style="font-size: 0.8em;">Motor ${idx + 1}:</label>
+          <input type="range" class="motor-slider" data-device="${deviceIndex}" data-motor="${idx}"
+          min="0" max="100" value="0" style="width: 100%; margin-top: 3px;">
+        </div>
         `).join('')}
       </div>
+    </div>
     `
     deviceDiv.append(motorsHtml)
   }
-  
+
   // Add waveform generator controls
   if (hasVibration) {
+    const deviceIndex = devices.length - 1
     const waveformHtml = `
-      <div style="margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
-        <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px;">Waveform Generator:</div>
+    <div style="margin-top: 10px;">
+      <div id="intiface-waveform-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.85em; font-weight: bold;">Waveform Generator</span>
+          <span id="intiface-waveform-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+        </span>
+      </div>
+      <div id="intiface-waveform-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
         <div style="display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 5px;">
           ${Object.keys(WaveformPatterns).map(wave => {
             const isTeasingPattern = ['heartbeat', 'tickle', 'edging', 'ruin', 'teasing', 'desperation', 'mercy', 'tease_escalate', 'stop_start', 'random_tease', 'micro_tease', 'abrupt_edge', 'build_and_ruin', 'rapid_micro', 'peak_and_drop', 'ghost_tease', 'erratic', 'held_edge', 'flutter'].includes(wave)
@@ -3484,37 +3784,46 @@ async function handleDeviceAdded(newDevice) {
             } else if (isMilkingPattern) {
               style = 'background: rgba(100,255,100,0.2); border: 1px solid rgba(100,255,100,0.4);'
             }
-            return `<button class="menu_button waveform-btn" data-waveform="${wave}" data-device="${devices.length - 1}"
-              style="padding: 3px 6px; font-size: 0.7em; border-radius: 3px; ${style}">${wave}</button>`
+            return `<button class="menu_button waveform-btn" data-waveform="${wave}" data-device="${deviceIndex}"
+            style="padding: 3px 6px; font-size: 0.7em; border-radius: 3px; ${style}">${wave}</button>`
           }).join('')}
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.75em;">
-<div>Min: <input type="number" id="waveform-min-${devices.length - 1}" value="20" min="0" max="100" style="width: 50px; background: #000; color: #fff;"></div>
-<div>Max: <input type="number" id="waveform-max-${devices.length - 1}" value="80" min="0" max="100" style="width: 50px; background: #000; color: #fff;"></div>
-<div>Dur: <input type="number" id="waveform-dur-${devices.length - 1}" value="5000" min="100" style="width: 60px; background: #000; color: #fff;"></div>
-<div>Cycles: <input type="number" id="waveform-cycles-${devices.length - 1}" value="3" min="1" style="width: 40px; background: #000; color: #fff;"></div>
+          <div>Min: <input type="number" id="waveform-min-${deviceIndex}" value="20" min="0" max="100" style="width: 50px; background: #000; color: #fff;"></div>
+          <div>Max: <input type="number" id="waveform-max-${deviceIndex}" value="80" min="0" max="100" style="width: 50px; background: #000; color: #fff;"></div>
+          <div>Dur: <input type="number" id="waveform-dur-${deviceIndex}" value="5000" min="100" style="width: 60px; background: #000; color: #fff;"></div>
+          <div>Cycles: <input type="number" id="waveform-cycles-${deviceIndex}" value="3" min="1" style="width: 40px; background: #000; color: #fff;"></div>
         </div>
       </div>
+    </div>
     `
     deviceDiv.append(waveformHtml)
   }
 
-  // Add Denial Domina mode section
+// Add Denial Domina mode section
   if (hasVibration || hasOscillate) {
+    const deviceIndex = devices.length - 1
     const denyModes = DenialDominaMode
     const modeNames = Object.keys(denyModes)
 
     if (modeNames.length > 0 && modeSettings.denialDomina) {
       const denyHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(255,100,100,0.1); border-radius: 4px; border: 1px solid rgba(255,100,100,0.3);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ff6464;">Denial Domina Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-deny-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,100,100,0.15); border-radius: 4px; border: 1px solid rgba(255,100,100,0.3);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #ff6464;">Denial Domina Modes</span>
+            <span id="intiface-deny-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-deny-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,100,100,0.1); border-radius: 4px; border: 1px solid rgba(255,100,100,0.3);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${modeNames.map(mode =>
-              `<button class="menu_button deny-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(200,50,50,0.2); border: 1px solid rgba(200,50,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button deny-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(200,50,50,0.2); border: 1px solid rgba(200,50,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(denyHtml)
     }
@@ -3524,15 +3833,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (milkModeNames.length > 0 && modeSettings.milkMaid) {
       const milkHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(100,200,100,0.1); border-radius: 4px; border: 1px solid rgba(100,200,100,0.3);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #64ff64;">Milk Maid Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-milk-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(100,200,100,0.15); border-radius: 4px; border: 1px solid rgba(100,200,100,0.3);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #64ff64;">Milk Maid Modes</span>
+            <span id="intiface-milk-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-milk-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(100,200,100,0.1); border-radius: 4px; border: 1px solid rgba(100,200,100,0.3);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${milkModeNames.map(mode =>
-              `<button class="menu_button milk-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(50,200,50,0.2); border: 1px solid rgba(50,200,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button milk-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(50,200,50,0.2); border: 1px solid rgba(50,200,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(milkHtml)
     }
@@ -3542,15 +3858,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (petModeNames.length > 0 && modeSettings.petTraining) {
       const petHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(100,100,255,0.1); border-radius: 4px; border: 1px solid rgba(100,100,255,0.3);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #6464ff;">Pet Training Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-pet-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(100,100,255,0.15); border-radius: 4px; border: 1px solid rgba(100,100,255,0.3);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #6464ff;">Pet Training Modes</span>
+            <span id="intiface-pet-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-pet-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(100,100,255,0.1); border-radius: 4px; border: 1px solid rgba(100,100,255,0.3);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${petModeNames.map(mode =>
-              `<button class="menu_button pet-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(50,50,200,0.2); border: 1px solid rgba(50,50,200,0.4);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button pet-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(50,50,200,0.2); border: 1px solid rgba(50,50,200,0.4);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(petHtml)
     }
@@ -3560,15 +3883,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (sissyModeNames.length > 0 && modeSettings.sissySurrender) {
       const sissyHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(255,100,200,0.1); border-radius: 4px; border: 1px solid rgba(255,100,200,0.3);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ff64c8;">Sissy Surrender Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-sissy-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,100,200,0.15); border-radius: 4px; border: 1px solid rgba(255,100,200,0.3);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #ff64c8;">Sissy Surrender Modes</span>
+            <span id="intiface-sissy-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-sissy-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,100,200,0.1); border-radius: 4px; border: 1px solid rgba(255,100,200,0.3);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${sissyModeNames.map(mode =>
-              `<button class="menu_button sissy-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(200,50,100,0.2); border: 1px solid rgba(200,50,100,0.4);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button sissy-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(200,50,100,0.2); border: 1px solid rgba(200,50,100,0.4);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(sissyHtml)
     }
@@ -3578,15 +3908,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (prejacModeNames.length > 0 && modeSettings.prejacPrincess) {
       const prejacHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(0,255,255,0.1); border-radius: 4px; border: 1px solid rgba(0,255,255,0.3);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #00ffff;">Prejac Princess Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-prejac-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,255,255,0.15); border-radius: 4px; border: 1px solid rgba(0,255,255,0.3);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #00ffff;">Prejac Princess Modes</span>
+            <span id="intiface-prejac-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-prejac-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,255,255,0.1); border-radius: 4px; border: 1px solid rgba(0,255,255,0.3);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${prejacModeNames.map(mode =>
-              `<button class="menu_button prejac-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(0,200,255,0.2); border: 1px solid rgba(0,200,255,0.4);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button prejac-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(0,200,255,0.2); border: 1px solid rgba(0,200,255,0.4);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(prejacHtml)
     }
@@ -3596,15 +3933,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (roboticModeNames.length > 0 && modeSettings.roboticRuination) {
       const roboticHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(200,200,200,0.1); border-radius: 4px; border: 1px solid rgba(200,200,200,0.3);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ff00ff;">Robotic Ruination Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-robotic-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(200,200,200,0.15); border-radius: 4px; border: 1px solid rgba(200,200,200,0.3);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #ff00ff;">Robotic Ruination Modes</span>
+            <span id="intiface-robotic-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-robotic-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(200,200,200,0.1); border-radius: 4px; border: 1px solid rgba(200,200,200,0.3);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${roboticModeNames.map(mode =>
-              `<button class="menu_button robotic-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(150,150,150,0.2); border: 1px solid rgba(150,150,150,0.4);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button robotic-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(150,150,150,0.2); border: 1px solid rgba(150,150,150,0.4);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(roboticHtml)
     }
@@ -3614,15 +3958,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (evilModeNames.length > 0 && modeSettings.evilEdgingMistress) {
       const evilHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(128,0,128,0.15); border-radius: 4px; border: 1px solid rgba(128,0,128,0.4);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #bf00ff;">Evil Edging Mistress Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-evil-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(128,0,128,0.2); border-radius: 4px; border: 1px solid rgba(128,0,128,0.4);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #bf00ff;">Evil Edging Mistress Modes</span>
+            <span id="intiface-evil-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-evil-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(128,0,128,0.15); border-radius: 4px; border: 1px solid rgba(128,0,128,0.4);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${evilModeNames.map(mode =>
-              `<button class="menu_button evil-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(100,0,100,0.25); border: 1px solid rgba(100,0,100,0.5);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button evil-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(100,0,100,0.25); border: 1px solid rgba(100,0,100,0.5);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(evilHtml)
     }
@@ -3632,15 +3983,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (frustrationModeNames.length > 0 && modeSettings.frustrationFairy) {
       const frustrationHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(255,255,0,0.1); border-radius: 4px; border: 1px solid rgba(255,255,0,0.4);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ffff00;">Frustration Fairy Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-frustration-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,255,0,0.15); border-radius: 4px; border: 1px solid rgba(255,255,0,0.4);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #ffff00;">Frustration Fairy Modes</span>
+            <span id="intiface-frustration-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-frustration-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,255,0,0.1); border-radius: 4px; border: 1px solid rgba(255,255,0,0.4);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${frustrationModeNames.map(mode =>
-              `<button class="menu_button frustration-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(255,255,0,0.2); border: 1px solid rgba(255,255,0,0.5);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button frustration-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(255,255,0,0.2); border: 1px solid rgba(255,255,0,0.5);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(frustrationHtml)
     }
@@ -3650,15 +4008,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (hypnoModeNames.length > 0 && modeSettings.hypnoHelper) {
       const hypnoHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(138,43,226,0.15); border-radius: 4px; border: 1px solid rgba(138,43,226,0.4);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #dda0dd;">Hypno Helper Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-hypno-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(138,43,226,0.2); border-radius: 4px; border: 1px solid rgba(138,43,226,0.4);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #dda0dd;">Hypno Helper Modes</span>
+            <span id="intiface-hypno-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-hypno-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(138,43,226,0.15); border-radius: 4px; border: 1px solid rgba(138,43,226,0.4);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${hypnoModeNames.map(mode =>
-              `<button class="menu_button hypno-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(138,43,226,0.2); border: 1px solid rgba(138,43,226,0.4);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button hypno-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(138,43,226,0.2); border: 1px solid rgba(138,43,226,0.4);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(hypnoHtml)
     }
@@ -3668,15 +4033,22 @@ async function handleDeviceAdded(newDevice) {
 
     if (chastityModeNames.length > 0 && modeSettings.chastityCaretaker) {
       const chastityHtml = `
-        <div style="margin-top: 10px; padding: 8px; background: rgba(255,192,203,0.15); border-radius: 4px; border: 1px solid rgba(255,192,203,0.4);">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px; color: #ffc0cb;">Chastity Caretaker Modes:</div>
+      <div style="margin-top: 10px;">
+        <div id="intiface-chastity-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,192,203,0.2); border-radius: 4px; border: 1px solid rgba(255,192,203,0.4);">
+          <span style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85em; font-weight: bold; color: #ffc0cb;">Chastity Caretaker Modes</span>
+            <span id="intiface-chastity-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+          </span>
+        </div>
+        <div id="intiface-chastity-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,192,203,0.15); border-radius: 4px; border: 1px solid rgba(255,192,203,0.4);">
           <div style="display: flex; flex-wrap: wrap; gap: 5px;">
             ${chastityModeNames.map(mode =>
-              `<button class="menu_button chastity-mode-btn" data-mode="${mode}" data-device="${devices.length - 1}"
-                style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(255,192,203,0.2); border: 1px solid rgba(255,192,203,0.5);">${mode.replace(/_/g, ' ')}</button>`
+              `<button class="menu_button chastity-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(255,192,203,0.2); border: 1px solid rgba(255,192,203,0.5);">${mode.replace(/_/g, ' ')}</button>`
             ).join('')}
           </div>
         </div>
+      </div>
       `
       deviceDiv.append(chastityHtml)
     }
@@ -4802,29 +5174,47 @@ $(async () => {
       console.log(`${NAME}: Auto-connect set to: ${$(this).is(":checked")}`)
     })
 
-    // Load and set up mode settings
-    const savedModeSettings = localStorage.getItem("intiface-mode-settings")
-    if (savedModeSettings) {
-      try {
-        modeSettings = JSON.parse(savedModeSettings)
-      } catch (e) {
-        console.error(`${NAME}: Failed to parse mode settings`, e)
-      }
-    }
+// Load and set up mode settings
+const savedModeSettings = localStorage.getItem("intiface-mode-settings")
+if (savedModeSettings) {
+  try {
+    modeSettings = JSON.parse(savedModeSettings)
+  } catch (e) {
+    console.error(`${NAME}: Failed to parse mode settings`, e)
+  }
+}
 
-    // Set mode checkboxes from loaded settings
-    $("#intiface-mode-denial-domina").prop("checked", modeSettings.denialDomina)
-    $("#intiface-mode-milk-maid").prop("checked", modeSettings.milkMaid)
-    $("#intiface-mode-pet-training").prop("checked", modeSettings.petTraining)
-    $("#intiface-mode-sissy-surrender").prop("checked", modeSettings.sissySurrender)
-    $("#intiface-mode-prejac-princess").prop("checked", modeSettings.prejacPrincess)
-    $("#intiface-mode-robotic-ruination").prop("checked", modeSettings.roboticRuination)
-    $("#intiface-mode-evil-edging-mistress").prop("checked", modeSettings.evilEdgingMistress)
-    $("#intiface-mode-frustration-fairy").prop("checked", modeSettings.frustrationFairy)
-    $("#intiface-mode-hypno-helper").prop("checked", modeSettings.hypnoHelper)
-    $("#intiface-mode-chastity-caretaker").prop("checked", modeSettings.chastityCaretaker)
+// Load mode intensity multipliers
+const savedModeIntensities = localStorage.getItem("intiface-mode-intensities")
+if (savedModeIntensities) {
+  try {
+    const parsed = JSON.parse(savedModeIntensities)
+    // Merge with defaults to ensure all modes exist
+    modeIntensityMultipliers = { ...modeIntensityMultipliers, ...parsed }
+  } catch (e) {
+    console.error(`${NAME}: Failed to parse mode intensity settings`, e)
+  }
+}
 
-    // Save mode settings on change and refresh UI
+// Set mode checkboxes from loaded settings
+$("#intiface-mode-denial-domina").prop("checked", modeSettings.denialDomina)
+$("#intiface-mode-milk-maid").prop("checked", modeSettings.milkMaid)
+$("#intiface-mode-pet-training").prop("checked", modeSettings.petTraining)
+$("#intiface-mode-sissy-surrender").prop("checked", modeSettings.sissySurrender)
+$("#intiface-mode-prejac-princess").prop("checked", modeSettings.prejacPrincess)
+$("#intiface-mode-robotic-ruination").prop("checked", modeSettings.roboticRuination)
+$("#intiface-mode-evil-edging-mistress").prop("checked", modeSettings.evilEdgingMistress)
+$("#intiface-mode-frustration-fairy").prop("checked", modeSettings.frustrationFairy)
+$("#intiface-mode-hypno-helper").prop("checked", modeSettings.hypnoHelper)
+$("#intiface-mode-chastity-caretaker").prop("checked", modeSettings.chastityCaretaker)
+
+// Save mode intensity multipliers
+const saveModeIntensity = () => {
+  localStorage.setItem("intiface-mode-intensities", JSON.stringify(modeIntensityMultipliers))
+  console.log(`${NAME}: Mode intensity settings saved`, modeIntensityMultipliers)
+}
+
+// Save mode settings on change and refresh UI
     const saveModeSettings = () => {
       modeSettings = {
         denialDomina: $("#intiface-mode-denial-domina").is(":checked"),
@@ -4854,10 +5244,133 @@ $(async () => {
     $("#intiface-mode-robotic-ruination").on("change", saveModeSettings)
     $("#intiface-mode-evil-edging-mistress").on("change", saveModeSettings)
     $("#intiface-mode-frustration-fairy").on("change", saveModeSettings)
-    $("#intiface-mode-hypno-helper").on("change", saveModeSettings)
-    $("#intiface-mode-chastity-caretaker").on("change", saveModeSettings)
+$("#intiface-mode-hypno-helper").on("change", saveModeSettings)
+$("#intiface-mode-chastity-caretaker").on("change", saveModeSettings)
 
-    // Load and set up Intiface exe path
+// Set up mode intensity sliders from loaded values
+$("#intiface-mode-intensity-denial").val(Math.round(modeIntensityMultipliers.denialDomina * 100))
+$("#intiface-mode-intensity-denial-display").text(`${Math.round(modeIntensityMultipliers.denialDomina * 100)}%`)
+$("#intiface-mode-intensity-milk").val(Math.round(modeIntensityMultipliers.milkMaid * 100))
+$("#intiface-mode-intensity-milk-display").text(`${Math.round(modeIntensityMultipliers.milkMaid * 100)}%`)
+$("#intiface-mode-intensity-pet").val(Math.round(modeIntensityMultipliers.petTraining * 100))
+$("#intiface-mode-intensity-pet-display").text(`${Math.round(modeIntensityMultipliers.petTraining * 100)}%`)
+$("#intiface-mode-intensity-sissy").val(Math.round(modeIntensityMultipliers.sissySurrender * 100))
+$("#intiface-mode-intensity-sissy-display").text(`${Math.round(modeIntensityMultipliers.sissySurrender * 100)}%`)
+$("#intiface-mode-intensity-prejac").val(Math.round(modeIntensityMultipliers.prejacPrincess * 100))
+$("#intiface-mode-intensity-prejac-display").text(`${Math.round(modeIntensityMultipliers.prejacPrincess * 100)}%`)
+$("#intiface-mode-intensity-robotic").val(Math.round(modeIntensityMultipliers.roboticRuination * 100))
+$("#intiface-mode-intensity-robotic-display").text(`${Math.round(modeIntensityMultipliers.roboticRuination * 100)}%`)
+$("#intiface-mode-intensity-evil").val(Math.round(modeIntensityMultipliers.evilEdgingMistress * 100))
+$("#intiface-mode-intensity-evil-display").text(`${Math.round(modeIntensityMultipliers.evilEdgingMistress * 100)}%`)
+$("#intiface-mode-intensity-frustration").val(Math.round(modeIntensityMultipliers.frustrationFairy * 100))
+$("#intiface-mode-intensity-frustration-display").text(`${Math.round(modeIntensityMultipliers.frustrationFairy * 100)}%`)
+$("#intiface-mode-intensity-hypno").val(Math.round(modeIntensityMultipliers.hypnoHelper * 100))
+$("#intiface-mode-intensity-hypno-display").text(`${Math.round(modeIntensityMultipliers.hypnoHelper * 100)}%`)
+$("#intiface-mode-intensity-chastity").val(Math.round(modeIntensityMultipliers.chastityCaretaker * 100))
+$("#intiface-mode-intensity-chastity-display").text(`${Math.round(modeIntensityMultipliers.chastityCaretaker * 100)}%`)
+
+// Handle mode intensity slider changes
+$("#intiface-mode-intensity-denial").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.denialDomina = val / 100
+  $("#intiface-mode-intensity-denial-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-milk").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.milkMaid = val / 100
+  $("#intiface-mode-intensity-milk-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-pet").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.petTraining = val / 100
+  $("#intiface-mode-intensity-pet-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-sissy").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.sissySurrender = val / 100
+  $("#intiface-mode-intensity-sissy-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-prejac").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.prejacPrincess = val / 100
+  $("#intiface-mode-intensity-prejac-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-robotic").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.roboticRuination = val / 100
+  $("#intiface-mode-intensity-robotic-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-evil").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.evilEdgingMistress = val / 100
+  $("#intiface-mode-intensity-evil-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-frustration").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.frustrationFairy = val / 100
+  $("#intiface-mode-intensity-frustration-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-hypno").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.hypnoHelper = val / 100
+  $("#intiface-mode-intensity-hypno-display").text(`${val}%`)
+  saveModeIntensity()
+})
+$("#intiface-mode-intensity-chastity").on("input", function() {
+  const val = parseInt($(this).val())
+  modeIntensityMultipliers.chastityCaretaker = val / 100
+  $("#intiface-mode-intensity-chastity-display").text(`${val}%`)
+  saveModeIntensity()
+})
+
+// Handle reset button
+$("#intiface-reset-mode-intensities").on("click", function() {
+  // Reset all to 100%
+  modeIntensityMultipliers = {
+    denialDomina: 1.0,
+    milkMaid: 1.0,
+    petTraining: 1.0,
+    sissySurrender: 1.0,
+    prejacPrincess: 1.0,
+    roboticRuination: 1.0,
+    evilEdgingMistress: 1.0,
+    frustrationFairy: 1.0,
+    hypnoHelper: 1.0,
+    chastityCaretaker: 1.0
+  }
+  // Update all sliders
+  $("#intiface-mode-intensity-denial").val(100)
+  $("#intiface-mode-intensity-denial-display").text("100%")
+  $("#intiface-mode-intensity-milk").val(100)
+  $("#intiface-mode-intensity-milk-display").text("100%")
+  $("#intiface-mode-intensity-pet").val(100)
+  $("#intiface-mode-intensity-pet-display").text("100%")
+  $("#intiface-mode-intensity-sissy").val(100)
+  $("#intiface-mode-intensity-sissy-display").text("100%")
+  $("#intiface-mode-intensity-prejac").val(100)
+  $("#intiface-mode-intensity-prejac-display").text("100%")
+  $("#intiface-mode-intensity-robotic").val(100)
+  $("#intiface-mode-intensity-robotic-display").text("100%")
+  $("#intiface-mode-intensity-evil").val(100)
+  $("#intiface-mode-intensity-evil-display").text("100%")
+  $("#intiface-mode-intensity-frustration").val(100)
+  $("#intiface-mode-intensity-frustration-display").text("100%")
+  $("#intiface-mode-intensity-hypno").val(100)
+  $("#intiface-mode-intensity-hypno-display").text("100%")
+  $("#intiface-mode-intensity-chastity").val(100)
+  $("#intiface-mode-intensity-chastity-display").text("100%")
+  saveModeIntensity()
+})
+
+// Load and set up Intiface exe path
     const savedExePath = localStorage.getItem("intiface-exe-path")
     if (savedExePath) {
       $("#intiface-exe-path").val(savedExePath)
@@ -4990,29 +5503,48 @@ $(async () => {
       }
     })
     
-    // Handle waveform button clicks (delegated)
-    $(document).on('click', '.waveform-btn', async function() {
-      const waveform = $(this).data('waveform')
-      const deviceIndex = $(this).data('device') || 0
+// Handle waveform button clicks (delegated)
+$(document).on('click', '.waveform-btn', async function() {
+  const waveform = $(this).data('waveform')
+  const deviceIndex = $(this).data('device') || 0
 
-      const minInput = $(`#waveform-min-${deviceIndex}`)
-      const maxInput = $(`#waveform-max-${deviceIndex}`)
-      const durInput = $(`#waveform-dur-${deviceIndex}`)
-      const cyclesInput = $(`#waveform-cycles-${deviceIndex}`)
+  const minInput = $(`#waveform-min-${deviceIndex}`)
+  const maxInput = $(`#waveform-max-${deviceIndex}`)
+  const durInput = $(`#waveform-dur-${deviceIndex}`)
+  const cyclesInput = $(`#waveform-cycles-${deviceIndex}`)
 
-      const options = {
-        pattern: waveform,
-        min: minInput.length ? parseInt(minInput.val()) : 20,
-        max: maxInput.length ? parseInt(maxInput.val()) : 80,
-        duration: durInput.length ? parseInt(durInput.val()) : 5000,
-        cycles: cyclesInput.length ? parseInt(cyclesInput.val()) : 3
-      }
+  const options = {
+    pattern: waveform,
+    min: minInput.length ? parseInt(minInput.val()) : 20,
+    max: maxInput.length ? parseInt(maxInput.val()) : 80,
+    duration: durInput.length ? parseInt(durInput.val()) : 5000,
+    cycles: cyclesInput.length ? parseInt(cyclesInput.val()) : 3
+  }
 
-      console.log(`${NAME}: Waveform button clicked - ${waveform}`, options)
-      await executeWaveformPattern(deviceIndex, 'custom', options)
-    })
+  console.log(`${NAME}: Waveform button clicked - ${waveform}`, options)
+  await executeWaveformPattern(deviceIndex, 'custom', options)
+})
 
-    // Handle denial domina mode button clicks (delegated)
+// Handle mode toggle clicks (delegated)
+const modeTypes = ['deny', 'milk', 'pet', 'sissy', 'prejac', 'robotic', 'evil', 'frustration', 'hypno', 'chastity']
+modeTypes.forEach(modeType => {
+  $(document).on("click", `[id^='intiface-${modeType}-toggle-']`, function() {
+    const toggleId = $(this).attr("id")
+    const deviceIndex = toggleId.replace(`intiface-${modeType}-toggle-`, "")
+    const content = $(`#intiface-${modeType}-content-${deviceIndex}`)
+    const arrow = $(`#intiface-${modeType}-arrow-${deviceIndex}`)
+    
+    if (content.is(":visible")) {
+      content.slideUp(200)
+      arrow.css("transform", "rotate(0deg)")
+    } else {
+      content.slideDown(200)
+      arrow.css("transform", "rotate(180deg)")
+    }
+  })
+})
+
+// Handle denial domina mode button clicks (delegated)
     $(document).on('click', '.deny-mode-btn', async function() {
       const modeName = $(this).data('mode')
       const deviceIndex = $(this).data('device') || 0
@@ -5093,16 +5625,16 @@ $(async () => {
       await executeTeaseAndDenialMode(deviceIndex, modeName)
     })
 
-    // Handle chastity caretaker mode button clicks (delegated)
-    $(document).on('click', '.chastity-mode-btn', async function() {
-      const modeName = $(this).data('mode')
-      const deviceIndex = $(this).data('device') || 0
+// Handle chastity caretaker mode button clicks (delegated)
+$(document).on('click', '.chastity-mode-btn', async function() {
+  const modeName = $(this).data('mode')
+  const deviceIndex = $(this).data('device') || 0
 
-      console.log(`${NAME}: Chastity Caretaker mode button clicked - ${modeName}`)
-      await executeTeaseAndDenialMode(deviceIndex, modeName)
-    })
+  console.log(`${NAME}: Chastity Caretaker mode button clicked - ${modeName}`)
+  await executeTeaseAndDenialMode(deviceIndex, modeName)
+})
 
-    updateButtonStates(client.connected)
+updateButtonStates(client.connected)
     updateStatus("Disconnected")
 
 // Attach device event handlers
@@ -5326,20 +5858,25 @@ $("#intiface-mode-menu-toggle").on("click", function () {
     }
   })
   
-  // Handle menu intensity
-  $("#intiface-menu-intensity").on("input", function() {
-    mediaPlayer.globalIntensity = parseInt($(this).val())
-    const display = $("#intiface-menu-intensity-display")
-    display.text(`${mediaPlayer.globalIntensity}%`)
-    // Color code based on intensity
-    if (mediaPlayer.globalIntensity < 30) {
-      display.css("color", "#4CAF50")
-    } else if (mediaPlayer.globalIntensity < 70) {
-      display.css("color", "#FFEB3B")
-    } else {
-      display.css("color", "#F44336")
-    }
-  })
+// Handle menu intensity
+$("#intiface-menu-intensity").on("input", function() {
+  const newIntensity = parseInt($(this).val())
+  // Update both funscript intensity AND global intensity scale
+  mediaPlayer.globalIntensity = newIntensity
+  globalIntensityScale = newIntensity
+  const display = $("#intiface-menu-intensity-display")
+  display.text(`${newIntensity}%`)
+  // Color code based on intensity scale (0-400%)
+  if (newIntensity < 100) {
+    display.css("color", "#4CAF50") // Green: Reduced intensity
+  } else if (newIntensity < 200) {
+    display.css("color", "#FFEB3B") // Yellow: Slight boost
+  } else if (newIntensity < 300) {
+    display.css("color", "#FF9800") // Orange: Moderate boost
+  } else {
+    display.css("color", "#F44336") // Red: Maximum boost
+  }
+})
   
   // Handle menu loop
   $("#intiface-menu-loop").on("change", function() {
@@ -5822,12 +6359,23 @@ function stopFunscriptSyncTimer() {
 // Execute Funscript action
 async function executeFunscriptAction(action) {
   if (!client.connected || devices.length === 0) return
-  
+
   const deviceType = getDeviceType(devices[0])
   const targetDevice = devices[0]
+
+  // Apply global intensity modifier using MultiFunPlayer's approach:
+  // Scale the deviation from default (50%), not the raw value
+  // Formula: default + (value - default) * scale
+  // This preserves dynamic range and amplifies swings
+  const defaultValue = 50 // Neutral point (50%)
+  const scale = mediaPlayer.globalIntensity / 100 // Convert percentage to multiplier
+  const scriptValue = action.pos // Funscript value (0-100)
   
-  // Apply global intensity modifier
-  const adjustedPos = Math.round(action.pos * (mediaPlayer.globalIntensity / 100))
+  // Calculate scaled value: default + (deviation * scale)
+  const scaledValue = defaultValue + (scriptValue - defaultValue) * scale
+  
+  // Clamp to valid device range (0-100)
+  const adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
   
   try {
     // Choose control method based on device type
