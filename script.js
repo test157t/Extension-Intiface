@@ -2429,41 +2429,68 @@ function parseDeviceCommands(text) {
     
     // Check for INTERFACE system commands (start, connect, disconnect)
     if (deviceType === 'interface' || deviceType === 'system') {
-      if (commandText === 'START') {
-        commands.push({ type: 'intiface_start' })
-        continue
-      }
-      if (commandText === 'CONNECT') {
-        commands.push({ type: 'intiface_connect' })
-        continue
-      }
-      if (commandText === 'DISCONNECT') {
-        commands.push({ type: 'intiface_disconnect' })
-        continue
-      }
-    }
+if (commandText === 'START') {
+commands.push({ type: 'intiface_start' })
+continue
+}
+if (commandText === 'CONNECT') {
+commands.push({ type: 'intiface_connect' })
+continue
+}
+if (commandText === 'DISCONNECT') {
+commands.push({ type: 'intiface_disconnect' })
+continue
+}
+if (commandText === 'SCAN') {
+commands.push({ type: 'intiface_scan' })
+continue
+}
+}
 
-    // Check for MEDIA commands
-    if (deviceType === 'media') {
-      if (commandText === 'LIST') {
-        commands.push({ type: 'media_list' })
-        continue
-      }
-      if (commandText === 'STOP') {
-        commands.push({ type: 'media_stop' })
-        continue
-      }
-      // Parse PLAY command with filename
-        // Format: PLAY: filename.ext or PLAY filename.ext (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg)
-      const playMatch = commandText.match(/PLAY[\s:]+(.+)/i)
-      if (playMatch) {
-        commands.push({
-          type: 'media_play',
-          filename: playMatch[1].trim()
-        })
-        continue
-      }
-    }
+// Check for MEDIA commands
+if (deviceType === 'media') {
+if (commandText === 'LIST') {
+commands.push({ type: 'media_list' })
+continue
+}
+if (commandText === 'STOP') {
+commands.push({ type: 'media_stop' })
+continue
+}
+if (commandText === 'PAUSE') {
+commands.push({ type: 'media_pause' })
+continue
+}
+if (commandText === 'RESUME' || commandText === 'PLAY') {
+commands.push({ type: 'media_resume' })
+continue
+}
+// Parse PLAY command with filename
+// Format: PLAY: filename.ext or PLAY filename.ext (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg)
+const playMatch = commandText.match(/PLAY[\s:]+(.+)/i)
+if (playMatch) {
+commands.push({
+type: 'media_play',
+filename: playMatch[1].trim()
+})
+continue
+}
+// Parse INTENSITY command for funscript
+// Format: INTENSITY: 150 or INTENSITY 150 (sets funscript intensity percentage)
+const intensityMatch = commandText.match(/INTENSITY[\s:]+(\d+)/i)
+if (intensityMatch) {
+const intensity = parseInt(intensityMatch[1])
+if (intensity >= 0 && intensity <= 500) {
+commands.push({
+type: 'media_intensity',
+intensity: intensity
+})
+} else {
+console.log(`${NAME}: Ignoring out-of-range media intensity: ${intensity}%`)
+}
+continue
+}
+}
 
     // Parse PRESET command
     // Format: PRESET: tease or PRESET tease
@@ -2801,44 +2828,57 @@ async function executeCommand(cmd) {
   }
   
 // System commands can run without connection
-  if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
-    try {
-      switch (cmd.type) {
-        case 'intiface_start':
-          await handleIntifaceStart()
-          break
-        case 'intiface_connect':
-          await handleIntifaceConnect()
-          break
-        case 'intiface_disconnect':
-          await handleIntifaceDisconnect()
-          break
-      }
+if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect' || cmd.type === 'intiface_scan') {
+try {
+switch (cmd.type) {
+case 'intiface_start':
+await handleIntifaceStart()
+break
+case 'intiface_connect':
+await handleIntifaceConnect()
+break
+case 'intiface_disconnect':
+await handleIntifaceDisconnect()
+break
+case 'intiface_scan':
+await handleDeviceScan()
+break
+}
     } catch (e) {
       console.error(`${NAME}: System command execution failed:`, e)
     }
     return
   }
 
-  // Media commands
-  if (cmd.type === 'media_list' || cmd.type === 'media_play' || cmd.type === 'media_stop') {
-    try {
-      switch (cmd.type) {
-        case 'media_list':
-          await handleMediaList()
-          break
-        case 'media_play':
-          await handleMediaPlay(cmd.filename)
-          break
-        case 'media_stop':
-          await handleMediaStop()
-          break
-      }
-    } catch (e) {
-      console.error(`${NAME}: Media command execution failed:`, e)
-    }
-    return
-  }
+// Media commands
+if (cmd.type === 'media_list' || cmd.type === 'media_play' || cmd.type === 'media_stop' ||
+cmd.type === 'media_pause' || cmd.type === 'media_resume' || cmd.type === 'media_intensity') {
+try {
+switch (cmd.type) {
+case 'media_list':
+await handleMediaList()
+break
+case 'media_play':
+await handleMediaPlay(cmd.filename)
+break
+case 'media_stop':
+await handleMediaStop()
+break
+case 'media_pause':
+await handleMediaPause()
+break
+case 'media_resume':
+await handleMediaResume()
+break
+case 'media_intensity':
+await handleMediaIntensity(cmd.intensity)
+break
+}
+} catch (e) {
+console.error(`${NAME}: Media command execution failed:`, e)
+}
+return
+}
 
   // Device commands require connection
   if (!client.connected || devices.length === 0) {
@@ -3076,16 +3116,52 @@ async function handleIntifaceConnect() {
 
 // Handle Intiface disconnect command
 async function handleIntifaceDisconnect() {
-  if (!client.connected) {
-    console.log(`${NAME}: Not connected`)
-    return
-  }
-  try {
-    await disconnect()
-    updateStatus(`Disconnected from Intiface`)
-  } catch (e) {
-    updateStatus(`Disconnect failed: ${e.message}`, true)
-  }
+if (!client.connected) {
+console.log(`${NAME}: Not connected`)
+return
+}
+try {
+await disconnect()
+updateStatus(`Disconnected from Intiface`)
+} catch (e) {
+updateStatus(`Disconnect failed: ${e.message}`, true)
+}
+}
+
+// Handle device scan command
+async function handleDeviceScan() {
+if (!client.connected) {
+updateStatus('Cannot scan - not connected to Intiface', true)
+console.log(`${NAME}: Cannot scan - not connected`)
+return
+}
+
+try {
+updateStatus('Scanning for devices...')
+console.log(`${NAME}: Starting device scan`)
+
+// Start scanning
+await client.startScanning()
+
+// Scan for 5 seconds then stop
+setTimeout(async () => {
+try {
+await client.stopScanning()
+const deviceCount = devices.length
+if (deviceCount > 0) {
+updateStatus(`Scan complete - ${deviceCount} device(s) found`)
+} else {
+updateStatus('Scan complete - no devices found')
+}
+} catch (e) {
+console.log(`${NAME}: Stop scanning failed:`, e)
+}
+}, 5000)
+
+} catch (e) {
+updateStatus(`Scan failed: ${e.message}`, true)
+console.error(`${NAME}: Device scan error:`, e)
+}
 }
 
 // Handle media list command - appends list to the last message
@@ -3229,11 +3305,69 @@ async function handleMediaStop() {
     // Stop device actions
     await stopAllDeviceActions()
 
-    updateStatus('Media playback stopped')
-  } catch (e) {
-    updateStatus(`Failed to stop media: ${e.message}`, true)
-    console.error(`${NAME}: Media stop error:`, e)
-  }
+updateStatus('Media playback stopped')
+} catch (e) {
+updateStatus(`Failed to stop media: ${e.message}`, true)
+console.error(`${NAME}: Media stop error:`, e)
+}
+}
+
+// Handle media pause command
+async function handleMediaPause() {
+try {
+if (mediaPlayer.videoElement && !mediaPlayer.videoElement.paused) {
+mediaPlayer.videoElement.pause()
+mediaPlayer.isPlaying = false
+stopFunscriptSync()
+updateStatus('Media paused')
+$("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
+} else {
+console.log(`${NAME}: Media already paused or no video playing`)
+}
+} catch (e) {
+updateStatus(`Failed to pause media: ${e.message}`, true)
+console.error(`${NAME}: Media pause error:`, e)
+}
+}
+
+// Handle media resume command
+async function handleMediaResume() {
+try {
+if (mediaPlayer.videoElement && mediaPlayer.videoElement.paused) {
+await mediaPlayer.videoElement.play()
+mediaPlayer.isPlaying = true
+startFunscriptSync()
+updateStatus('Media resumed')
+$("#intiface-chat-funscript-info").text("Playing - Funscript active").css("color", "#4CAF50")
+} else if (!mediaPlayer.videoElement) {
+updateStatus('No media loaded to resume', true)
+} else {
+console.log(`${NAME}: Media already playing`)
+}
+} catch (e) {
+updateStatus(`Failed to resume media: ${e.message}`, true)
+console.error(`${NAME}: Media resume error:`, e)
+}
+}
+
+// Handle media intensity command
+async function handleMediaIntensity(intensity) {
+try {
+if (intensity >= 0 && intensity <= 500) {
+mediaPlayer.globalIntensity = intensity
+globalIntensityScale = intensity
+updateStatus(`Media intensity set to ${intensity}%`)
+console.log(`${NAME}: Media intensity changed to ${intensity}%`)
+// Update display if slider exists
+$("#intiface-menu-funscript-intensity").val(intensity)
+$("#intiface-menu-funscript-intensity-display").text(`${intensity}%`)
+} else {
+updateStatus(`Invalid intensity: ${intensity}% (must be 0-500)`, true)
+}
+} catch (e) {
+updateStatus(`Failed to set intensity: ${e.message}`, true)
+console.error(`${NAME}: Media intensity error:`, e)
+}
 }
 
 // Execute pattern commands with intervals
@@ -4270,7 +4404,8 @@ function updatePrompt() {
 System commands (to manage Intiface itself):
 ${canStartIntiface ? `- <interface:START> - Start Intiface Central application (configured: ${exePath})` : ''}
 - <interface:CONNECT> - Connect to Intiface server
-- <interface:DISCONNECT> - Disconnect from Intiface server`
+- <interface:DISCONNECT> - Disconnect from Intiface server
+- <interface:SCAN> - Scan for new devices (runs for 5 seconds)`
 
     // Build dynamic device examples based on connected devices
     let deviceTypeExamples = ''
@@ -4585,7 +4720,10 @@ You can also play videos with synchronized haptic feedback! Videos are stored in
 MEDIA COMMANDS (chat-based control):
 - <media:LIST> - List all available media files in the library
 - <media:PLAY: filename.ext> - Play media with automatic funscript synchronization (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg)
+- <media:PAUSE> - Pause media playback (device stops)
+- <media:RESUME> or <media:PLAY> - Resume paused media
 - <media:STOP> - Stop media playback and all device activity
+- <media:INTENSITY: 150> - Adjust funscript intensity (0-500%, default 100%)
 
 MEDIA PLAYBACK (detection):
 - You can also simply mention a media filename like: "Let me play that video for you: video.mp4" or "Listen to this: audio.m4a"
@@ -4600,6 +4738,9 @@ MEDIA EXAMPLES:
 ✓ Media command: <media:PLAY: myvideo.mp4> or <media:PLAY: myaudio.m4a>
 ✓ Chat detection: "Let me play something special for you - check out this video: myvideo.mp4"
 ✓ Audio detection: "Listen to this audio file: myaudio.m4a"
+✓ Pause media: <media:PAUSE>
+✓ Resume media: <media:RESUME>
+✓ Adjust intensity: <media:INTENSITY: 150> (increases to 150%) or <media:INTENSITY: 50> (decreases to 50%)
 
 === RULES ===:
 1. ALWAYS include the command literally: <deviceName:COMMAND: value>
