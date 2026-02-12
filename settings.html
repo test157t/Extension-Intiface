@@ -3,71 +3,36 @@
     <div class="drawer-icon fa-solid fa-heart-pulse fa-fw closedIcon" title="Intiface Connect"></div>
   </div>
   <div class="drawer-content closedDrawer">
-    <div class="flex-container alignitemscenter">
-      <h3 class="margin0 flex1">
-        <span>Intiface Connect</span>
-        <a href="https://intiface.com/" class="notes-link" target="_blank">
-          <span class="fa-solid fa-circle-question note-link-span"></span>
-        </a>
-      </h3>
-    </div>
-    <div id="intiface-status-panel" class="intiface-status disconnected">Status: Disconnected</div>
-    <div id="intiface-devices" style="margin-top: 10px;"></div>
-    <div class="flex-container alignitemscenter" style="margin-top: 10px;">
-      <input type="text" id="intiface-ip-input" class="text_pole" value="127.0.0.1:12345" placeholder="127.0.0.1:12345" style="flex-grow: 1;">
-    </div>
-  <div class="flex-container alignitemscenter" style="margin-top: 10px; gap: 10px;">
-    <button id="intiface-connect-action-button" class="menu_button connect-button" style="flex-grow: 1;">
-      <i class="fa-solid fa-power-off"></i> Connect
-    </button>
-    <button id="intiface-rescan-button" class="menu_button" style="display: none;">
-      <i class="fa-solid fa-rotate"></i>
-    </button>
-    <label style="display: flex; align-items: center; cursor: pointer; font-size: 0.85em; white-space: nowrap;">
-      <input type="checkbox" id="intiface-auto-connect" style="margin-right: 6px;">
-      <span>Auto-connect</span>
-    </label>
-  </div>
+<div class="flex-container alignitemscenter" style="gap: 10px;">
+<h3 class="margin0 flex1">
+<span>Intiface Connect</span>
+<a href="https://intiface.com/" class="notes-link" target="_blank">
+<span class="fa-solid fa-circle-question note-link-span"></span>
+</a>
+</h3>
+</div>
+<div id="intiface-status-panel" class="intiface-status disconnected">Status: Disconnected</div>
+<div id="intiface-ai-status" style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
+<div style="font-size: 0.8em; color: #888;">
+<i class="fa-solid fa-robot"></i> <span id="intiface-ai-status-text">AI is ready to control your device via chat commands</span>
+</div>
+</div>
+<div class="flex-container alignitemscenter" style="margin-top: 10px; gap: 8px;">
+<input type="text" id="intiface-ip-input" class="text_pole" value="127.0.0.1:12345" placeholder="127.0.0.1:12345" style="flex: 1; min-width: 120px;">
+<button id="intiface-connect-action-button" class="menu_button connect-button" style="white-space: nowrap;">
+<i class="fa-solid fa-power-off"></i> <span class="btn-text">Connect</span>
+</button>
+<button id="intiface-rescan-button" class="menu_button" style="display: none;">
+<i class="fa-solid fa-rotate"></i>
+</button>
+<label style="display: flex; align-items: center; cursor: pointer; font-size: 0.8em; white-space: nowrap;">
+<input type="checkbox" id="intiface-auto-connect" style="margin-right: 4px;">
+<span>Auto</span>
+</label>
+</div>
+<div id="intiface-devices" style="margin-top: 10px;"></div>
 
-  <!-- AI Control - Always chat-based -->
-    <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 4px;">
-      <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 5px;">
-        <i class="fa-solid fa-robot"></i> AI Control
-      </div>
-      <div style="font-size: 0.8em; color: #888;">
-        Chat-based device control is enabled. The AI can control devices using commands in its responses.
-      </div>
-    </div>
-<!-- Debug Tools Section -->
-    <div style="margin-top: 15px;">
-      <div id="intiface-debug-menu-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
-        <span style="display: flex; justify-content: space-between; align-items: center;">
-          <span><i class="fa-solid fa-bug"></i> Debug Tools</span>
-          <span id="intiface-debug-menu-arrow" style="transition: transform 0.3s;">▼</span>
-        </span>
-      </div>
-      <div id="intiface-debug-menu-content" style="display: none; margin-top: 10px;">
-        <!-- Show Chat Player Button -->
-        <div style="margin-bottom: 10px;">
-          <button id="intiface-show-chat-player-btn" class="menu_button" style="width: 100%; background: rgba(76, 175, 80, 0.2);">
-            <i class="fa-solid fa-eye"></i> Show Chat Player
-          </button>
-          <div style="font-size: 0.7em; color: #666; margin-top: 3px; text-align: center;">
-            Opens the video player sidebar for testing
-          </div>
-        </div>
-
-        <!-- Test Backend Connection Button -->
-        <div style="margin-bottom: 10px;">
-          <button id="intiface-test-backend-btn" class="menu_button" style="width: 100%;">
-            <i class="fa-solid fa-plug"></i> Test Backend Connection
-          </button>
-          <div id="intiface-test-backend-status" style="margin-top: 5px; font-size: 0.75em; text-align: center;"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Media Player Section in Menu -->
+<!-- Media Player Section in Menu -->
     <div style="margin-top: 15px;">
       <div id="intiface-media-menu-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
         <span style="display: flex; justify-content: space-between; align-items: center;">

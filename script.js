@@ -2039,8 +2039,16 @@ async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
       updateStatus(`${deviceName}: ${presetName} pattern (${config.pattern}) [${globalIntensityScale}%]`)
     }
     
-    const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
-  } else if (config.type === 'gradient') {
+const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
+// Store pattern result for proper cleanup
+if (patternResult && typeof patternResult === 'function') {
+activePatterns.set(deviceIndex, {
+mode: 'pattern',
+modeName: `waveform_${presetName}`,
+stop: patternResult
+})
+}
+} else if (config.type === 'gradient') {
     await executeGradientPattern(deviceIndex, config)
     updateStatus(`${deviceName}: ${presetName} gradient`)
   } else if (config.type === 'linear_waveform') {
@@ -2111,74 +2119,125 @@ async function executeGradientPattern(deviceIndex, config) {
     patternData = { pattern: scaledMotor1Values, intervals }
   }
   
-  const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
-  return patternResult
+const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
+// Store pattern result for proper cleanup
+if (patternResult && typeof patternResult === 'function') {
+activePatterns.set(deviceIndex, {
+mode: 'pattern',
+modeName: 'gradient',
+stop: patternResult
+})
+}
+return patternResult
 }
 
 // Execute linear waveform (position-based)
 async function executeLinearWaveform(deviceIndex, config) {
-  const { pattern, positions, duration, cycles } = config
-  const [startPos, endPos] = positions
-  const steps = Math.floor(duration / 100)
-  const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
-  
-  const targetDevice = devices[deviceIndex] || devices[0]
-  if (!targetDevice) return
-  
-  let currentCycle = 0
-  let currentStep = 0
-  
-  const executeStep = async () => {
-    if (currentCycle >= cycles || !client.connected) return
-    
-    const phase = currentStep / steps
-    const normalized = generator(phase, 1)
-    const position = Math.round(startPos + (endPos - startPos) * normalized)
-    
-    try {
-      await targetDevice.linear(position / 100, 100)
-    } catch (e) {
-      console.error(`${NAME}: Linear waveform step failed:`, e)
-    }
-    
-    currentStep++
-    if (currentStep >= steps) {
-      currentStep = 0
-      currentCycle++
-    }
-    
-        if (currentCycle < cycles) {
-          setWorkerTimeout(executeStep, 100)
-        }
-      }
+const { pattern, positions, duration, cycles } = config
+const [startPos, endPos] = positions
+const steps = Math.floor(duration / 100)
+const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
 
-      executeStep()
-    }
+const targetDevice = devices[deviceIndex] || devices[0]
+if (!targetDevice) return
 
-    // Execute linear gradient
-    async function executeLinearGradient(deviceIndex, config) {
-      const { positions, duration, hold = 0 } = config
-      const [startPos, endPos] = positions
-      const steps = Math.floor(duration / 50)
+let currentCycle = 0
+let currentStep = 0
+let stepTimeoutId = null
+let isRunning = true
 
-      const targetDevice = devices[deviceIndex] || devices[0]
-      if (!targetDevice) return
+const executeStep = async () => {
+if (!isRunning || currentCycle >= cycles || !client.connected) {
+activePatterns.delete(deviceIndex)
+return
+}
 
-      for (let i = 0; i < steps; i++) {
-        const progress = i / steps
-        const position = Math.round(startPos + (endPos - startPos) * progress)
-        try {
-          await targetDevice.linear(position / 100, 50)
-        } catch (e) {
-          console.error(`${NAME}: Linear gradient step failed:`, e)
-        }
-        await new Promise(resolve => setTimeout(resolve, 50))
-      }
+const phase = currentStep / steps
+const normalized = generator(phase, 1)
+const position = Math.round(startPos + (endPos - startPos) * normalized)
 
-      if (hold > 0) {
-        await new Promise(resolve => setTimeout(resolve, hold))
-      }
-    }
+try {
+await targetDevice.linear(position / 100, 100)
+} catch (e) {
+console.error(`${NAME}: Linear waveform step failed:`, e)
+}
+
+currentStep++
+if (currentStep >= steps) {
+currentStep = 0
+currentCycle++
+}
+
+if (currentCycle < cycles && isRunning) {
+stepTimeoutId = setWorkerTimeout(executeStep, 100)
+// Update active patterns with the timeout ID
+activePatterns.set(deviceIndex, {
+mode: 'linear_waveform',
+modeName: `linear_${pattern}`,
+interval: stepTimeoutId
+})
+}
+}
+
+// Start execution
+stepTimeoutId = setWorkerTimeout(executeStep, 100)
+activePatterns.set(deviceIndex, {
+mode: 'linear_waveform',
+modeName: `linear_${pattern}`,
+interval: stepTimeoutId
+})
+}
+
+// Execute linear gradient
+async function executeLinearGradient(deviceIndex, config) {
+const { positions, duration, hold = 0 } = config
+const [startPos, endPos] = positions
+const steps = Math.floor(duration / 50)
+
+const targetDevice = devices[deviceIndex] || devices[0]
+if (!targetDevice) return
+
+// Create a controller to allow stopping
+let isRunning = true
+const stopController = () => { isRunning = false }
+activePatterns.set(deviceIndex, {
+mode: 'linear_gradient',
+modeName: 'linear_gradient',
+stop: stopController
+})
+
+for (let i = 0; i < steps; i++) {
+if (!isRunning || !client.connected) break
+const progress = i / steps
+const position = Math.round(startPos + (endPos - startPos) * progress)
+try {
+await targetDevice.linear(position / 100, 50)
+} catch (e) {
+console.error(`${NAME}: Linear gradient step failed:`, e)
+}
+if (isRunning) {
+await new Promise(resolve => setTimeout(resolve, 50))
+}
+}
+
+if (isRunning && hold > 0 && client.connected) {
+await new Promise(resolve => {
+const holdTimeout = setTimeout(resolve, hold)
+// Store timeout so it can be cleared
+activePatterns.set(deviceIndex, {
+mode: 'linear_gradient',
+modeName: 'linear_gradient',
+stop: () => {
+isRunning = false
+clearTimeout(holdTimeout)
+},
+interval: holdTimeout
+})
+})
+}
+
+activePatterns.delete(deviceIndex)
+}
 
 // Execute Mode sequence (Denial Domina, Milk Maid, Pet Training)
 async function executeTeaseAndDenialMode(deviceIndex, modeName) {
@@ -3263,37 +3322,89 @@ async function executePattern(cmd, actionType, deviceIndex = 0) {
   return result
 }
 
+// AI status check interval
+let aiStatusCheckInterval = null
+
+// Update AI control status indicator based on actual activity
+function updateAIStatusFromActivity() {
+const statusEl = $("#intiface-ai-status")
+const textEl = $("#intiface-ai-status-text")
+
+// Check if any patterns are active or command queue is running
+const hasActivePatterns = activePatterns.size > 0
+const isProcessing = isExecutingCommands || messageCommands.length > 0
+
+if (hasActivePatterns || isProcessing) {
+statusEl.css("background", "rgba(76, 175, 80, 0.15)")
+textEl.css("color", "#4CAF50").text("AI is controlling your device...")
+} else {
+statusEl.css("background", "rgba(0,0,0,0.05)")
+textEl.css("color", "#888").text("AI is ready to control your device via chat commands")
+}
+}
+
+// Start monitoring AI activity status
+function startAIStatusMonitoring() {
+if (aiStatusCheckInterval) return
+aiStatusCheckInterval = setInterval(updateAIStatusFromActivity, 500)
+}
+
+// Stop monitoring AI activity status
+function stopAIStatusMonitoring() {
+if (aiStatusCheckInterval) {
+clearInterval(aiStatusCheckInterval)
+aiStatusCheckInterval = null
+}
+}
+
 // Process command queue sequentially
 async function processCommandQueue() {
-  if (isExecutingCommands || messageCommands.length === 0) return
+if (isExecutingCommands || messageCommands.length === 0) return
 
-  isExecutingCommands = true
+// Check if media player is active before starting
+const playerPanel = $("#intiface-chat-media-panel")
+const isMediaPlaying = playerPanel.length > 0 && playerPanel.is(":visible") && mediaPlayer.isPlaying
 
-  while (messageCommands.length > 0) {
-    const cmd = messageCommands.shift()
+if (isMediaPlaying) {
+// Clear all pending commands if media is playing
+if (messageCommands.length > 0) {
+console.log(`${NAME}: Clearing ${messageCommands.length} pending AI commands - media player is active`)
+messageCommands = []
+}
+return
+}
 
-    // Skip system commands - they should have been handled immediately
-    if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
-      console.log(`${NAME}: Skipping system command in queue (should have been executed immediately): ${cmd.type}`)
-      continue
-    }
+isExecutingCommands = true
+startAIStatusMonitoring()
 
-    // Skip AI device commands when media player is open (funscript/media has priority until player is closed)
-    const playerPanel = $("#intiface-chat-media-panel")
-    if (playerPanel.length > 0 && playerPanel.is(":visible")) {
-      console.log(`${NAME}: Skipping AI command - media player is open: ${cmd.type}`)
-      continue
-    }
+while (messageCommands.length > 0) {
+const cmd = messageCommands.shift()
 
-    // Device commands require connection
-    if (client.connected) {
-      await executeCommand(cmd)
-    } else {
-      console.log(`${NAME}: Skipping device command - not connected`)
-    }
-  }
+// Skip system commands - they should have been handled immediately
+if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
+console.log(`${NAME}: Skipping system command in queue (should have been handled immediately): ${cmd.type}`)
+continue
+}
 
-  isExecutingCommands = false
+// Skip AI device commands when media player is open (funscript/media has priority until player is closed)
+const currentPlayerPanel = $("#intiface-chat-media-panel")
+if (currentPlayerPanel.length > 0 && currentPlayerPanel.is(":visible") && mediaPlayer.isPlaying) {
+console.log(`${NAME}: Skipping AI command - media player is active: ${cmd.type}`)
+// Clear remaining commands
+messageCommands = []
+break
+}
+
+// Device commands require connection
+if (client.connected) {
+await executeCommand(cmd)
+} else {
+console.log(`${NAME}: Skipping device command - not connected`)
+}
+}
+
+isExecutingCommands = false
+updateAIStatusFromActivity()
 }
 
 // Handle streaming token received
@@ -3313,24 +3424,31 @@ async function onStreamTokenReceived(data) {
   
   const commands = parseDeviceCommands(streamingText)
   
-  for (const cmd of commands) {
-    // Create a unique key for deduplication
-    const cmdKey = JSON.stringify({ type: cmd.type, deviceIndex: cmd.deviceIndex })
-    
-    if (!executedCommands.has(cmdKey)) {
-      executedCommands.add(cmdKey)
-      console.log(`${NAME}: New command detected: ${cmd.type}`)
-      
-      // Execute system commands immediately (don't add to queue)
-      if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
-        console.log(`${NAME}: Executing system command immediately: ${cmd.type}`)
-        executeCommand(cmd)
-      } else {
-        // Device commands go to queue
-        messageCommands.push(cmd)
-      }
-    }
-  }
+// Check if media player is active (funscript has priority)
+const playerPanel = $("#intiface-chat-media-panel")
+const isMediaPlaying = playerPanel.length > 0 && playerPanel.is(":visible") && mediaPlayer.isPlaying
+
+for (const cmd of commands) {
+// Create a unique key for deduplication
+const cmdKey = JSON.stringify({ type: cmd.type, deviceIndex: cmd.deviceIndex })
+
+if (!executedCommands.has(cmdKey)) {
+executedCommands.add(cmdKey)
+console.log(`${NAME}: New command detected: ${cmd.type}`)
+
+// Execute system commands immediately (don't add to queue)
+if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
+console.log(`${NAME}: Executing system command immediately: ${cmd.type}`)
+executeCommand(cmd)
+} else if (isMediaPlaying) {
+// Skip device commands when media player is active (funscript has priority)
+console.log(`${NAME}: Skipping AI device command - media player is active: ${cmd.type}`)
+} else {
+// Device commands go to queue
+messageCommands.push(cmd)
+}
+}
+}
 }
 
 // Handle message received (fallback for non-streaming)
@@ -3350,50 +3468,64 @@ async function onMessageReceived(data) {
     await loadChatMediaFile(videoFilename)
   }
   
-  const commands = parseDeviceCommands(messageText)
-  
-  if (commands.length === 0 && !videoFilename) return
-  
-  // Separate system commands from device commands
-  const systemCommands = commands.filter(cmd =>
-    cmd.type === 'intiface_start' ||
-    cmd.type === 'intiface_connect' ||
-    cmd.type === 'intiface_disconnect'
-  )
-  const deviceCommandsList = commands.filter(cmd =>
-    cmd.type !== 'intiface_start' &&
-    cmd.type !== 'intiface_connect' &&
-    cmd.type !== 'intiface_disconnect'
-  )
-  
-  // Execute system commands immediately (even if not connected)
-  for (const cmd of systemCommands) {
-    await executeCommand(cmd)
-  }
-  
-  // Only process device commands if connected
-  if (!client.connected && !videoFilename) return
-  
-  // Clear previous commands and stop current activity (unless we're playing video OR tab is hidden)
-  if (!mediaPlayer.isPlaying && !document.hidden) {
-    messageCommands = []
-    executedCommands.clear()
-    streamingText = ''
+const commands = parseDeviceCommands(messageText)
 
-    if (commandQueueInterval) {
-      clearWorkerTimeout(commandQueueInterval)
-      commandQueueInterval = null
-    }
+if (commands.length === 0 && !videoFilename) return
 
-    await stopAllDeviceActions()
-  }
-  
-  // Queue new device commands
-  messageCommands = deviceCommandsList
-  executedCommands = new Set(deviceCommandsList.map(cmd => JSON.stringify(cmd)))
-  
-  // Start processing
-  processCommandQueue()
+// Separate system commands from device commands
+const systemCommands = commands.filter(cmd =>
+cmd.type === 'intiface_start' ||
+cmd.type === 'intiface_connect' ||
+cmd.type === 'intiface_disconnect'
+)
+
+// Check if media player is active (funscript has priority)
+const playerPanel = $("#intiface-chat-media-panel")
+const isMediaPlaying = playerPanel.length > 0 && playerPanel.is(":visible") && mediaPlayer.isPlaying
+
+// Filter out device commands if media is playing
+const deviceCommandsList = isMediaPlaying ? [] : commands.filter(cmd =>
+cmd.type !== 'intiface_start' &&
+cmd.type !== 'intiface_connect' &&
+cmd.type !== 'intiface_disconnect'
+)
+
+if (isMediaPlaying && commands.some(cmd =>
+cmd.type !== 'intiface_start' &&
+cmd.type !== 'intiface_connect' &&
+cmd.type !== 'intiface_disconnect'
+)) {
+console.log(`${NAME}: Skipping AI device commands - media player is active`)
+}
+
+// Execute system commands immediately (even if not connected)
+for (const cmd of systemCommands) {
+await executeCommand(cmd)
+}
+
+// Only process device commands if connected
+if (!client.connected && !videoFilename) return
+
+// Clear previous commands and stop current activity (unless we're playing video OR tab is hidden)
+if (!mediaPlayer.isPlaying && !document.hidden) {
+messageCommands = []
+executedCommands.clear()
+streamingText = ''
+
+if (commandQueueInterval) {
+clearWorkerTimeout(commandQueueInterval)
+commandQueueInterval = null
+}
+
+await stopAllDeviceActions()
+}
+
+// Queue new device commands (empty if media is playing)
+messageCommands = deviceCommandsList
+executedCommands = new Set(deviceCommandsList.map(cmd => JSON.stringify(cmd)))
+
+// Start processing
+processCommandQueue()
 }
 
 // Handle generation started
@@ -3417,28 +3549,37 @@ function getDeviceDisplayName(dev) {
 
 // Get device type classification
 function getDeviceType(dev) {
-  const devName = (dev.displayName || dev.name || '').toLowerCase()
-  if (devName.includes('cage')) return 'cage'
-  if (devName.includes('plug')) return 'plug'
-  if (devName.includes('solace') || devName.includes('stroker') || devName.includes('launch')) return 'stroker'
-  if (devName.includes('lush') || devName.includes('hush')) return 'vibrator'
-  if (devName.includes('nora') || devName.includes('max') || devName.includes('domi')) return 'vibrator'
-  return 'general'
+const devName = (dev.displayName || dev.name || '').toLowerCase()
+if (devName.includes('cage')) return 'cage'
+if (devName.includes('plug')) return 'plug'
+if (devName.includes('solace') || devName.includes('stroker') || devName.includes('launch')) return 'stroker'
+if (devName.includes('lush') || devName.includes('hush')) return 'vibrator'
+if (devName.includes('nora') || devName.includes('max') || devName.includes('domi')) return 'vibrator'
+if (devName.includes('gush')) return 'gush'
+return 'general'
+}
+
+// Get device-specific default intensity
+function getDeviceDefaultIntensity(dev) {
+const devName = (dev.displayName || dev.name || '').toLowerCase()
+if (devName.includes('gush')) return 117 // Gush 2 works better at 117%
+return 100 // Default for all other devices
 }
 
 // Get shorthand for device
 function getDeviceShorthand(dev) {
-  const devName = (dev.displayName || dev.name || '').toLowerCase()
-  if (devName.includes('cage')) return 'cage'
-  if (devName.includes('plug')) return 'plug'
-  if (devName.includes('solace')) return 'solace'
-  if (devName.includes('lush')) return 'lush'
-  if (devName.includes('hush')) return 'hush'
-  if (devName.includes('nora')) return 'nora'
-  if (devName.includes('max')) return 'max'
-  if (devName.includes('domi')) return 'domi'
-  if (devName.includes('edge')) return 'edge'
-  return devName.split(' ')[0]
+const devName = (dev.displayName || dev.name || '').toLowerCase()
+if (devName.includes('cage')) return 'cage'
+if (devName.includes('plug')) return 'plug'
+if (devName.includes('solace')) return 'solace'
+if (devName.includes('lush')) return 'lush'
+if (devName.includes('hush')) return 'hush'
+if (devName.includes('nora')) return 'nora'
+if (devName.includes('max')) return 'max'
+if (devName.includes('domi')) return 'domi'
+if (devName.includes('edge')) return 'edge'
+if (devName.includes('gush')) return 'gush'
+return devName.split(' ')[0]
 }
 
 function clickHandlerHack() {
@@ -3631,9 +3772,8 @@ async function handleDeviceAdded(newDevice) {
   // Add separator
   devicesEl.append('<hr style="margin: 10px 0; opacity: 0.3;">')
 
-  // Show active device info
-  const deviceDiv = $(`<div id="device-${device.index}"></div>`)
-  deviceDiv.html(`<h3>${device.name}</h3>`)
+// Show active device info
+const deviceDiv = $(`<div id="device-${device.index}"></div>`)
 
   // Check device capabilities from message attributes
   const messageAttrs = device.messageAttributes
@@ -3641,10 +3781,18 @@ async function handleDeviceAdded(newDevice) {
   const hasOscillate = messageAttrs?.OscillateCmd !== undefined
   const hasLinear = messageAttrs?.LinearCmd !== undefined
   
-  // Get device type
-  const deviceType = getDeviceType(device)
+// Get device type
+const deviceType = getDeviceType(device)
 
-  // Show supported features info
+// Apply device-specific default intensity
+const deviceDefaultIntensity = getDeviceDefaultIntensity(device)
+if (deviceDefaultIntensity !== 100 && globalIntensityScale === 100) {
+globalIntensityScale = deviceDefaultIntensity
+console.log(`${NAME}: Applied ${deviceDefaultIntensity}% default intensity for ${device.name}`)
+updateStatus(`Device ${device.name}: Using ${deviceDefaultIntensity}% intensity default`)
+}
+
+// Show supported features info
   const featuresList = []
   if (hasVibration) featuresList.push(`Vibrate (${device.vibrateAttributes.length} motor${device.vibrateAttributes.length > 1 ? 's' : ''})`)
   if (hasOscillate) featuresList.push('Oscillate')
@@ -3723,18 +3871,34 @@ $(document).on("click", "[id^='intiface-motors-toggle-']", function() {
 
 // Handle waveform toggle click (delegated for dynamically added devices)
 $(document).on("click", "[id^='intiface-waveform-toggle-']", function() {
-  const toggleId = $(this).attr("id")
-  const deviceIndex = toggleId.replace("intiface-waveform-toggle-", "")
-  const content = $(`#intiface-waveform-content-${deviceIndex}`)
-  const arrow = $(`#intiface-waveform-arrow-${deviceIndex}`)
-  
-  if (content.is(":visible")) {
-    content.slideUp(200)
-    arrow.css("transform", "rotate(0deg)")
-  } else {
-    content.slideDown(200)
-    arrow.css("transform", "rotate(180deg)")
-  }
+const toggleId = $(this).attr("id")
+const deviceIndex = toggleId.replace("intiface-waveform-toggle-", "")
+const content = $(`#intiface-waveform-content-${deviceIndex}`)
+const arrow = $(`#intiface-waveform-arrow-${deviceIndex}`)
+
+if (content.is(":visible")) {
+content.slideUp(200)
+arrow.css("transform", "rotate(0deg)")
+} else {
+content.slideDown(200)
+arrow.css("transform", "rotate(180deg)")
+}
+})
+
+// Handle modes toggle click (delegated for dynamically added devices)
+$(document).on("click", "[id^='intiface-modes-toggle-']", function() {
+const toggleId = $(this).attr("id")
+const deviceIndex = toggleId.replace("intiface-modes-toggle-", "")
+const content = $(`#intiface-modes-content-${deviceIndex}`)
+const arrow = $(`#intiface-modes-arrow-${deviceIndex}`)
+
+if (content.is(":visible")) {
+content.slideUp(200)
+arrow.css("transform", "rotate(0deg)")
+} else {
+content.slideDown(200)
+arrow.css("transform", "rotate(180deg)")
+}
 })
   
   // Add per-motor controls if multiple motors
@@ -3800,259 +3964,211 @@ $(document).on("click", "[id^='intiface-waveform-toggle-']", function() {
     deviceDiv.append(waveformHtml)
   }
 
-// Add Denial Domina mode section
-  if (hasVibration || hasOscillate) {
-    const deviceIndex = devices.length - 1
-    const denyModes = DenialDominaMode
-    const modeNames = Object.keys(denyModes)
+// Add Modes section with all mode categories as subsections
+if (hasVibration || hasOscillate) {
+const deviceIndex = devices.length - 1
 
-    if (modeNames.length > 0 && modeSettings.denialDomina) {
-      const denyHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-deny-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,100,100,0.15); border-radius: 4px; border: 1px solid rgba(255,100,100,0.3);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #ff6464;">Denial Domina Modes</span>
-            <span id="intiface-deny-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-deny-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,100,100,0.1); border-radius: 4px; border: 1px solid rgba(255,100,100,0.3);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${modeNames.map(mode =>
-              `<button class="menu_button deny-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(200,50,50,0.2); border: 1px solid rgba(200,50,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(denyHtml)
-    }
+// Build modes content
+let modesContent = ''
 
-    const milkModes = MilkMaidMode
-    const milkModeNames = Object.keys(milkModes)
+// Denial Domina
+if (modeSettings.denialDomina) {
+const denyModes = DenialDominaMode
+const modeNames = Object.keys(denyModes)
+if (modeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,100,100,0.1); border-radius: 4px; border: 1px solid rgba(255,100,100,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #ff6464; margin-bottom: 6px;"><i class="fa-solid fa-heart"></i> Denial Domina</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${modeNames.map(mode =>
+`<button class="menu_button deny-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(200,50,50,0.2); border: 1px solid rgba(200,50,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    if (milkModeNames.length > 0 && modeSettings.milkMaid) {
-      const milkHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-milk-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(100,200,100,0.15); border-radius: 4px; border: 1px solid rgba(100,200,100,0.3);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #64ff64;">Milk Maid Modes</span>
-            <span id="intiface-milk-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-milk-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(100,200,100,0.1); border-radius: 4px; border: 1px solid rgba(100,200,100,0.3);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${milkModeNames.map(mode =>
-              `<button class="menu_button milk-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(50,200,50,0.2); border: 1px solid rgba(50,200,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(milkHtml)
-    }
+// Milk Maid
+if (modeSettings.milkMaid) {
+const milkModes = MilkMaidMode
+const milkModeNames = Object.keys(milkModes)
+if (milkModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(100,200,100,0.1); border-radius: 4px; border: 1px solid rgba(100,200,100,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #64ff64; margin-bottom: 6px;"><i class="fa-solid fa-cow"></i> Milk Maid</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${milkModeNames.map(mode =>
+`<button class="menu_button milk-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(50,200,50,0.2); border: 1px solid rgba(50,200,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    const petModes = PetTrainingMode
-    const petModeNames = Object.keys(petModes)
+// Pet Training
+if (modeSettings.petTraining) {
+const petModes = PetTrainingMode
+const petModeNames = Object.keys(petModes)
+if (petModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(100,100,255,0.1); border-radius: 4px; border: 1px solid rgba(100,100,255,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #6464ff; margin-bottom: 6px;"><i class="fa-solid fa-paw"></i> Pet Training</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${petModeNames.map(mode =>
+`<button class="menu_button pet-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(50,50,200,0.2); border: 1px solid rgba(50,50,200,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    if (petModeNames.length > 0 && modeSettings.petTraining) {
-      const petHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-pet-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(100,100,255,0.15); border-radius: 4px; border: 1px solid rgba(100,100,255,0.3);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #6464ff;">Pet Training Modes</span>
-            <span id="intiface-pet-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-pet-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(100,100,255,0.1); border-radius: 4px; border: 1px solid rgba(100,100,255,0.3);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${petModeNames.map(mode =>
-              `<button class="menu_button pet-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(50,50,200,0.2); border: 1px solid rgba(50,50,200,0.4);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(petHtml)
-    }
+// Sissy Surrender
+if (modeSettings.sissySurrender) {
+const sissyModes = SissySurrenderMode
+const sissyModeNames = Object.keys(sissyModes)
+if (sissyModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,100,200,0.1); border-radius: 4px; border: 1px solid rgba(255,100,200,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #ff64c8; margin-bottom: 6px;"><i class="fa-solid fa-gem"></i> Sissy Surrender</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${sissyModeNames.map(mode =>
+`<button class="menu_button sissy-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(200,50,100,0.2); border: 1px solid rgba(200,50,100,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    const sissyModes = SissySurrenderMode
-    const sissyModeNames = Object.keys(sissyModes)
+// Prejac Princess
+if (modeSettings.prejacPrincess) {
+const prejacModes = PrejacPrincessMode
+const prejacModeNames = Object.keys(prejacModes)
+if (prejacModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(0,255,255,0.1); border-radius: 4px; border: 1px solid rgba(0,255,255,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #00ffff; margin-bottom: 6px;"><i class="fa-solid fa-crown"></i> Prejac Princess</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${prejacModeNames.map(mode =>
+`<button class="menu_button prejac-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(0,200,255,0.2); border: 1px solid rgba(0,200,255,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    if (sissyModeNames.length > 0 && modeSettings.sissySurrender) {
-      const sissyHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-sissy-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,100,200,0.15); border-radius: 4px; border: 1px solid rgba(255,100,200,0.3);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #ff64c8;">Sissy Surrender Modes</span>
-            <span id="intiface-sissy-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-sissy-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,100,200,0.1); border-radius: 4px; border: 1px solid rgba(255,100,200,0.3);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${sissyModeNames.map(mode =>
-              `<button class="menu_button sissy-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(200,50,100,0.2); border: 1px solid rgba(200,50,100,0.4);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(sissyHtml)
-    }
+// Robotic Ruination
+if (modeSettings.roboticRuination) {
+const roboticModes = RoboticRuinationMode
+const roboticModeNames = Object.keys(roboticModes)
+if (roboticModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(200,200,200,0.1); border-radius: 4px; border: 1px solid rgba(200,200,200,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #ff00ff; margin-bottom: 6px;"><i class="fa-solid fa-robot"></i> Robotic Ruination</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${roboticModeNames.map(mode =>
+`<button class="menu_button robotic-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(150,150,150,0.2); border: 1px solid rgba(150,150,150,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    const prejacModes = PrejacPrincessMode
-    const prejacModeNames = Object.keys(prejacModes)
+// Evil Edging Mistress
+if (modeSettings.evilEdgingMistress) {
+const evilModes = EvilEdgingMistressMode
+const evilModeNames = Object.keys(evilModes)
+if (evilModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(128,0,128,0.1); border-radius: 4px; border: 1px solid rgba(128,0,128,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #bf00ff; margin-bottom: 6px;"><i class="fa-solid fa-skull"></i> Evil Edging Mistress</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${evilModeNames.map(mode =>
+`<button class="menu_button evil-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(100,0,100,0.2); border: 1px solid rgba(100,0,100,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    if (prejacModeNames.length > 0 && modeSettings.prejacPrincess) {
-      const prejacHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-prejac-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,255,255,0.15); border-radius: 4px; border: 1px solid rgba(0,255,255,0.3);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #00ffff;">Prejac Princess Modes</span>
-            <span id="intiface-prejac-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-prejac-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,255,255,0.1); border-radius: 4px; border: 1px solid rgba(0,255,255,0.3);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${prejacModeNames.map(mode =>
-              `<button class="menu_button prejac-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(0,200,255,0.2); border: 1px solid rgba(0,200,255,0.4);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(prejacHtml)
-    }
+// Frustration Fairy
+if (modeSettings.frustrationFairy) {
+const frustrationModes = FrustrationFairyMode
+const frustrationModeNames = Object.keys(frustrationModes)
+if (frustrationModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,255,0,0.1); border-radius: 4px; border: 1px solid rgba(255,255,0,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #ffff00; margin-bottom: 6px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Frustration Fairy</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${frustrationModeNames.map(mode =>
+`<button class="menu_button frustration-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(255,255,0,0.2); border: 1px solid rgba(255,255,0,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    const roboticModes = RoboticRuinationMode
-    const roboticModeNames = Object.keys(roboticModes)
+// Hypno Helper
+if (modeSettings.hypnoHelper) {
+const hypnoModes = HypnoHelperMode
+const hypnoModeNames = Object.keys(hypnoModes)
+if (hypnoModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 12px; padding: 8px; background: rgba(138,43,226,0.1); border-radius: 4px; border: 1px solid rgba(138,43,226,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #dda0dd; margin-bottom: 6px;"><i class="fa-solid fa-eye"></i> Hypno Helper</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${hypnoModeNames.map(mode =>
+`<button class="menu_button hypno-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(138,43,226,0.2); border: 1px solid rgba(138,43,226,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    if (roboticModeNames.length > 0 && modeSettings.roboticRuination) {
-      const roboticHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-robotic-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(200,200,200,0.15); border-radius: 4px; border: 1px solid rgba(200,200,200,0.3);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #ff00ff;">Robotic Ruination Modes</span>
-            <span id="intiface-robotic-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-robotic-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(200,200,200,0.1); border-radius: 4px; border: 1px solid rgba(200,200,200,0.3);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${roboticModeNames.map(mode =>
-              `<button class="menu_button robotic-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(150,150,150,0.2); border: 1px solid rgba(150,150,150,0.4);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(roboticHtml)
-    }
+// Chastity Caretaker
+if (modeSettings.chastityCaretaker) {
+const chastityModes = ChastityCaretakerMode
+const chastityModeNames = Object.keys(chastityModes)
+if (chastityModeNames.length > 0) {
+modesContent += `
+<div style="margin-bottom: 8px; padding: 8px; background: rgba(255,192,203,0.1); border-radius: 4px; border: 1px solid rgba(255,192,203,0.2);">
+<div style="font-size: 0.8em; font-weight: bold; color: #ffc0cb; margin-bottom: 6px;"><i class="fa-solid fa-heart"></i> Chastity Caretaker</div>
+<div style="display: flex; flex-wrap: wrap; gap: 4px;">
+${chastityModeNames.map(mode =>
+`<button class="menu_button chastity-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
+style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(255,192,203,0.2); border: 1px solid rgba(255,192,203,0.4);">${mode.replace(/_/g, ' ')}</button>`
+).join('')}
+</div>
+</div>`
+}
+}
 
-    const evilModes = EvilEdgingMistressMode
-    const evilModeNames = Object.keys(evilModes)
-
-    if (evilModeNames.length > 0 && modeSettings.evilEdgingMistress) {
-      const evilHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-evil-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(128,0,128,0.2); border-radius: 4px; border: 1px solid rgba(128,0,128,0.4);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #bf00ff;">Evil Edging Mistress Modes</span>
-            <span id="intiface-evil-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-evil-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(128,0,128,0.15); border-radius: 4px; border: 1px solid rgba(128,0,128,0.4);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${evilModeNames.map(mode =>
-              `<button class="menu_button evil-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(100,0,100,0.25); border: 1px solid rgba(100,0,100,0.5);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(evilHtml)
-    }
-
-    const frustrationModes = FrustrationFairyMode
-    const frustrationModeNames = Object.keys(frustrationModes)
-
-    if (frustrationModeNames.length > 0 && modeSettings.frustrationFairy) {
-      const frustrationHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-frustration-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,255,0,0.15); border-radius: 4px; border: 1px solid rgba(255,255,0,0.4);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #ffff00;">Frustration Fairy Modes</span>
-            <span id="intiface-frustration-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-frustration-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,255,0,0.1); border-radius: 4px; border: 1px solid rgba(255,255,0,0.4);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${frustrationModeNames.map(mode =>
-              `<button class="menu_button frustration-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(255,255,0,0.2); border: 1px solid rgba(255,255,0,0.5);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(frustrationHtml)
-    }
-
-    const hypnoModes = HypnoHelperMode
-    const hypnoModeNames = Object.keys(hypnoModes)
-
-    if (hypnoModeNames.length > 0 && modeSettings.hypnoHelper) {
-      const hypnoHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-hypno-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(138,43,226,0.2); border-radius: 4px; border: 1px solid rgba(138,43,226,0.4);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #dda0dd;">Hypno Helper Modes</span>
-            <span id="intiface-hypno-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-hypno-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(138,43,226,0.15); border-radius: 4px; border: 1px solid rgba(138,43,226,0.4);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${hypnoModeNames.map(mode =>
-              `<button class="menu_button hypno-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(138,43,226,0.2); border: 1px solid rgba(138,43,226,0.4);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(hypnoHtml)
-    }
-
-    const chastityModes = ChastityCaretakerMode
-    const chastityModeNames = Object.keys(chastityModes)
-
-    if (chastityModeNames.length > 0 && modeSettings.chastityCaretaker) {
-      const chastityHtml = `
-      <div style="margin-top: 10px;">
-        <div id="intiface-chastity-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(255,192,203,0.2); border-radius: 4px; border: 1px solid rgba(255,192,203,0.4);">
-          <span style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85em; font-weight: bold; color: #ffc0cb;">Chastity Caretaker Modes</span>
-            <span id="intiface-chastity-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-          </span>
-        </div>
-        <div id="intiface-chastity-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,192,203,0.15); border-radius: 4px; border: 1px solid rgba(255,192,203,0.4);">
-          <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-            ${chastityModeNames.map(mode =>
-              `<button class="menu_button chastity-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-              style="padding: 4px 8px; font-size: 0.7em; border-radius: 3px; background: rgba(255,192,203,0.2); border: 1px solid rgba(255,192,203,0.5);">${mode.replace(/_/g, ' ')}</button>`
-            ).join('')}
-          </div>
-        </div>
-      </div>
-      `
-      deviceDiv.append(chastityHtml)
-    }
-  }
+// Only add the Modes section if there's content
+if (modesContent) {
+const modesHtml = `
+<div style="margin-top: 10px;">
+<div id="intiface-modes-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(100,100,255,0.15); border-radius: 4px; border: 1px solid rgba(100,100,255,0.3);">
+<span style="display: flex; justify-content: space-between; align-items: center;">
+<span style="font-size: 0.85em; font-weight: bold;"><i class="fa-solid fa-gamepad"></i> Play Modes</span>
+<span id="intiface-modes-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
+</span>
+</div>
+<div id="intiface-modes-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px; max-height: 400px; overflow-y: auto;">
+${modesContent}
+</div>
+</div>
+`
+deviceDiv.append(modesHtml)
+}
+}
 
   devicesEl.append(deviceDiv)
 
@@ -5001,83 +5117,109 @@ function attachDeviceEventHandlers() {
 
 // Stop all device actions immediately
 async function stopAllDeviceActions() {
-  try {
-    if (devices.length === 0) {
-      return "No devices connected"
-    }
+try {
+// Update AI status immediately since we're stopping
+updateAIStatusFromActivity()
 
-  // Clear all intervals
-  if (strokerIntervalId) {
-    clearWorkerTimeout(strokerIntervalId)
-    strokerIntervalId = null
-  }
-  if (vibrateIntervalId) {
-    clearWorkerTimeout(vibrateIntervalId)
-    vibrateIntervalId = null
-  }
-  if (oscillateIntervalId) {
-    clearWorkerTimeout(oscillateIntervalId)
-    oscillateIntervalId = null
-  }
-    isStroking = false
-    
-  // Clear all active patterns
-  for (const [deviceIndex, active] of activePatterns.entries()) {
-    if (active.interval) {
-      clearWorkerTimeout(active.interval)
-    }
-  }
-  activePatterns.clear()
+if (devices.length === 0) {
+return "No devices connected"
+}
 
-    // Stop all devices
-    const results = []
-    for (const dev of devices) {
-      try {
-        // Stop vibration - try simple method first, fallback to scalar
-        try {
-          await dev.vibrate(0)
-        } catch (e) {
-          // Fallback to scalar command
-          const vibrateAttributes = dev.vibrateAttributes
-          if (vibrateAttributes && vibrateAttributes.length > 0) {
-            for (let i = 0; i < vibrateAttributes.length; i++) {
-              const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, 0, "Vibrate")
-              await dev.scalar(scalarCommand)
-              await new Promise((resolve) => setTimeout(resolve, 50))
-            }
-          }
-        }
+// Clear all intervals
+if (strokerIntervalId) {
+clearWorkerTimeout(strokerIntervalId)
+strokerIntervalId = null
+}
+if (vibrateIntervalId) {
+clearWorkerTimeout(vibrateIntervalId)
+vibrateIntervalId = null
+}
+if (oscillateIntervalId) {
+clearWorkerTimeout(oscillateIntervalId)
+oscillateIntervalId = null
+}
+isStroking = false
 
-        // Stop oscillation
-        try {
-          await dev.oscillate(0)
-        } catch (e) {
-          // Ignore - some devices don't support oscillation
-        }
+// Clear all active patterns
+for (const [deviceIndex, active] of activePatterns.entries()) {
+if (active.interval) {
+clearWorkerTimeout(active.interval)
+}
+if (active.stop && typeof active.stop === 'function') {
+try {
+active.stop()
+} catch (e) {
+// Ignore stop errors
+}
+}
+}
+activePatterns.clear()
 
-        results.push(dev.name)
-      } catch (devError) {
-        console.error(`Failed to stop ${dev.name}:`, devError)
-      }
-    }
+// Stop all devices - use Promise.all with timeout to prevent hanging
+updateStatus("Stopping device...")
+const stopPromises = devices.map(async (dev) => {
+try {
+// Create timeout wrapper for device stop commands
+const stopWithTimeout = async (operation, timeout = 2000) => {
+return Promise.race([
+operation(),
+new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeout))
+]).catch(() => null) // Return null on timeout/error instead of throwing
+}
 
-    // Reset sliders
-    $(".vibrate-slider").val(0)
-    $(".motor-slider").val(0)
-    $("#oscillate-slider").val(0)
-    $("#intiface-interval-display").text("Interval: N/A")
-    $("#intiface-oscillate-interval-display").text("Oscillate Interval: N/A")
+// Stop vibration - try simple method first, fallback to scalar
+await stopWithTimeout(async () => {
+try {
+await dev.vibrate(0)
+} catch (e) {
+// Fallback to scalar command
+const vibrateAttributes = dev.vibrateAttributes
+if (vibrateAttributes && vibrateAttributes.length > 0) {
+for (let i = 0; i < vibrateAttributes.length; i++) {
+const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, 0, "Vibrate")
+await dev.scalar(scalarCommand)
+await new Promise((resolve) => setTimeout(resolve, 50))
+}
+}
+}
+}, 1500)
 
-    updateStatus(`Stopped ${results.length} device(s)`)
-    // Update prompt to reflect stopped state
-    updatePrompt()
-    return `Stopped ${results.length} device(s): ${results.join(', ')}`
-  } catch (e) {
-    const errorMsg = `Failed to stop device actions: ${e.message}`
-    console.error(errorMsg, e)
-    updateStatus(errorMsg, true)
-    throw new Error(errorMsg)
-  }
+// Stop oscillation
+await stopWithTimeout(async () => {
+try {
+await dev.oscillate(0)
+} catch (e) {
+// Ignore - some devices don't support oscillation
+}
+}, 1000)
+
+return dev.name
+} catch (devError) {
+console.error(`Failed to stop ${dev.name}:`, devError)
+return null
+}
+})
+
+// Wait for all stop operations with overall timeout
+const results = (await Promise.all(stopPromises)).filter(name => name !== null)
+
+// Reset sliders
+$(".vibrate-slider").val(0)
+$(".motor-slider").val(0)
+$("#oscillate-slider").val(0)
+$("#intiface-interval-display").text("Interval: N/A")
+$("#intiface-oscillate-interval-display").text("Oscillate Interval: N/A")
+
+updateStatus(`Stopped ${results.length} device(s)`)
+// Update prompt to reflect stopped state
+updatePrompt()
+return `Stopped ${results.length} device(s): ${results.join(', ')}`
+} catch (e) {
+const errorMsg = `Failed to stop device actions: ${e.message}`
+console.error(errorMsg, e)
+updateStatus(errorMsg, true)
+return "Stop failed"
+}
 }
 
 // Dynamically load the buttplug.js library
@@ -5435,35 +5577,6 @@ $("#intiface-reset-mode-intensities").on("click", function() {
       }
     })
 
-    // Handle test backend button
-    $("#intiface-test-backend-btn").on("click", async function () {
-      const statusEl = $("#intiface-test-backend-status")
-      statusEl.text("Testing...").css("color", "#FFA500")
-
-      try {
-        console.log(`${NAME}: Testing backend...`)
-        const response = await fetch('/api/plugins/intiface-launcher/test', {
-          method: 'GET',
-          headers: getRequestHeaders()
-        })
-
-        console.log(`${NAME}: Test response status:`, response.status)
-
-        if (response.ok) {
-          const result = await response.json()
-          statusEl.text(`✓ Backend working: ${result.message}`).css("color", "#4CAF50")
-          console.log(`${NAME}: Backend test success:`, result)
-        } else {
-          const errorText = await response.text()
-          statusEl.text(`✗ Backend error: ${response.status}`).css("color", "#F44336")
-          console.error(`${NAME}: Backend test failed:`, errorText)
-        }
-      } catch (error) {
-        statusEl.text(`✗ Backend not available: ${error.message}`).css("color", "#F44336")
-        console.error(`${NAME}: Backend test error:`, error)
-      }
-    })
-
 // AI control is always chat-based
     chatControlEnabled = true
     localStorage.setItem("intiface-ai-mode", "chat")
@@ -5772,20 +5885,6 @@ function initMediaPlayer() {
   // Handle connect action button
   $("#intiface-connect-action-button").on("click", toggleConnection)
   
-// Handle debug menu section toggle
-$("#intiface-debug-menu-toggle").on("click", function () {
-  const content = $("#intiface-debug-menu-content")
-  const arrow = $("#intiface-debug-menu-arrow")
-
-  if (content.is(":visible")) {
-    content.slideUp(200)
-    arrow.css("transform", "rotate(0deg)")
-  } else {
-    content.slideDown(200)
-    arrow.css("transform", "rotate(180deg)")
-  }
-})
-
 // Handle menu media section toggle
 $("#intiface-media-menu-toggle").on("click", function () {
   const content = $("#intiface-media-menu-content")
@@ -5831,13 +5930,7 @@ $("#intiface-mode-menu-toggle").on("click", function () {
 // Handle menu refresh button
   $("#intiface-menu-refresh-media-btn").on("click", refreshMenuMediaList)
   
-  // Handle show chat player button (debug)
-  $("#intiface-show-chat-player-btn").on("click", () => {
-    console.log(`${NAME}: Debug - showing chat player`)
-    showChatMediaPanel()
-  })
-  
-  // Handle menu media file selection
+// Handle menu media file selection
   $(document).on('click', '.menu-media-file-item', async function() {
     const filename = $(this).data('filename')
     await loadChatMediaFile(filename)
@@ -6358,7 +6451,9 @@ function stopFunscriptSyncTimer() {
 
 // Execute Funscript action
 async function executeFunscriptAction(action) {
-  if (!client.connected || devices.length === 0) return
+// Check if media is still playing before executing
+if (!mediaPlayer.isPlaying || !mediaPlayer.videoElement) return
+if (!client.connected || devices.length === 0) return
 
   const deviceType = getDeviceType(devices[0])
   const targetDevice = devices[0]
@@ -6584,29 +6679,60 @@ function setupChatVideoEventListeners() {
   video.onpause = null
   video.onended = null
 
-  // Add new listeners
-  video.onplay = () => {
-    console.log(`${NAME}: Video onplay event fired`)
-    mediaPlayer.isPlaying = true
-    startFunscriptSync()
-    $("#intiface-chat-funscript-info").text("Playing - Funscript active").css("color", "#4CAF50")
-  }
+// Add new listeners
+video.onplay = async () => {
+console.log(`${NAME}: Video onplay event fired`)
 
-  video.onpause = () => {
-    console.log(`${NAME}: Video onpause triggered - hidden: ${document.hidden}, devices: ${devices.length}, connected: ${client.connected}`)
-    // Don't stop if tab is hidden - let visibility handler manage background mode
-    if (document.hidden) {
-      console.log(`${NAME}: Video/audio paused but tab is hidden - continuing in background mode`)
-      // Keep isPlaying true so background sync can work
-      return
-    }
-    console.log(`${NAME}: Video/audio paused - pausing funscript sync (keeping device state)`)
-    mediaPlayer.isPlaying = false
-    stopFunscriptSync()
-    // Don't stop the device on pause - this causes weaker playback on resume
-    // The device will maintain its last position and continue smoothly when resuming
-    $("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
-  }
+// Wait a moment for device to finish stopping if it was just paused
+await new Promise(resolve => setTimeout(resolve, 50))
+
+mediaPlayer.isPlaying = true
+
+// Reset last action index to ensure we start from current position
+if (mediaPlayer.videoElement) {
+const currentTime = mediaPlayer.videoElement.currentTime * 1000
+// Find the correct starting position in the funscript
+if (mediaPlayer.currentFunscript && mediaPlayer.currentFunscript.actions) {
+const actions = mediaPlayer.currentFunscript.actions
+for (let i = 0; i < actions.length; i++) {
+if (actions[i].at > currentTime) {
+mediaPlayer.lastActionIndex = Math.max(0, i - 1)
+break
+}
+}
+}
+}
+
+// Clear any pending AI commands when video starts playing
+if (messageCommands.length > 0) {
+console.log(`${NAME}: Clearing ${messageCommands.length} pending AI commands - video playback has priority`)
+messageCommands = []
+executedCommands.clear()
+}
+
+startFunscriptSync()
+updateStatus("Playing funscript")
+$("#intiface-chat-funscript-info").text("Playing - Funscript active").css("color", "#4CAF50")
+}
+
+video.onpause = async () => {
+console.log(`${NAME}: Video onpause triggered - hidden: ${document.hidden}, devices: ${devices.length}, connected: ${client.connected}`)
+// Don't stop if tab is hidden - let visibility handler manage background mode
+if (document.hidden) {
+console.log(`${NAME}: Video/audio paused but tab is hidden - continuing in background mode`)
+// Keep isPlaying true so background sync can work
+return
+}
+console.log(`${NAME}: Video/audio paused - stopping funscript sync and device`)
+// Set isPlaying false FIRST to prevent any new commands from being sent
+mediaPlayer.isPlaying = false
+// Stop sync loops immediately
+stopFunscriptSync()
+// Small delay to let any in-flight commands complete, then stop device
+await new Promise(resolve => setTimeout(resolve, 100))
+await stopAllDeviceActions()
+$("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
+}
 
   video.onended = () => {
     console.log(`${NAME}: Video onended event fired`)
