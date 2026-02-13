@@ -65,6 +65,79 @@ let modeIntensityMultipliers = {
   chastityCaretaker: 1.0
 }
 
+// Global inversion setting (applies to ALL devices)
+let globalInvert = false
+
+// Load global inversion from localStorage
+function loadGlobalInvert() {
+  try {
+    const saved = localStorage.getItem('intiface-global-invert')
+    if (saved !== null) {
+      globalInvert = saved === 'true'
+      console.log(`${NAME}: Loaded global invert: ${globalInvert}`)
+    }
+  } catch (e) {
+    console.error(`${NAME}: Failed to load global invert:`, e)
+    globalInvert = false
+  }
+}
+
+// Save global inversion to localStorage
+function saveGlobalInvert(value) {
+  try {
+    globalInvert = value
+    localStorage.setItem('intiface-global-invert', value.toString())
+    console.log(`${NAME}: Saved global invert: ${value}`)
+  } catch (e) {
+    console.error(`${NAME}: Failed to save global invert:`, e)
+  }
+}
+
+// Apply inversion to intensity/position values (0-100)
+function applyInversion(value) {
+  if (globalInvert) {
+    return 100 - value
+  }
+  return value
+}
+
+// Global device polling rate (Hz) - controls how often commands are sent to devices
+// Higher = smoother but more CPU/BT traffic, Lower = less spam but less smooth
+let devicePollingRate = 30 // Default 30Hz (33ms interval)
+
+// Load polling rate from localStorage
+function loadDevicePollingRate() {
+  try {
+    const saved = localStorage.getItem('intiface-polling-rate')
+    if (saved) {
+      devicePollingRate = parseInt(saved, 10) || 30
+      // Validate range
+      if (devicePollingRate < 10) devicePollingRate = 10
+      if (devicePollingRate > 120) devicePollingRate = 120
+    }
+    console.log(`${NAME}: Device polling rate set to ${devicePollingRate}Hz`)
+  } catch (e) {
+    console.error(`${NAME}: Failed to load polling rate:`, e)
+    devicePollingRate = 30
+  }
+}
+
+// Save polling rate to localStorage
+function saveDevicePollingRate(rate) {
+  try {
+    devicePollingRate = rate
+    localStorage.setItem('intiface-polling-rate', rate.toString())
+    console.log(`${NAME}: Device polling rate saved: ${rate}Hz`)
+  } catch (e) {
+    console.error(`${NAME}: Failed to save polling rate:`, e)
+  }
+}
+
+// Get polling interval in milliseconds
+function getPollingInterval() {
+  return Math.round(1000 / devicePollingRate)
+}
+
 // Apply global intensity to values with optional mode scaling
 function applyIntensityScale(values, modeName = null) {
   // Get base scale from global intensity (default 100%)
@@ -1986,40 +2059,43 @@ async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
     console.error(`${NAME}: No device found for waveform pattern`)
     return
   }
-  
+
   // Determine device type
   const devName = (targetDevice.displayName || targetDevice.name || '').toLowerCase()
   let deviceType = 'general'
   if (devName.includes('cage')) deviceType = 'cage'
   else if (devName.includes('plug')) deviceType = 'plug'
   else if (devName.includes('solace') || devName.includes('stroker') || devName.includes('launch')) deviceType = 'stroker'
-  
+
   // Get preset
   const presets = DevicePresets[deviceType] || DevicePresets.general
   const preset = presets[presetName] || presets.warmup || { type: 'waveform', pattern: 'sine', min: 20, max: 60, duration: 3000, cycles: 3 }
-  
+
   // Merge with options
   const config = { ...preset, ...options }
-  
+
   // Stop existing pattern for this device
   await stopDevicePattern(deviceIndex)
-  
+
   const deviceName = getDeviceDisplayName(targetDevice)
-  
+
   if (config.type === 'waveform') {
     const steps = Math.floor(config.duration / 100) // 100ms resolution
     const intervals = Array(steps).fill(100)
-    
+
     // Check if device has multiple motors
     const motorCount = getMotorCount(targetDevice)
     let patternData
-    
+
     if (motorCount >= 2) {
       // Generate dual motor pattern with phase offset
       const dualValues = generateDualMotorWaveform(config.pattern, steps, config.min, config.max)
       // Apply global intensity scaling
       dualValues.motor1 = applyIntensityScale(dualValues.motor1)
       dualValues.motor2 = applyIntensityScale(dualValues.motor2)
+      // Apply device inversion
+      dualValues.motor1 = dualValues.motor1.map(v => applyInversion(v))
+      dualValues.motor2 = dualValues.motor2.map(v => applyInversion(v))
       patternData = {
         pattern: dualValues,
         intervals: intervals,
@@ -2031,24 +2107,26 @@ async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
       const values = generateWaveformValues(config.pattern, steps, config.min, config.max)
       // Apply global intensity scaling
       const scaledValues = applyIntensityScale(values)
+      // Apply device inversion
+      const invertedValues = scaledValues.map(v => applyInversion(v))
       patternData = {
-        pattern: scaledValues,
+        pattern: invertedValues,
         intervals: intervals,
         loop: config.cycles || 1
       }
       updateStatus(`${deviceName}: ${presetName} pattern (${config.pattern}) [${globalIntensityScale}%]`)
     }
-    
-const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
-// Store pattern result for proper cleanup
-if (patternResult && typeof patternResult === 'function') {
-activePatterns.set(deviceIndex, {
-mode: 'pattern',
-modeName: `waveform_${presetName}`,
-stop: patternResult
-})
-}
-} else if (config.type === 'gradient') {
+
+    const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
+    // Store pattern result for proper cleanup
+    if (patternResult && typeof patternResult === 'function') {
+      activePatterns.set(deviceIndex, {
+        mode: 'pattern',
+        modeName: `waveform_${presetName}`,
+        stop: patternResult
+      })
+    }
+  } else if (config.type === 'gradient') {
     await executeGradientPattern(deviceIndex, config)
     updateStatus(`${deviceName}: ${presetName} gradient`)
   } else if (config.type === 'linear_waveform') {
@@ -2101,7 +2179,7 @@ async function executeGradientPattern(deviceIndex, config) {
     }
   }
 
-  // Check if device has multiple motors
+// Check if device has multiple motors
   const targetDevice = devices[deviceIndex] || devices[0]
   const motorCount = getMotorCount(targetDevice)
 
@@ -2109,17 +2187,21 @@ async function executeGradientPattern(deviceIndex, config) {
   const scaledMotor1Values = applyIntensityScale(motor1Values)
   const scaledMotor2Values = applyIntensityScale(motor2Values)
 
+  // Apply device inversion
+  const invertedMotor1Values = scaledMotor1Values.map(v => applyInversion(v))
+  const invertedMotor2Values = scaledMotor2Values.map(v => applyInversion(v))
+
   let patternData
   if (motorCount >= 2) {
     patternData = {
-      pattern: { motor1: scaledMotor1Values, motor2: scaledMotor2Values },
+      pattern: { motor1: invertedMotor1Values, motor2: invertedMotor2Values },
       intervals
     }
   } else {
-    patternData = { pattern: scaledMotor1Values, intervals }
+    patternData = { pattern: invertedMotor1Values, intervals }
   }
-  
-const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
+
+  const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
 // Store pattern result for proper cleanup
 if (patternResult && typeof patternResult === 'function') {
 activePatterns.set(deviceIndex, {
@@ -2133,110 +2215,118 @@ return patternResult
 
 // Execute linear waveform (position-based)
 async function executeLinearWaveform(deviceIndex, config) {
-const { pattern, positions, duration, cycles } = config
-const [startPos, endPos] = positions
-const steps = Math.floor(duration / 100)
-const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
+  const { pattern, positions, duration, cycles } = config
+  const [startPos, endPos] = positions
+  const steps = Math.floor(duration / 100)
+  const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
 
-const targetDevice = devices[deviceIndex] || devices[0]
-if (!targetDevice) return
+  const targetDevice = devices[deviceIndex] || devices[0]
+  if (!targetDevice) return
 
-let currentCycle = 0
-let currentStep = 0
-let stepTimeoutId = null
-let isRunning = true
+  // Apply device inversion to positions
+  const invertedStartPos = applyInversion(startPos)
+  const invertedEndPos = applyInversion(endPos)
 
-const executeStep = async () => {
-if (!isRunning || currentCycle >= cycles || !client.connected) {
-activePatterns.delete(deviceIndex)
-return
-}
+  let currentCycle = 0
+  let currentStep = 0
+  let stepTimeoutId = null
+  let isRunning = true
 
-const phase = currentStep / steps
-const normalized = generator(phase, 1)
-const position = Math.round(startPos + (endPos - startPos) * normalized)
+  const executeStep = async () => {
+    if (!isRunning || currentCycle >= cycles || !client.connected) {
+      activePatterns.delete(deviceIndex)
+      return
+    }
 
-try {
-await targetDevice.linear(position / 100, 100)
-} catch (e) {
-console.error(`${NAME}: Linear waveform step failed:`, e)
-}
+    const phase = currentStep / steps
+    const normalized = generator(phase, 1)
+    const position = Math.round(invertedStartPos + (invertedEndPos - invertedStartPos) * normalized)
 
-currentStep++
-if (currentStep >= steps) {
-currentStep = 0
-currentCycle++
-}
+    try {
+      await targetDevice.linear(position / 100, 100)
+    } catch (e) {
+      console.error(`${NAME}: Linear waveform step failed:`, e)
+    }
 
-if (currentCycle < cycles && isRunning) {
-stepTimeoutId = setWorkerTimeout(executeStep, 100)
-// Update active patterns with the timeout ID
-activePatterns.set(deviceIndex, {
-mode: 'linear_waveform',
-modeName: `linear_${pattern}`,
-interval: stepTimeoutId
-})
-}
-}
+    currentStep++
+    if (currentStep >= steps) {
+      currentStep = 0
+      currentCycle++
+    }
 
-// Start execution
-stepTimeoutId = setWorkerTimeout(executeStep, 100)
-activePatterns.set(deviceIndex, {
-mode: 'linear_waveform',
-modeName: `linear_${pattern}`,
-interval: stepTimeoutId
-})
+    if (currentCycle < cycles && isRunning) {
+      stepTimeoutId = setWorkerTimeout(executeStep, 100)
+      // Update active patterns with the timeout ID
+      activePatterns.set(deviceIndex, {
+        mode: 'linear_waveform',
+        modeName: `linear_${pattern}`,
+        interval: stepTimeoutId
+      })
+    }
+  }
+
+  // Start execution
+  stepTimeoutId = setWorkerTimeout(executeStep, 100)
+  activePatterns.set(deviceIndex, {
+    mode: 'linear_waveform',
+    modeName: `linear_${pattern}`,
+    interval: stepTimeoutId
+  })
 }
 
 // Execute linear gradient
 async function executeLinearGradient(deviceIndex, config) {
-const { positions, duration, hold = 0 } = config
-const [startPos, endPos] = positions
-const steps = Math.floor(duration / 50)
+  const { positions, duration, hold = 0 } = config
+  const [startPos, endPos] = positions
+  const steps = Math.floor(duration / 50)
 
-const targetDevice = devices[deviceIndex] || devices[0]
-if (!targetDevice) return
+  const targetDevice = devices[deviceIndex] || devices[0]
+  if (!targetDevice) return
 
-// Create a controller to allow stopping
-let isRunning = true
-const stopController = () => { isRunning = false }
-activePatterns.set(deviceIndex, {
-mode: 'linear_gradient',
-modeName: 'linear_gradient',
-stop: stopController
-})
+  // Apply device inversion to positions
+  const invertedStartPos = applyInversion(startPos)
+  const invertedEndPos = applyInversion(endPos)
 
-for (let i = 0; i < steps; i++) {
-if (!isRunning || !client.connected) break
-const progress = i / steps
-const position = Math.round(startPos + (endPos - startPos) * progress)
-try {
-await targetDevice.linear(position / 100, 50)
-} catch (e) {
-console.error(`${NAME}: Linear gradient step failed:`, e)
-}
-if (isRunning) {
-await new Promise(resolve => setTimeout(resolve, 50))
-}
-}
+  // Create a controller to allow stopping
+  let isRunning = true
+  const stopController = () => { isRunning = false }
+  activePatterns.set(deviceIndex, {
+    mode: 'linear_gradient',
+    modeName: 'linear_gradient',
+    stop: stopController
+  })
 
-if (isRunning && hold > 0 && client.connected) {
-await new Promise(resolve => {
-const holdTimeout = setTimeout(resolve, hold)
-// Store timeout so it can be cleared
-activePatterns.set(deviceIndex, {
-mode: 'linear_gradient',
-modeName: 'linear_gradient',
-stop: () => {
-isRunning = false
-clearTimeout(holdTimeout)
-},
-interval: holdTimeout
-})
-})
-}
+  for (let i = 0; i < steps; i++) {
+    if (!isRunning || !client.connected) break
+    const progress = i / steps
+    const position = Math.round(invertedStartPos + (invertedEndPos - invertedStartPos) * progress)
+    try {
+      await targetDevice.linear(position / 100, 50)
+    } catch (e) {
+      console.error(`${NAME}: Linear gradient step failed:`, e)
+    }
+    if (isRunning) {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+  }
 
-activePatterns.delete(deviceIndex)
+  if (isRunning && hold > 0 && client.connected) {
+    await new Promise(resolve => {
+      const holdTimeout = setTimeout(resolve, hold)
+      // Store timeout so it can be cleared
+      activePatterns.set(deviceIndex, {
+        mode: 'linear_gradient',
+        modeName: 'linear_gradient',
+        stop: () => {
+          isRunning = false
+          clearTimeout(holdTimeout)
+        },
+        interval: holdTimeout
+      })
+    })
+  }
+
+  activePatterns.delete(deviceIndex)
 }
 
 // Execute Mode sequence (Denial Domina, Milk Maid, Pet Training)
@@ -2256,10 +2346,12 @@ async function executeTeaseAndDenialMode(deviceIndex, modeName) {
   await stopDevicePattern(deviceIndex)
 
   const deviceName = getDeviceDisplayName(targetDevice)
-  const sequence = mode.sequence
+const sequence = mode.sequence
   const repeat = mode.repeat !== false
 
   updateStatus(`${deviceName}: ${modeName} mode (${mode.description})`)
+
+  // Get device ID for inversion
 
   let sequenceIndex = 0
   let isRunning = true
@@ -2275,13 +2367,16 @@ async function executeTeaseAndDenialMode(deviceIndex, modeName) {
       const steps = Math.floor(duration / 100)
       const motorCount = getMotorCount(targetDevice)
       let patternData
-      
+
       if (motorCount >= 2) {
         // Use dual motor patterns with phase offset
         const dualValues = generateDualMotorWaveform(pattern, steps, min, max)
         // Apply global intensity with mode-specific scaling
         dualValues.motor1 = applyIntensityScale(dualValues.motor1, modeName)
         dualValues.motor2 = applyIntensityScale(dualValues.motor2, modeName)
+        // Apply device inversion
+        dualValues.motor1 = dualValues.motor1.map(v => applyInversion(v))
+        dualValues.motor2 = dualValues.motor2.map(v => applyInversion(v))
         patternData = {
           pattern: dualValues,
           intervals: Array(steps).fill(100),
@@ -2292,8 +2387,10 @@ async function executeTeaseAndDenialMode(deviceIndex, modeName) {
         const values = generateWaveformValues(pattern, steps, min, max)
         // Apply global intensity with mode-specific scaling
         const scaledValues = applyIntensityScale(values, modeName)
+        // Apply device inversion
+        const invertedValues = scaledValues.map(v => applyInversion(v))
         patternData = {
-          pattern: scaledValues,
+          pattern: invertedValues,
           intervals: Array(steps).fill(100),
           loop: 1
         }
@@ -2946,34 +3043,41 @@ if (cmd.type === 'funscript_view' || cmd.type === 'funscript_modify' || cmd.type
     updateStatus(`Global intensity set to ${cmd.intensity}% by AI`)
     break
 
-  case 'vibrate':
+case 'vibrate':
         const vibrateAttrs = targetDevice.vibrateAttributes
         if (vibrateAttrs && vibrateAttrs[cmd.motorIndex]) {
-          const intensity = cmd.intensity / 100
+          // Apply global inversion if enabled
+          let intensity = applyInversion(cmd.intensity)
+          const intensityValue = intensity / 100
           // Try simple vibrate method first (better for Lovense), fallback to scalar
           try {
-            await targetDevice.vibrate(intensity)
+            await targetDevice.vibrate(intensityValue)
           } catch (e) {
             // Fallback to scalar command
             const scalarCmd = new buttplug.ScalarSubcommand(
               vibrateAttrs[cmd.motorIndex].Index,
-              intensity,
+              intensityValue,
               "Vibrate"
             )
             await targetDevice.scalar(scalarCmd)
           }
-          updateStatus(`${deviceName} vibrating at ${cmd.intensity}%`)
+          updateStatus(`${deviceName} vibrating at ${intensity}%`)
         }
         break
-      
+
       case 'oscillate':
-        await targetDevice.oscillate(cmd.intensity / 100)
-        updateStatus(`${deviceName} oscillating at ${cmd.intensity}%`)
+        // Apply global inversion if enabled
+        let oscillateIntensity = applyInversion(cmd.intensity)
+        await targetDevice.oscillate(oscillateIntensity / 100)
+        updateStatus(`${deviceName} oscillating at ${oscillateIntensity}%`)
         break
-      
+
       case 'linear':
-        await targetDevice.linear(cmd.endPos / 100, cmd.duration)
-        updateStatus(`${deviceName} linear stroke ${cmd.startPos}% to ${cmd.endPos}%`)
+        // Apply global inversion if enabled (invert both positions)
+        let startPos = applyInversion(cmd.startPos)
+        let endPos = applyInversion(cmd.endPos)
+        await targetDevice.linear(endPos / 100, cmd.duration)
+        updateStatus(`${deviceName} linear stroke ${startPos}% to ${endPos}%`)
         break
       
       case 'stop':
@@ -4152,11 +4256,11 @@ if (hasVibration || hasOscillate) {
       </div>
     </div>
     `
-    deviceDiv.append(presetsHtml)
+      deviceDiv.append(presetsHtml)
+    }
   }
-}
 
-// Handle presets toggle click (delegated for dynamically added devices)
+  // Handle presets toggle click (delegated for dynamically added devices)
 $(document).on("click", "[id^='intiface-presets-toggle-']", function() {
   const toggleId = $(this).attr("id")
   const deviceIndex = toggleId.replace("intiface-presets-toggle-", "")
@@ -5610,10 +5714,16 @@ $(async () => {
     // @ts-ignore
     buttplug = window.buttplug
 
-    // Initialize timer worker for background vibration (prevents throttling in hidden tabs)
+// Initialize timer worker for background vibration (prevents throttling in hidden tabs)
     initTimerWorker()
 
-  client = new buttplug.ButtplugClient("SillyTavern Intiface Client")
+    // Load global inversion setting
+    loadGlobalInvert()
+
+    // Load device polling rate
+    loadDevicePollingRate()
+
+    client = new buttplug.ButtplugClient("SillyTavern Intiface Client")
 
   // Clear any stale device data on initialization
   console.log(`${NAME}: Clearing stale device data on init`)
@@ -5934,7 +6044,7 @@ $("#intiface-reset-mode-intensities").on("click", function() {
       input.click()
     })
 
-    // Handle advanced config dropdown toggle
+// Handle advanced config dropdown toggle
     $("#intiface-advanced-toggle").on("click", function () {
       const content = $("#intiface-advanced-content")
       const arrow = $("#intiface-advanced-arrow")
@@ -5948,7 +6058,43 @@ $("#intiface-reset-mode-intensities").on("click", function() {
       }
     })
 
-// AI control is always chat-based
+    // Handle device polling rate slider
+    $("#intiface-polling-rate").on("input", function() {
+      const val = parseInt($(this).val())
+      devicePollingRate = val
+      saveDevicePollingRate(val)
+      $("#intiface-polling-rate-display").text(`${val}Hz (${getPollingInterval()}ms)`)
+      console.log(`${NAME}: Polling rate changed to ${val}Hz (${getPollingInterval()}ms)`)
+    })
+
+    // Initialize polling rate display
+    $("#intiface-polling-rate").val(devicePollingRate)
+    $("#intiface-polling-rate-display").text(`${devicePollingRate}Hz (${getPollingInterval()}ms)`)
+
+    // Handle global inversion checkbox
+    $("#intiface-global-invert").on('change', function() {
+      const isChecked = $(this).is(':checked')
+      saveGlobalInvert(isChecked)
+      
+      const statusEl = $("#intiface-global-invert-status")
+      if (isChecked) {
+        statusEl.show()
+        updateStatus('Global inversion enabled')
+      } else {
+        statusEl.hide()
+        updateStatus('Global inversion disabled')
+      }
+      
+      console.log(`${NAME}: Global invert set to ${isChecked}`)
+    })
+
+    // Initialize global inversion checkbox
+    $("#intiface-global-invert").prop('checked', globalInvert)
+    if (globalInvert) {
+      $("#intiface-global-invert-status").show()
+    }
+
+    // AI control is always chat-based
     chatControlEnabled = true
     localStorage.setItem("intiface-ai-mode", "chat")
     localStorage.setItem("intiface-chat-control", "true")
@@ -6572,9 +6718,173 @@ function applyMediaPlayerAppearance() {
         panel.css("margin-bottom", "10px")
     }
 
-    // Apply video opacity (videoPlayer already declared above)
+  // Apply video opacity (videoPlayer already declared above)
     if (videoPlayer.length > 0) {
-        videoPlayer.css("opacity", videoOpacity)
+      videoPlayer.css("opacity", videoOpacity)
+      // Also set as style attribute for fullscreen persistence
+      videoPlayer[0].style.setProperty('opacity', videoOpacity, 'important')
+      
+      // Check if video is currently in fullscreen and apply opacity there too
+      const isFullscreen = document.fullscreenElement === videoPlayer[0] || 
+                          document.webkitFullscreenElement === videoPlayer[0] ||
+                          document.mozFullScreenElement === videoPlayer[0] ||
+                          document.msFullscreenElement === videoPlayer[0]
+      
+      if (isFullscreen) {
+        // In fullscreen mode, need to target the element directly
+        videoPlayer[0].style.opacity = videoOpacity
+        // Note: Browser handles fullscreen sizing, don't force viewport sizes here
+        // Just ensure transparency and reset any problematic transforms
+        videoPlayer[0].style.transform = 'none'
+        
+        // Also try to set via stylesheet injection
+        let style = document.getElementById('intiface-video-opacity-style')
+        if (!style) {
+          style = document.createElement('style')
+          style.id = 'intiface-video-opacity-style'
+          document.head.appendChild(style)
+        }
+        style.textContent = `
+          /* Video element in fullscreen - BACKDROP IS KEY */
+          ::backdrop {
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+          }
+          
+          *::backdrop {
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+          }
+          
+          video::-webkit-media-controls-enclosure {
+            opacity: 1 !important;
+          }
+          
+          /* Target the video element itself - FILL VIEWPORT */
+          video:fullscreen {
+            opacity: ${videoOpacity} !important;
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            object-fit: contain !important;
+            border-radius: 0 !important;
+            transform: none !important;
+            translate: none !important;
+            inset: 0 !important;
+          }
+          video:-webkit-full-screen {
+            opacity: ${videoOpacity} !important;
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            object-fit: contain !important;
+            border-radius: 0 !important;
+            transform: none !important;
+          }
+          video:-moz-full-screen {
+            opacity: ${videoOpacity} !important;
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            object-fit: contain !important;
+            border-radius: 0 !important;
+            transform: none !important;
+          }
+          video:-ms-fullscreen {
+            opacity: ${videoOpacity} !important;
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            object-fit: contain !important;
+            border-radius: 0 !important;
+            transform: none !important;
+          }
+          
+          /* Target fullscreen container/parent */
+          video:fullscreen::backdrop {
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+          }
+          video:-webkit-full-screen::backdrop {
+            background: transparent !important;
+            background-color: rgba(0,0,0,0) !important;
+          }
+          
+          /* Target any element in fullscreen context */
+          *:fullscreen video {
+            opacity: ${videoOpacity} !important;
+            background: transparent !important;
+          }
+          *:-webkit-full-screen video {
+            opacity: ${videoOpacity} !important;
+            background: transparent !important;
+          }
+          
+          /* HTML and body in fullscreen */
+          html:fullscreen, body:fullscreen {
+            background: transparent !important;
+          }
+          html:-webkit-full-screen, body:-webkit-full-screen {
+            background: transparent !important;
+          }
+          
+          /* Force all fullscreen elements to be transparent */
+          :fullscreen {
+            background: transparent !important;
+          }
+          :-webkit-full-screen {
+            background: transparent !important;
+          }
+          
+          /* Reset margins and positioning on video containers in fullscreen - keep it simple */
+          :fullscreen #intiface-chat-media-panel,
+          :-webkit-full-screen #intiface-chat-media-panel {
+            margin: 0 !important;
+            margin-bottom: 0 !important;
+            margin-top: 0 !important;
+            transform: none !important;
+          }
+          
+          /* The video element itself - just ensure opacity works */
+          #intiface-chat-video-player:fullscreen {
+            opacity: ${videoOpacity} !important;
+          }
+        `
+      }
     }
   
 // Apply filename visibility
@@ -7114,23 +7424,23 @@ function startFunscriptSync() {
   if (mediaPlayer.animationFrameId) {
     cancelAnimationFrame(mediaPlayer.animationFrameId)
   }
-  
+
   mediaPlayer.lastActionIndex = 0
-  
+
   const syncLoop = () => {
     if (!mediaPlayer.isPlaying || !mediaPlayer.currentFunscript) {
       return
     }
-    
+
     const video = mediaPlayer.videoElement
     const funscript = mediaPlayer.currentFunscript
     const currentTime = (video.currentTime * 1000) + mediaPlayer.syncOffset
-    
+
     // Find and execute actions
     const actions = funscript.actions
     for (let i = mediaPlayer.lastActionIndex; i < actions.length; i++) {
       const action = actions[i]
-      
+
       if (action.at <= currentTime) {
         // Execute action
         executeFunscriptAction(action)
@@ -7139,22 +7449,24 @@ function startFunscriptSync() {
         break
       }
     }
-    
+
     // Reset if video looped
     if (currentTime < 0) {
       mediaPlayer.lastActionIndex = 0
     }
-    
-    mediaPlayer.animationFrameId = requestAnimationFrame(syncLoop)
+
+    // Use polling rate interval instead of requestAnimationFrame for consistent timing
+    const interval = getPollingInterval()
+    mediaPlayer.animationFrameId = setTimeout(syncLoop, interval)
   }
-  
+
   syncLoop()
 }
 
 // Stop Funscript synchronization
 function stopFunscriptSync() {
   if (mediaPlayer.animationFrameId) {
-    cancelAnimationFrame(mediaPlayer.animationFrameId)
+    clearTimeout(mediaPlayer.animationFrameId)
     mediaPlayer.animationFrameId = null
   }
   stopFunscriptSyncTimer()
@@ -7220,9 +7532,9 @@ function startFunscriptSyncTimer() {
 
     // Continue loop only if still hidden
     if (document.hidden && mediaPlayer.isPlaying) {
-      // Use 50ms interval - browsers typically allow this in background
-      // and it won't be as choppy as 16ms when throttled to 1000ms
-      mediaPlayer.syncTimerId = setTimeout(syncLoop, 50)
+      // Use polling rate interval for consistent device timing
+      const interval = getPollingInterval()
+      mediaPlayer.syncTimerId = setTimeout(syncLoop, interval)
     }
   }
 
@@ -7238,9 +7550,9 @@ function stopFunscriptSyncTimer() {
 
 // Execute Funscript action
 async function executeFunscriptAction(action) {
-// Check if media is still playing before executing
-if (!mediaPlayer.isPlaying || !mediaPlayer.videoElement) return
-if (!client.connected || devices.length === 0) return
+  // Check if media is still playing before executing
+  if (!mediaPlayer.isPlaying || !mediaPlayer.videoElement) return
+  if (!client.connected || devices.length === 0) return
 
   const deviceType = getDeviceType(devices[0])
   const targetDevice = devices[0]
@@ -7252,13 +7564,16 @@ if (!client.connected || devices.length === 0) return
   const defaultValue = 50 // Neutral point (50%)
   const scale = mediaPlayer.globalIntensity / 100 // Convert percentage to multiplier
   const scriptValue = action.pos // Funscript value (0-100)
-  
+
   // Calculate scaled value: default + (deviation * scale)
   const scaledValue = defaultValue + (scriptValue - defaultValue) * scale
-  
+
   // Clamp to valid device range (0-100)
-  const adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
-  
+  let adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
+
+  // Apply device inversion if enabled
+  adjustedPos = applyInversion(adjustedPos)
+
   try {
     // Choose control method based on device type
     if (deviceType === 'stroker' && targetDevice.messageAttributes?.LinearCmd) {
@@ -7344,16 +7659,200 @@ function setupChatPanelEventHandlers() {
   $("#intiface-close-chat-media").on("click", () => {
     hideChatMediaPanel()
   })
-  
+
   // Add hover effect for close button visibility
   const videoContainer = $("#intiface-chat-video-container")
   const closeButton = $("#intiface-close-chat-media")
-  
+
   videoContainer.on("mouseenter", function() {
     closeButton.css("opacity", "1")
   }).on("mouseleave", function() {
     closeButton.css("opacity", "0")
   })
+
+  // Custom fullscreen handler - intercepts native fullscreen and redirects to custom
+  const video = document.getElementById('intiface-chat-video-player')
+  const panel = document.getElementById('intiface-chat-media-panel')
+  const container = document.getElementById('intiface-chat-video-container')
+  
+  if (video && panel && container) {
+    // Function to enter custom fullscreen
+    const enterCustomFullscreen = () => {
+      panel.classList.add('intiface-fullscreen-mode')
+      
+      // Save current state
+      panel.dataset.prevPosition = panel.style.position || ''
+      panel.dataset.prevTop = panel.style.top || ''
+      panel.dataset.prevLeft = panel.style.left || ''
+      panel.dataset.prevWidth = panel.style.width || ''
+      panel.dataset.prevHeight = panel.style.height || ''
+      panel.dataset.prevTransform = panel.style.transform || ''
+      panel.dataset.prevZIndex = panel.style.zIndex || ''
+      panel.dataset.prevMargin = panel.style.margin || ''
+      panel.dataset.prevPadding = panel.style.padding || ''
+      panel.dataset.prevBackground = panel.style.background || ''
+      
+      // Apply fullscreen styles
+      panel.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 99999 !important;
+        transform: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        display: block !important;
+      `
+      
+      container.style.cssText = `
+        position: relative !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+      `
+      
+      // Save video state
+      video.dataset.prevWidth = video.style.width || ''
+      video.dataset.prevHeight = video.style.height || ''
+      video.dataset.prevObjectFit = video.style.objectFit || ''
+      video.dataset.prevBorderRadius = video.style.borderRadius || ''
+      video.dataset.prevMargin = video.style.margin || ''
+      video.dataset.prevOpacity = video.style.opacity || ''
+
+      // Get current opacity from the slider
+      const currentOpacity = parseInt($("#intiface-menu-video-opacity").val()) / 100
+
+      video.style.cssText = `
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+        opacity: ${currentOpacity} !important;
+      `
+      
+      console.log(`${NAME}: Entered custom fullscreen`)
+    }
+    
+    // Function to exit custom fullscreen
+    const exitCustomFullscreen = () => {
+      if (!panel.classList.contains('intiface-fullscreen-mode')) return
+      
+      panel.classList.remove('intiface-fullscreen-mode')
+      
+      // Restore panel state
+      panel.style.cssText = ''
+      panel.style.position = panel.dataset.prevPosition || ''
+      panel.style.top = panel.dataset.prevTop || ''
+      panel.style.left = panel.dataset.prevLeft || ''
+      panel.style.width = panel.dataset.prevWidth || ''
+      panel.style.height = panel.dataset.prevHeight || ''
+      panel.style.transform = panel.dataset.prevTransform || ''
+      panel.style.zIndex = panel.dataset.prevZIndex || ''
+      panel.style.margin = panel.dataset.prevMargin || ''
+      panel.style.padding = panel.dataset.prevPadding || ''
+      panel.style.background = panel.dataset.prevBackground || ''
+      panel.style.display = 'block'
+      
+      // Restore container
+      container.style.cssText = ''
+      container.style.position = 'relative'
+      container.style.width = '100%'
+      container.style.lineHeight = '0'
+      
+      // Restore video
+      video.style.cssText = ''
+      video.style.width = video.dataset.prevWidth || '100%'
+      video.style.height = video.dataset.prevHeight || 'auto'
+      video.style.objectFit = video.dataset.prevObjectFit || ''
+      video.style.borderRadius = video.dataset.prevBorderRadius || '4px'
+      video.style.margin = video.dataset.prevMargin || ''
+      video.style.opacity = video.dataset.prevOpacity || ''
+      video.style.display = 'block'
+      
+      // Re-apply normal appearance settings
+      applyMediaPlayerAppearance()
+      
+      console.log(`${NAME}: Exited custom fullscreen`)
+    }
+    
+// Listen for native fullscreen attempts and redirect to custom
+const handleFullscreenChange = () => {
+  const isNativeFullscreen = document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement
+
+  if (isNativeFullscreen) {
+    // Check if we're already in custom fullscreen - if so, user wants to exit
+    if (panel.classList.contains('intiface-fullscreen-mode')) {
+      // Exit native fullscreen first
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen()
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen()
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen()
+      }
+      // Exit custom fullscreen
+      exitCustomFullscreen()
+      return
+    }
+
+    // Browser entered native fullscreen - exit it and use custom
+    if (document.exitFullscreen) {
+      document.exitFullscreen()
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen()
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen()
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen()
+    }
+
+    // Enter custom fullscreen after a brief delay
+    setTimeout(() => {
+      enterCustomFullscreen()
+    }, 50)
+  } else {
+    // Exiting fullscreen - check if we were in custom mode
+    if (panel.classList.contains('intiface-fullscreen-mode')) {
+      exitCustomFullscreen()
+    }
+  }
+}
+    
+    // Listen for fullscreen events
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange)
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange)
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange)
+    
+    // Double-click on video to toggle fullscreen
+    video.addEventListener('dblclick', function(e) {
+      e.preventDefault()
+      if (panel.classList.contains('intiface-fullscreen-mode')) {
+        exitCustomFullscreen()
+      } else {
+        enterCustomFullscreen()
+      }
+    })
+    
+    // ESC key to exit
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && panel.classList.contains('intiface-fullscreen-mode')) {
+        exitCustomFullscreen()
+      }
+    })
+  }
 }
 
 // Show chat media panel

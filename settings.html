@@ -337,13 +337,52 @@ Chastity Caretaker Modes
                     <div style="font-size: 0.7em; color: #888; margin-top: 5px; font-style: italic;">
                         Forwards local Intiface connection through secure WebSocket proxy. Required when accessing SillyTavern via HTTPS.
                     </div>
-                    <div id="intiface-proxy-status" style="font-size: 0.75em; color: #888; margin-top: 8px; display: none;">
-                        <i class="fa-solid fa-circle" style="color: #4CAF50; font-size: 0.6em; margin-right: 5px;"></i>
-                        Proxy running on port 12346
-                    </div>
-                </div>
+<div id="intiface-proxy-status" style="font-size: 0.75em; color: #888; margin-top: 8px; display: none;">
+        <i class="fa-solid fa-circle" style="color: #4CAF50; font-size: 0.6em; margin-right: 5px;"></i>
+        Proxy running on port 12346
+      </div>
+    </div>
 
-      <!-- Player Appearance Settings -->
+    <!-- Device Polling Rate -->
+    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+      <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+        <i class="fa-solid fa-tachometer-alt"></i> Device Polling Rate
+      </div>
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
+          <span>Polling Rate (Hz)</span>
+          <span id="intiface-polling-rate-display" style="color: #64B5F6;">30Hz</span>
+        </div>
+        <input type="range" id="intiface-polling-rate" min="10" max="60" value="30" step="1" style="width: 100%;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.65em; color: #666; margin-top: 2px;">
+          <span>10Hz</span>
+          <span>60Hz</span>
+        </div>
+      </div>
+<div style="font-size: 0.7em; color: #888; margin-top: 5px; font-style: italic;">
+      Lower = less device spam, better battery. Higher = smoother playback, more responsive.
+      <br><strong>10-20Hz:</strong> Power saving | <strong>30Hz:</strong> Balanced (default) | <strong>60Hz:</strong> Maximum smoothness
+    </div>
+  </div>
+
+  <!-- Global Inversion Setting -->
+  <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+    <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+      <i class="fa-solid fa-rotate"></i> Output Inversion
+    </div>
+    <label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
+      <input type="checkbox" id="intiface-global-invert" style="margin-right: 8px;">
+      <span style="color: #bbb;">Invert All Device Output (0% ↔ 100%)</span>
+    </label>
+    <div id="intiface-global-invert-status" style="font-size: 0.7em; color: #888; margin-top: 5px; display: none;">
+      <i class="fa-solid fa-rotate" style="color: #64B5F6;"></i> Inversion active - funscripts, patterns & commands reversed
+    </div>
+    <div style="font-size: 0.7em; color: #888; margin-top: 5px; font-style: italic;">
+      Reverses all intensity values for all devices. Useful if your device responds backwards to commands.
+    </div>
+  </div>
+
+  <!-- Player Appearance Settings -->
       <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
         <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
           <i class="fa-solid fa-palette"></i> Player Appearance
