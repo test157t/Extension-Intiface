@@ -2488,11 +2488,31 @@ intensity: intensity
 } else {
 console.log(`${NAME}: Ignoring out-of-range media intensity: ${intensity}%`)
 }
-continue
-}
+      continue
+  }
+
+  // Parse FUNSCRIPT commands (view, modify, reset)
+  // Format: FUNSCRIPT: VIEW, FUNSCRIPT: MODIFY pauses 2000, FUNSCRIPT: RESET
+  const funscriptMatch = commandText.match(/FUNSCRIPT[:\s]+(\w+)(?:[\s,]+(.+))?/i)
+  if (funscriptMatch) {
+    const subCommand = funscriptMatch[1].toUpperCase()
+    const args = funscriptMatch[2] || ''
+
+    if (subCommand === 'VIEW') {
+      commands.push({ type: 'funscript_view' })
+    } else if (subCommand === 'MODIFY') {
+      commands.push({
+        type: 'funscript_modify',
+        args: args
+      })
+    } else if (subCommand === 'RESET') {
+      commands.push({ type: 'funscript_reset' })
+    }
+    continue
+  }
 }
 
-    // Parse PRESET command
+// Parse PRESET command
     // Format: PRESET: tease or PRESET tease
     const presetMatch = commandText.match(/PRESET[\s:]+(\w+)/i)
     if (presetMatch) {
@@ -2870,17 +2890,37 @@ break
 case 'media_resume':
 await handleMediaResume()
 break
-case 'media_intensity':
-await handleMediaIntensity(cmd.intensity)
-break
-}
-} catch (e) {
-console.error(`${NAME}: Media command execution failed:`, e)
-}
-return
+    case 'media_intensity':
+      await handleMediaIntensity(cmd.intensity)
+      break
+    }
+  } catch (e) {
+    console.error(`${NAME}: Media command execution failed:`, e)
+  }
+  return
 }
 
-  // Device commands require connection
+// Funscript commands
+if (cmd.type === 'funscript_view' || cmd.type === 'funscript_modify' || cmd.type === 'funscript_reset') {
+  try {
+    switch (cmd.type) {
+    case 'funscript_view':
+      await handleFunscriptView()
+      break
+    case 'funscript_modify':
+      await handleFunscriptModify(cmd.args)
+      break
+    case 'funscript_reset':
+      await handleFunscriptReset()
+      break
+    }
+  } catch (e) {
+    console.error(`${NAME}: Funscript command execution failed:`, e)
+  }
+  return
+}
+
+// Device commands require connection
   if (!client.connected || devices.length === 0) {
     console.log(`${NAME}: Cannot execute device command - not connected or no devices`)
     return
@@ -3871,8 +3911,8 @@ function updateButtonStates(isConnected) {
   $("#intiface-connect-button .drawer-icon").toggleClass("flashing-icon", isConnected)
 }
 
-async function connect() {
-  console.log(`${NAME}: connect() called`)
+async function connect(isAutoConnect = false) {
+  console.log(`${NAME}: connect() called${isAutoConnect ? ' (auto-connect mode)' : ''}`)
   try {
     const serverIp = $("#intiface-ip-input").val().replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '')
     // Use wss:// for HTTPS pages, ws:// for HTTP pages (browser security requirement)
@@ -3881,7 +3921,11 @@ async function connect() {
     console.log(`${NAME}: Connecting to ${serverUrl}`)
     localStorage.setItem("intiface-server-ip", serverIp) // Save on connect
     connector = new buttplug.ButtplugBrowserWebsocketClientConnector(serverUrl)
-    updateStatus("Connecting...")
+    
+    if (!isAutoConnect) {
+      updateStatus("Connecting...")
+    }
+    
     console.log(`${NAME}: Calling client.connect()...`)
     await client.connect(connector)
     console.log(`${NAME}: client.connect() succeeded`)
@@ -3933,11 +3977,36 @@ async function connect() {
     // Update prompt to show connection status
     updatePrompt()
   } catch (e) {
-    const errorMsg = e?.message || e?.toString?.() || String(e) || 'Unknown error'
-    console.error(`${NAME}: Connect error details:`, e, typeof e, JSON.stringify(e))
-    updateStatus(`Error connecting: ${errorMsg}`, true)
+    // Handle various error formats - some WebSocket errors are weird objects
+    let errorMsg = e?.message || e?.toString?.() || String(e) || 'Unknown error'
+    
+    // Clean up common connection error messages
+    if (!errorMsg || errorMsg === 'undefined' || errorMsg === 'null') {
+      errorMsg = 'Server not available'
+    } else if (errorMsg.includes('WebSocket') && errorMsg.includes('failed')) {
+      errorMsg = 'Server not available'
+    } else if (errorMsg.includes('ECONNREFUSED') || errorMsg.includes('refused')) {
+      errorMsg = 'Connection refused - server may be offline'
+    } else if (errorMsg.includes('ENOTFOUND') || errorMsg.includes('not found')) {
+      errorMsg = 'Server address not found'
+    } else if (errorMsg.includes('ETIMEDOUT') || errorMsg.includes('timeout')) {
+      errorMsg = 'Connection timed out'
+    }
+    
+    // During auto-connect, don't show scary error - just log quietly
+    if (isAutoConnect) {
+      console.log(`${NAME}: Auto-connect attempt failed - server not available`)
+    } else {
+      // Manual connection - show cleaner error
+      console.log(`${NAME}: Connect failed:`, e?.message || errorMsg)
+      updateStatus(errorMsg, true)
+    }
+    
     // Update prompt even on failure
     updatePrompt()
+    
+    // Re-throw so caller knows it failed
+    throw e
   }
 }
 
@@ -4830,6 +4899,18 @@ ${startCommand}${deviceCommands}
 ${exampleResponses}
 ${deviceInfo.length > 0 ? 'You ARE currently connected - include device commands naturally in your responses.\n\nDEVICE CAPABILITIES:\n' + deviceInfo.map(d => `- ${d.name}: ${d.type} (${d.capabilities.join(', ')}, ${d.motors} motor${d.motors > 1 ? 's' : ''})`).join('\n') : '⚠️ You are DISCONNECTED - you MUST include <interface:CONNECT> or <interface:START> in your response to establish connection BEFORE sending any device commands.'}
 
+${mediaPlayer.currentFunscript ? `=== CURRENT FUNSCRIPT STATUS ===
+Media is playing with funscript synchronization active!
+Funscript Details:
+- Actions: ${mediaPlayer.currentFunscript.stats.actionCount}
+- Duration: ${(mediaPlayer.currentFunscript.duration / 1000).toFixed(1)}s
+- Average Position: ${mediaPlayer.currentFunscript.stats.avgPosition}%
+- Range: ${mediaPlayer.currentFunscript.stats.minPosition}-${mediaPlayer.currentFunscript.stats.maxPosition}%
+- Status: ${mediaPlayer.modifiedFunscript ? `MODIFIED - ${mediaPlayer.modifiedFunscript.modification}` : 'Original (unmodified)'}
+- Current Intensity: ${mediaPlayer.globalIntensity}%
+
+⚠️ CRITICAL: You can modify the funscript in real-time using <funscript:MODIFY: type param> commands!` : '=== MEDIA STATUS ===\nNo media currently playing. Use <media:PLAY: filename.ext> to start.'}
+
 === VIDEO & FUNSCRIPT SUPPORT ===
 You can also play videos with synchronized haptic feedback! Videos are stored in the media library and can be played with matching Funscript files.
 
@@ -4857,6 +4938,31 @@ MEDIA EXAMPLES:
 ✓ Pause media: <media:PAUSE>
 ✓ Resume media: <media:RESUME>
 ✓ Adjust intensity: <media:INTENSITY: 150> (increases to 150%) or <media:INTENSITY: 50> (decreases to 50%)
+
+=== FUNSCRIPT MODIFICATION (AI Edging Control) ===
+When media is playing, you can MODIFY the funscript in real-time for edging and teasing:
+
+FUNSCRIPT COMMANDS:
+- <funscript:VIEW> - View current funscript stats (actions count, duration, intensity range)
+- <funscript:MODIFY: pauses 2000> - Insert 2000ms pauses between strokes (great for edging)
+- <funscript:MODIFY: pauses 3000> - Insert longer pauses (3000ms) for extended edging
+- <funscript:MODIFY: intensity 70> - Scale all intensities to 70% (reduce sensation)
+- <funscript:MODIFY: intensity 50> - Scale to 50% (heavy teasing)
+- <funscript:MODIFY: randomize 200> - Add ±200ms random timing variation
+- <funscript:MODIFY: slowdown 1.5> - Slow down playback by 1.5x (longer strokes)
+- <funscript:MODIFY: speedup 0.7> - Speed up by 0.7x (quicker patterns)
+- <funscript:MODIFY: hold 3000> - Add 3 second hold at peak intensity
+- <funscript:MODIFY: remove 30> - Remove all strokes below 30% intensity
+- <funscript:RESET> - Reset to original funscript (clear all modifications)
+
+FUNSCRIPT MODIFICATION EXAMPLES:
+✓ Edging setup: "Let me add some strategic pauses for you <funscript:MODIFY: pauses 2500>. Now you'll feel the build-up then wait..."
+✓ Reduce intensity: "Too intense? Let me dial it back <funscript:MODIFY: intensity 60>"
+✓ Extended tease: "This will be agonizing <funscript:MODIFY: pauses 4000> <funscript:MODIFY: slowdown 2.0>"
+✓ Quicken pace: "Let's speed things up <funscript:MODIFY: speedup 0.5>"
+✓ Randomize: "Unpredictable pleasure incoming <funscript:MODIFY: randomize 300>"
+✓ Add hold: "Hold it right there <funscript:MODIFY: hold 5000>"
+✓ Back to original: "Back to the original rhythm <funscript:RESET>"
 
 === RULES ===:
 1. ALWAYS include the command literally: <deviceName:COMMAND: value>
@@ -5348,8 +5454,13 @@ async function toggleConnection() {
     console.log(`${NAME}: disconnect() completed, client.connected = ${client?.connected}`)
   } else {
     console.log(`${NAME}: Calling connect...`)
-    await connect()
-    console.log(`${NAME}: connect() completed, client.connected = ${client?.connected}`)
+    try {
+      await connect()
+      console.log(`${NAME}: connect() completed, client.connected = ${client?.connected}`)
+    } catch (e) {
+      // Error is already handled in connect(), just prevent uncaught rejection
+      console.log(`${NAME}: connect() failed in toggleConnection`)
+    }
   }
 }
 
@@ -6126,6 +6237,8 @@ document.addEventListener('visibilitychange', async () => {
 let mediaPlayer = {
   videoElement: null,
   currentFunscript: null,
+  originalFunscript: null, // Store original funscript for comparison
+  modifiedFunscript: null, // Store AI-modified version
   isPlaying: false,
   syncOffset: 0,
   globalIntensity: 100,
@@ -6676,10 +6789,14 @@ async function loadFunscript(videoPath) {
     // Process Funscript
     const funscript = processFunscript(data.funscript)
     funscriptCache.set(funscriptPath, funscript)
+    
+    // Store as both current and original
     mediaPlayer.currentFunscript = funscript
+    mediaPlayer.originalFunscript = JSON.parse(JSON.stringify(funscript)) // Deep copy
+    mediaPlayer.modifiedFunscript = null // Clear any previous modifications
     
     updateChatFunscriptUI(funscript)
-    
+
   } catch (error) {
     console.error(`${NAME}: Failed to load Funscript:`, error)
     $("#intiface-chat-funscript-info").text(`Error: ${error.message}`).css("color", "#F44336")
@@ -6712,6 +6829,284 @@ function processFunscript(rawFunscript) {
       minPosition: minPos
     }
   }
+}
+
+// ==========================================
+// FUNSCRIPT MODIFICATION SYSTEM
+// ==========================================
+
+// Modified funscript cache to track AI modifications
+let modifiedFunscriptCache = new Map()
+
+// Funscript modification functions for AI control
+const FunscriptModifiers = {
+  // Insert pauses between strokes (great for edging)
+  insertPauses: (funscript, pauseDuration = 2000) => {
+    if (!funscript || !funscript.actions) return null
+    const actions = [...funscript.actions]
+    const modified = []
+    
+    for (let i = 0; i < actions.length; i++) {
+      modified.push(actions[i])
+      // Add pause after each stroke (except last)
+      if (i < actions.length - 1) {
+        const pauseTime = actions[i].at + pauseDuration
+        // Only add pause if it doesn't overlap with next action
+        if (pauseTime < actions[i + 1].at) {
+          modified.push({
+            at: pauseTime,
+            pos: 0, // Pause at 0 intensity
+            type: 'pause'
+          })
+        }
+      }
+    }
+    
+    return {
+      ...funscript,
+      actions: modified,
+      modified: true,
+      modification: `Inserted ${pauseDuration}ms pauses between strokes`
+    }
+  },
+
+  // Scale intensity values
+  scaleIntensity: (funscript, scale = 0.7) => {
+    if (!funscript || !funscript.actions) return null
+    const actions = funscript.actions.map(a => ({
+      ...a,
+      pos: Math.round(Math.min(100, Math.max(0, a.pos * scale)))
+    }))
+    
+    return {
+      ...funscript,
+      actions,
+      modified: true,
+      modification: `Scaled intensity to ${Math.round(scale * 100)}%`
+    }
+  },
+
+  // Add random variation to timing
+  randomizeTiming: (funscript, variance = 200) => {
+    if (!funscript || !funscript.actions) return null
+    const actions = funscript.actions.map((a, i) => ({
+      ...a,
+      at: i === 0 ? a.at : a.at + (Math.random() - 0.5) * variance * 2
+    }))
+    
+    return {
+      ...funscript,
+      actions,
+      modified: true,
+      modification: `Randomized timing by ±${variance}ms`
+    }
+  },
+
+  // Reverse the funscript (play backwards)
+  reverse: (funscript) => {
+    if (!funscript || !funscript.actions || funscript.actions.length === 0) return null
+    const duration = funscript.actions[funscript.actions.length - 1].at
+    const actions = funscript.actions.map(a => ({
+      ...a,
+      at: duration - a.at
+    })).reverse()
+    
+    return {
+      ...funscript,
+      actions,
+      modified: true,
+      modification: 'Reversed playback order'
+    }
+  },
+
+  // Slow down or speed up
+  changeSpeed: (funscript, multiplier = 1.5) => {
+    if (!funscript || !funscript.actions) return null
+    const actions = funscript.actions.map(a => ({
+      ...a,
+      at: Math.round(a.at * multiplier)
+    }))
+    
+    return {
+      ...funscript,
+      actions,
+      modified: true,
+      modification: `Speed changed to ${multiplier}x`
+    }
+  },
+
+  // Remove all actions below a threshold (for edging - remove low intensity strokes)
+  removeBelow: (funscript, threshold = 30) => {
+    if (!funscript || !funscript.actions) return null
+    const actions = funscript.actions.filter(a => a.pos >= threshold)
+    
+    return {
+      ...funscript,
+      actions,
+      modified: true,
+      modification: `Removed strokes below ${threshold}% intensity`
+    }
+  },
+
+  // Add a hold at peak intensity before release
+  addHoldAtPeak: (funscript, holdDuration = 3000) => {
+    if (!funscript || !funscript.actions) return null
+    const maxPos = Math.max(...funscript.actions.map(a => a.pos))
+    const peakActions = funscript.actions.filter(a => a.pos >= maxPos - 5)
+    
+    if (peakActions.length === 0) return funscript
+    
+    const peakTime = peakActions[0].at
+    const actions = [...funscript.actions]
+    
+    // Insert hold point
+    actions.push({
+      at: peakTime + holdDuration,
+      pos: maxPos,
+      type: 'hold'
+    })
+    
+    // Sort by time
+    actions.sort((a, b) => a.at - b.at)
+    
+    return {
+      ...funscript,
+      actions,
+      modified: true,
+      modification: `Added ${holdDuration}ms hold at peak`
+    }
+  }
+}
+
+// Apply funscript modification
+function applyFunscriptModification(funscript, modificationType, params = {}) {
+  if (!FunscriptModifiers[modificationType]) {
+    console.error(`${NAME}: Unknown funscript modification: ${modificationType}`)
+    return null
+  }
+  
+  try {
+    const modified = FunscriptModifiers[modificationType](funscript, ...Object.values(params))
+    if (modified) {
+      // Recalculate stats for modified version
+      const duration = modified.actions.length > 0 ? modified.actions[modified.actions.length - 1].at : 0
+      const avgPos = modified.actions.reduce((sum, a) => sum + a.pos, 0) / modified.actions.length || 0
+      const maxPos = Math.max(...modified.actions.map(a => a.pos), 0)
+      const minPos = Math.min(...modified.actions.map(a => a.pos), 100)
+      
+      modified.stats = {
+        actionCount: modified.actions.length,
+        avgPosition: Math.round(avgPos),
+        maxPosition: maxPos,
+        minPosition: minPos
+      }
+      modified.duration = duration
+    }
+    return modified
+  } catch (e) {
+    console.error(`${NAME}: Funscript modification failed:`, e)
+    return null
+  }
+}
+
+// Handle funscript modification command from AI
+async function handleFunscriptModify(commandText) {
+  if (!mediaPlayer.currentFunscript) {
+    console.log(`${NAME}: No funscript loaded to modify`)
+    return false
+  }
+  
+  // Store original if not already stored
+  if (!mediaPlayer.originalFunscript) {
+    mediaPlayer.originalFunscript = JSON.parse(JSON.stringify(mediaPlayer.currentFunscript))
+  }
+  
+  // Parse modification command
+  // Format: MODIFY: type=pauses, duration=2000 OR MODIFY pauses 2000
+  const modifyMatch = commandText.match(/MODIFY[:\s]+(\w+)(?:[,\s]+(\w+)=([\d.]+))?/i)
+  
+  if (!modifyMatch) {
+    console.log(`${NAME}: Invalid funscript modify command: ${commandText}`)
+    return false
+  }
+  
+  const modType = modifyMatch[1].toLowerCase()
+  const paramName = modifyMatch[2]
+  const paramValue = modifyMatch[3] ? parseFloat(modifyMatch[3]) : null
+  
+  const params = {}
+  if (paramName && paramValue !== null) {
+    params[paramName] = paramValue
+  }
+  
+  // Map command types to modifier functions
+  const modifierMap = {
+    'pauses': 'insertPauses',
+    'pause': 'insertPauses',
+    'scale': 'scaleIntensity',
+    'intensity': 'scaleIntensity',
+    'randomize': 'randomizeTiming',
+    'random': 'randomizeTiming',
+    'reverse': 'reverse',
+    'speed': 'changeSpeed',
+    'slowdown': 'changeSpeed',
+    'remove': 'removeBelow',
+    'hold': 'addHoldAtPeak'
+  }
+  
+  const modifierName = modifierMap[modType]
+  if (!modifierName) {
+    console.log(`${NAME}: Unknown modification type: ${modType}`)
+    return false
+  }
+  
+  // Get default params if not provided
+  if (modifierName === 'insertPauses' && !params.duration) params.duration = 2000
+  if (modifierName === 'scaleIntensity' && !params.scale) params.scale = 0.7
+  if (modifierName === 'randomizeTiming' && !params.variance) params.variance = 200
+  if (modifierName === 'changeSpeed' && !params.multiplier) params.multiplier = 1.5
+  if (modifierName === 'removeBelow' && !params.threshold) params.threshold = 30
+  if (modifierName === 'addHoldAtPeak' && !params.holdDuration) params.holdDuration = 3000
+  
+  // Apply to original funscript
+  const modified = applyFunscriptModification(
+    mediaPlayer.originalFunscript,
+    modifierName,
+    params
+  )
+  
+  if (modified) {
+    mediaPlayer.modifiedFunscript = modified
+    // Switch playback to modified version
+    mediaPlayer.currentFunscript = modified
+    updateStatus(`Funscript modified: ${modified.modification}`)
+    console.log(`${NAME}: Funscript modified - ${modified.modification}`)
+    
+    // Update both visualizations
+    updateFunscriptVisualizer(modified, 'modified')
+    updateFunscriptVisualizer(mediaPlayer.originalFunscript, 'original')
+    
+    return true
+  }
+  
+  return false
+}
+
+// Reset funscript to original
+async function handleFunscriptReset() {
+  if (mediaPlayer.originalFunscript) {
+    mediaPlayer.currentFunscript = mediaPlayer.originalFunscript
+    mediaPlayer.modifiedFunscript = null
+    updateStatus('Funscript reset to original')
+    console.log(`${NAME}: Funscript reset to original`)
+    
+    // Update visualizations
+    updateFunscriptVisualizer(mediaPlayer.originalFunscript, 'original')
+    clearFunscriptVisualizer('modified')
+    
+    return true
+  }
+  return false
 }
 
 // Start Funscript synchronization
@@ -7146,46 +7541,117 @@ $("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
 }
 
 // Update Funscript UI in chat panel
+// Update both funscript visualizers (original and modified)
 function updateChatFunscriptUI(funscript) {
   if (!funscript) return
-  
+
   // Update chat panel
   $("#intiface-chat-funscript-duration").text(`${(funscript.duration / 1000).toFixed(1)}s`)
   $("#intiface-chat-funscript-info").html(`
-    ${funscript.stats.actionCount} actions | 
+    ${funscript.stats.actionCount} actions |
     Range: ${funscript.stats.minPosition}-${funscript.stats.maxPosition}%
   `).css("color", "#888")
-  
-  // Update menu panel
-  $("#intiface-menu-funscript-duration").text(`${(funscript.duration / 1000).toFixed(1)}s`)
-  $("#intiface-menu-funscript-info").html(`
-    ${funscript.stats.actionCount} actions | 
-    Range: ${funscript.stats.minPosition}-${funscript.stats.maxPosition}%
-  `).css("color", "#888")
-  
-  // Draw visualizer in menu (chat visualizer was removed)
-  drawMenuFunscriptVisualizer(funscript)
+
+  // Update visualizers
+  updateFunscriptVisualizer(funscript, 'original')
+  if (mediaPlayer.modifiedFunscript) {
+    updateFunscriptVisualizer(mediaPlayer.modifiedFunscript, 'modified')
+  }
 }
 
 // Draw Funscript visualizer for menu panel
 function drawMenuFunscriptVisualizer(funscript) {
+  // Support legacy single canvas
   const canvas = document.getElementById('intiface-menu-funscript-canvas')
-  if (!canvas || !funscript) return
+  if (canvas && funscript) {
+    const ctx = canvas.getContext('2d')
+    const width = canvas.width = 400
+    const height = canvas.height = 80
+    
+    const actions = funscript.actions
+    if (actions.length === 0) return
+    
+    const duration = funscript.duration || 1
+    
+    // Clear
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'
+    ctx.fillRect(0, 0, width, height)
+    
+    // Draw grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)'
+    ctx.lineWidth = 1
+    for (let i = 0; i <= 4; i++) {
+      const y = (height / 4) * i
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(width, y)
+      ctx.stroke()
+    }
+    
+    // Draw waveform
+    ctx.strokeStyle = '#4CAF50'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    
+    actions.forEach((action, index) => {
+      const x = (action.at / duration) * width
+      const y = height - ((action.pos / 100) * height)
+      
+      if (index === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        ctx.lineTo(x, y)
+      }
+    })
+    
+    ctx.stroke()
+    
+    // Draw position points
+    ctx.fillStyle = '#81C784'
+    actions.forEach(action => {
+      const x = (action.at / duration) * width
+      const y = height - ((action.pos / 100) * height)
+      
+      ctx.beginPath()
+      ctx.arc(x, y, 2, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+}
+
+// Update specific funscript visualizer (original or modified)
+function updateFunscriptVisualizer(funscript, type = 'original') {
+  if (!funscript) return
+
+  const canvasId = type === 'modified' 
+    ? 'intiface-menu-funscript-canvas-modified'
+    : 'intiface-menu-funscript-canvas-original'
+  const infoId = type === 'modified'
+    ? 'intiface-menu-funscript-info-modified'
+    : 'intiface-menu-funscript-info-original'
+  const durationId = type === 'modified'
+    ? 'intiface-menu-funscript-duration-modified'
+    : 'intiface-menu-funscript-duration-original'
+
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
 
   const ctx = canvas.getContext('2d')
-  // Use fixed dimensions since the canvas might be in a hidden section
   const width = canvas.width = 400
-  const height = canvas.height = 80
+  const height = canvas.height = 60
 
   const actions = funscript.actions
-  if (actions.length === 0) return
-
   const duration = funscript.duration || 1
-  
+
   // Clear
   ctx.fillStyle = 'rgba(0,0,0,0.2)'
   ctx.fillRect(0, 0, width, height)
-  
+
+  if (actions.length === 0) {
+    $(`#${infoId}`).text(type === 'modified' ? 'No modifications applied' : 'No Funscript loaded').css("color", "#666")
+    return
+  }
+
   // Draw grid lines
   ctx.strokeStyle = 'rgba(255,255,255,0.1)'
   ctx.lineWidth = 1
@@ -7196,50 +7662,99 @@ function drawMenuFunscriptVisualizer(funscript) {
     ctx.lineTo(width, y)
     ctx.stroke()
   }
-  
+
   // Draw waveform
-  ctx.strokeStyle = '#4CAF50'
+  ctx.strokeStyle = type === 'modified' ? '#64B5F6' : '#4CAF50'
   ctx.lineWidth = 2
   ctx.beginPath()
-  
+
   actions.forEach((action, index) => {
     const x = (action.at / duration) * width
     const y = height - ((action.pos / 100) * height)
-    
+
     if (index === 0) {
       ctx.moveTo(x, y)
     } else {
       ctx.lineTo(x, y)
     }
   })
-  
+
   ctx.stroke()
-  
+
   // Draw position points
-  ctx.fillStyle = '#81C784'
+  ctx.fillStyle = type === 'modified' ? '#90CAF9' : '#81C784'
   actions.forEach(action => {
     const x = (action.at / duration) * width
     const y = height - ((action.pos / 100) * height)
-    
+
     ctx.beginPath()
     ctx.arc(x, y, 2, 0, Math.PI * 2)
     ctx.fill()
   })
+
+  // Update info text
+  $(`#${durationId}`).text(`${(duration / 1000).toFixed(1)}s`)
+  
+  let infoText = `${funscript.stats.actionCount} actions | Range: ${funscript.stats.minPosition}-${funscript.stats.maxPosition}%`
+  if (funscript.modification) {
+    infoText += ` | ${funscript.modification}`
+  }
+  $(`#${infoId}`).html(infoText).css("color", type === 'modified' ? '#64B5F6' : '#888')
 }
 
-// Clear Funscript visualizer
-function clearChatFunscriptVisualizer() {
-  // Clear menu canvas
-  const menuCanvas = document.getElementById('intiface-menu-funscript-canvas')
-  if (menuCanvas) {
-    const ctx = menuCanvas.getContext('2d')
+// Clear specific funscript visualizer
+function clearFunscriptVisualizer(type = 'original') {
+  const canvasId = type === 'modified'
+    ? 'intiface-menu-funscript-canvas-modified'
+    : 'intiface-menu-funscript-canvas-original'
+  const infoId = type === 'modified'
+    ? 'intiface-menu-funscript-info-modified'
+    : 'intiface-menu-funscript-info-original'
+  const durationId = type === 'modified'
+    ? 'intiface-menu-funscript-duration-modified'
+    : 'intiface-menu-funscript-duration-original'
+
+  const canvas = document.getElementById(canvasId)
+  if (canvas) {
+    const ctx = canvas.getContext('2d')
     ctx.fillStyle = 'rgba(0,0,0,0.2)'
-    ctx.fillRect(0, 0, menuCanvas.width, menuCanvas.height)
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
   }
-  
-  // Clear info displays
+
+  $(`#${durationId}`).text('--')
+  $(`#${infoId}`).text(type === 'modified' ? 'No modifications' : 'No Funscript loaded').css("color", "#666")
+}
+
+// Legacy clear function for backwards compatibility
+function clearChatFunscriptVisualizer() {
+  clearFunscriptVisualizer('original')
+  clearFunscriptVisualizer('modified')
   $("#intiface-menu-funscript-duration").text('--')
   $("#intiface-menu-funscript-info").text('No Funscript loaded').css("color", "#666")
+}
+
+// View funscript details (for AI to see the data)
+async function handleFunscriptView() {
+  if (!mediaPlayer.currentFunscript) {
+    console.log(`${NAME}: No funscript loaded to view`)
+    return false
+  }
+  
+  const funscript = mediaPlayer.currentFunscript
+  const summary = {
+    actionCount: funscript.stats.actionCount,
+    duration: `${(funscript.duration / 1000).toFixed(1)}s`,
+    avgPosition: funscript.stats.avgPosition,
+    minPosition: funscript.stats.minPosition,
+    maxPosition: funscript.stats.maxPosition,
+    isModified: !!funscript.modified,
+    modification: funscript.modification || 'None'
+  }
+  
+  console.log(`${NAME}: Funscript view requested:`, summary)
+  updateStatus(`Funscript: ${summary.actionCount} actions, ${summary.duration}`)
+  
+  return true
 }
 
 // Check for video/MP4 mentions in chat messages
@@ -7292,26 +7807,26 @@ function checkForVideoMentions(text) {
 async function autoConnectOnLoad() {
   // Check if auto-connect is enabled
   const autoConnect = localStorage.getItem("intiface-auto-connect") === "true"
-  
+
   if (!autoConnect) {
     console.log(`${NAME}: Auto-connect disabled`)
     return
   }
-  
+
   console.log(`${NAME}: Auto-connect enabled, attempting connection...`)
-  
+
   // Wait a bit to ensure everything is fully loaded
   await new Promise(resolve => setTimeout(resolve, 2000))
-  
+
   // Only connect if not already connected
   if (!client.connected) {
     try {
-      await connect()
+      await connect(true) // Pass true to indicate this is an auto-connect attempt
       updateStatus(`Auto-connected to Intiface`)
       console.log(`${NAME}: Auto-connected successfully`)
     } catch (e) {
-      console.log(`${NAME}: Auto-connect failed:`, e.message)
-      updateStatus(`Auto-connect failed: ${e.message}`, true)
+      console.log(`${NAME}: Auto-connect failed, server not available`)
+      updateStatus(`Server not available - waiting for manual connection`)
     }
   } else {
     console.log(`${NAME}: Already connected, skipping auto-connect`)

@@ -72,19 +72,32 @@
           <span id="intiface-funscript-menu-arrow" style="transition: transform 0.3s;">▼</span>
         </span>
       </div>
-      <div id="intiface-funscript-menu-content" style="display: none; margin-top: 10px;">
-        <!-- Funscript Visualizer -->
-        <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 4px;">
-          <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
-            <i class="fa-solid fa-chart-area"></i> Funscript Preview
-          </div>
-          <canvas id="intiface-menu-funscript-canvas" style="width: 100%; height: 80px; background: rgba(0,0,0,0.2); border-radius: 4px;"></canvas>
-          <div style="display: flex; justify-content: space-between; font-size: 0.7em; color: #666; margin-top: 3px;">
-            <span>0s</span>
-            <span id="intiface-menu-funscript-duration">--</span>
-          </div>
-          <div id="intiface-menu-funscript-info" style="font-size: 0.75em; color: #888; margin-top: 5px; text-align: center;"></div>
+<div id="intiface-funscript-menu-content" style="display: none; margin-top: 10px;">
+      <!-- Funscript Visualizer - Original -->
+      <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+        <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px;">
+          <i class="fa-solid fa-chart-area"></i> Original Funscript
         </div>
+        <canvas id="intiface-menu-funscript-canvas-original" style="width: 100%; height: 60px; background: rgba(0,0,0,0.2); border-radius: 4px;"></canvas>
+        <div style="display: flex; justify-content: space-between; font-size: 0.7em; color: #666; margin-top: 3px;">
+          <span>0s</span>
+          <span id="intiface-menu-funscript-duration-original">--</span>
+        </div>
+        <div id="intiface-menu-funscript-info-original" style="font-size: 0.75em; color: #888; margin-top: 5px; text-align: center;"></div>
+      </div>
+
+      <!-- Funscript Visualizer - Modified -->
+      <div style="margin-top: 15px; padding: 10px; background: rgba(100,100,255,0.1); border-radius: 4px; border: 1px solid rgba(100,100,255,0.2);">
+        <div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px; color: #64B5F6;">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Modified Funscript (AI Control)
+        </div>
+        <canvas id="intiface-menu-funscript-canvas-modified" style="width: 100%; height: 60px; background: rgba(0,0,0,0.2); border-radius: 4px;"></canvas>
+        <div style="display: flex; justify-content: space-between; font-size: 0.7em; color: #666; margin-top: 3px;">
+          <span>0s</span>
+          <span id="intiface-menu-funscript-duration-modified">--</span>
+        </div>
+        <div id="intiface-menu-funscript-info-modified" style="font-size: 0.75em; color: #888; margin-top: 5px; text-align: center;"></div>
+      </div>
 
         <!-- Sync Settings -->
         <div style="margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.1); border-radius: 4px;">
