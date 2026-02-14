@@ -3465,11 +3465,10 @@ No media files available in the media library.
 Place videos/audio in: ${mediaPath}
 \`\`\``
 } else {
-const fileList = mediaFiles.map(file => {
-const funscriptStatus = file.hasFunscript ? '[has funscript]' : '[no funscript]'
-const typeLabel = file.type === 'audio' ? '[audio]' : '[video]'
-return `${file.name} ${typeLabel} ${funscriptStatus}`
-}).join('\n')
+            const fileList = mediaFiles.map(file => {
+                const typeLabel = file.type === 'audio' ? '[audio]' : '[video]'
+                return `${file.name} ${typeLabel}`
+            }).join('\n')
 
 mediaListBlock = `
 
@@ -6854,9 +6853,8 @@ async function refreshMenuMediaList() {
 
       // Build list
       let html = ''
-      mediaFiles.forEach(file => {
-        const funscriptIcon = file.hasFunscript ? '<i class="fa-solid fa-wave-square" style="color: #4CAF50; margin-left: 5px;" title="Has Funscript"></i>' : ''
-        const sizeMB = (file.size / 1024 / 1024).toFixed(1)
+        mediaFiles.forEach(file => {
+            const sizeMB = (file.size / 1024 / 1024).toFixed(1)
         const iconClass = file.type === 'audio' ? 'fa-music' : 'fa-film'
         const iconColor = file.type === 'audio' ? '#9C27B0' : '#64B5F6'
 
@@ -6864,11 +6862,10 @@ async function refreshMenuMediaList() {
         <div class="menu-media-file-item" data-filename="${file.name}"
         style="padding: 8px; margin: 3px 0; background: rgba(255,255,255,0.05); border-radius: 3px; cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;"
         onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
-          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-            <i class="fa-solid ${iconClass}" style="color: ${iconColor};"></i>
-            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
-            ${funscriptIcon}
-          </div>
+            <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                <i class="fa-solid ${iconClass}" style="color: ${iconColor};"></i>
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
+            </div>
           <span style="font-size: 0.75em; color: #888; white-space: nowrap;">${sizeMB} MB</span>
         </div>
       `
