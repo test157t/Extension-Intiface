@@ -6586,7 +6586,7 @@ let timelinePlaybackStartTime = 0
 let timelinePlaybackTimer = null
 let timelineCurrentPosition = 0 // Current playback position in ms
 const TIMELINE_MIN_DURATION = 30000 // Minimum 30 seconds
-const TIMELINE_PADDING = 10000 // 10 seconds padding after last block
+const TIMELINE_PADDING_MULTIPLIER = 2.0 // Double the content duration (100% extra space)
 
 // Calculate dynamic timeline duration based on blocks
 function getTimelineDuration() {
@@ -6596,17 +6596,29 @@ function getTimelineDuration() {
   
   // Find the end time of the last block
   const lastEndTime = Math.max(...timelineBlocks.map(b => b.startTime + b.duration))
-  const dynamicDuration = lastEndTime + TIMELINE_PADDING
+  // Add 100% extra space (double the content duration)
+  const dynamicDuration = lastEndTime * TIMELINE_PADDING_MULTIPLIER
   
   return Math.max(TIMELINE_MIN_DURATION, dynamicDuration)
 }
 
 // Format milliseconds to mm:ss for timeline display
 function formatTimelineTime(ms) {
-    const totalSeconds = Math.floor(ms / 1000)
-    const minutes = Math.floor(totalSeconds / 60)
-    const seconds = totalSeconds % 60
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+// Format duration in ms to compact string (e.g., "5s", "1m05s", "30m00s")
+function formatDurationShort(ms) {
+  const totalSeconds = Math.floor(ms / 1000)
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`
+  }
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}m${seconds.toString().padStart(2, '0')}s`
 }
 
 let timelineIsDragging = false
@@ -6900,9 +6912,9 @@ $('.pattern-btn').css('opacity', '0.5')
 $(`.pattern-btn[data-pattern="${patternName}"]`).css('opacity', '1')
 
 // Get pattern defaults and update sliders
-const defaults = getPatternDefaults(patternName, category)
-$('#intiface-pattern-duration').val(defaults.duration)
-$('#intiface-pattern-duration-display').text(`${(defaults.duration/1000).toFixed(1)}s`)
+  const defaults = getPatternDefaults(patternName, category)
+  $('#intiface-pattern-duration').val(defaults.duration)
+  $('#intiface-pattern-duration-display').text(formatDurationShort(defaults.duration))
 $('#intiface-pattern-min').val(defaults.min)
 $('#intiface-pattern-min-display').text(`${defaults.min}%`)
 $('#intiface-pattern-max').val(defaults.max)
@@ -6981,6 +6993,21 @@ async function clearTimeline() {
   updateStatus('Timeline cleared')
 }
 
+// Category colors for timeline blocks (matching the UI theme)
+const categoryColors = {
+  basic: { bg: 'rgba(100,100,100,0.6)', border: 'rgba(150,150,150,0.8)' },
+  denial: { bg: 'rgba(255,100,100,0.6)', border: 'rgba(255,100,100,0.8)' },
+  milking: { bg: 'rgba(100,255,100,0.6)', border: 'rgba(100,255,100,0.8)' },
+  training: { bg: 'rgba(100,100,255,0.6)', border: 'rgba(100,100,255,0.8)' },
+  robotic: { bg: 'rgba(255,0,255,0.6)', border: 'rgba(255,0,255,0.8)' },
+  sissy: { bg: 'rgba(255,100,200,0.6)', border: 'rgba(255,100,200,0.8)' },
+  prejac: { bg: 'rgba(0,255,255,0.6)', border: 'rgba(0,255,255,0.8)' },
+  evil: { bg: 'rgba(191,0,255,0.6)', border: 'rgba(191,0,255,0.8)' },
+  frustration: { bg: 'rgba(255,255,0,0.6)', border: 'rgba(255,255,0,0.8)' },
+  hypno: { bg: 'rgba(221,160,221,0.6)', border: 'rgba(221,160,221,0.8)' },
+  chastity: { bg: 'rgba(255,192,203,0.6)', border: 'rgba(255,192,203,0.8)' }
+}
+
 // Render timeline blocks
 function renderTimeline() {
   // Clear existing blocks
@@ -7012,18 +7039,21 @@ function renderTimeline() {
   })
 
   // Render blocks on each track
-timelineBlocks.forEach(block => {
-const displayName = block.patternName.replace(/_/g, ' ')
-const leftPercent = (block.startTime / getTimelineDuration()) * 100
-const widthPercent = (block.duration / getTimelineDuration()) * 100
+  timelineBlocks.forEach(block => {
+    const displayName = block.patternName.replace(/_/g, ' ')
+    const leftPercent = (block.startTime / getTimelineDuration()) * 100
+    const widthPercent = (block.duration / getTimelineDuration()) * 100
 
     // Use full display name - CSS will handle overflow with ellipsis
     const truncatedName = displayName
+    
+    // Get color based on category
+    const colors = categoryColors[block.category] || categoryColors.basic
 
     const blockHtml = `
     <div class="timeline-block" data-id="${block.id}"
       style="position: absolute; top: 2px; left: ${leftPercent}%; width: ${widthPercent}%;
-             height: calc(100% - 4px); background: rgba(100,150,255,0.6); border: 1px solid rgba(100,150,255,0.8);
+             height: calc(100% - 4px); background: ${colors.bg}; border: 1px solid ${colors.border};
              border-radius: 2px; cursor: move; display: flex; align-items: center; justify-content: center;
              font-size: 0.65em; color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px; user-select: none;"
       title="${displayName} (${block.category}) - Click and drag to move, right-click to delete">
@@ -7217,7 +7247,7 @@ async function playTimeline() {
     
     // Update scrubber
     $('#intiface-timeline-scrubber').val(timelineCurrentPosition)
-    $('#intiface-timeline-current-time').text(formatTimelineTime(timelineCurrentPosition))
+    $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
     
     // Stop at end
     if (timelineCurrentPosition >= getTimelineDuration()) {
@@ -7252,7 +7282,7 @@ async function pauseTimeline() {
   stopAllDeviceActions()
   
   updateStatus('Timeline paused')
-  $('#intiface-timeline-current-time').text(formatTimelineTime(timelineCurrentPosition) + ' (paused)')
+  $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition) + ' (paused)')
 }
 
 // Resume timeline playback from current position
@@ -7305,7 +7335,7 @@ async function resumeTimeline() {
     
     // Update scrubber
     $('#intiface-timeline-scrubber').val(timelineCurrentPosition)
-    $('#intiface-timeline-current-time').text(formatTimelineTime(timelineCurrentPosition))
+    $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
     
     // Stop at end
     if (timelineCurrentPosition >= getTimelineDuration()) {
@@ -7344,7 +7374,7 @@ async function stopTimeline() {
 // Update timeline from scrubber
 function scrubTimeline(value) {
   timelineCurrentPosition = parseInt(value)
-  $('#intiface-timeline-current-time').text(formatTimelineTime(timelineCurrentPosition))
+  $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
 
   if (mediaPlayer.isPlaying) {
     timelinePlaybackStartTime = Date.now() - timelineCurrentPosition
@@ -7404,10 +7434,10 @@ scrubTimeline($(this).val())
 })
 
 // Pattern duration slider
-$("#intiface-pattern-duration").on("input", function() {
-const duration = parseInt($(this).val())
-$("#intiface-pattern-duration-display").text(`${(duration/1000).toFixed(1)}s`)
-})
+  $("#intiface-pattern-duration").on("input", function() {
+    const duration = parseInt($(this).val())
+    $("#intiface-pattern-duration-display").text(formatDurationShort(duration))
+  })
 
 // Pattern intensity range sliders
 $("#intiface-pattern-min").on("input", function() {
