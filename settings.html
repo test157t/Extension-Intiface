@@ -155,37 +155,38 @@ Connect a device to see available patterns
 </div>
 
 <!-- Timeline Header - Time markers -->
-        <div id="intiface-timeline-header" style="display: flex; align-items: center; margin-bottom: 5px; padding-left: 100px;">
-            <div id="intiface-timeline-scale" style="flex: 1; height: 20px; position: relative; background: rgba(0,0,0,0.2); border-radius: 2px;">
-                <span id="timeline-scale-0" style="position: absolute; left: 0; font-size: 0.6em; color: #666;">0:00</span>
-                <span id="timeline-scale-1" style="position: absolute; left: 25%; font-size: 0.6em; color: #666;">25%</span>
-                <span id="timeline-scale-2" style="position: absolute; left: 50%; font-size: 0.6em; color: #666;">50%</span>
-                <span id="timeline-scale-3" style="position: absolute; left: 75%; font-size: 0.6em; color: #666;">75%</span>
-                <span id="timeline-scale-4" style="position: absolute; right: 0; font-size: 0.6em; color: #666;">100%</span>
-            </div>
-        </div>
+<!-- Note: The scale and track lanes must align perfectly. Track header is 76px wide (60px + 8px padding each side) -->
+<div id="intiface-timeline-header" style="display: flex; align-items: center; margin-bottom: 5px; padding-left: 76px;">
+  <div id="intiface-timeline-scale" style="flex: 1; height: 20px; position: relative; background: rgba(0,0,0,0.2); border-radius: 2px;">
+    <span id="timeline-scale-0" style="position: absolute; left: 0; font-size: 0.6em; color: #666;">0:00</span>
+    <span id="timeline-scale-1" style="position: absolute; left: 25%; font-size: 0.6em; color: #666;">25%</span>
+    <span id="timeline-scale-2" style="position: absolute; left: 50%; font-size: 0.6em; color: #666;">50%</span>
+    <span id="timeline-scale-3" style="position: absolute; left: 75%; font-size: 0.6em; color: #666;">75%</span>
+    <span id="timeline-scale-4" style="position: absolute; right: 0; font-size: 0.6em; color: #666;">100%</span>
+  </div>
+</div>
 
-<!-- Timeline Tracks -->
-<div id="intiface-timeline-tracks" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;">
-<!-- Track A -->
-        <div class="timeline-track-container" data-channel="A" style="display: flex; flex-direction: column; border-radius: 3px; border: 1px solid rgba(255,100,100,0.2); overflow: hidden;">
-            <div class="timeline-track-header" style="display: flex; align-items: center; height: 24px; background: rgba(255,100,100,0.1);">
-                <div style="width: 60px; padding: 0 8px; font-size: 0.7em; color: #ff6464; font-weight: bold; display: flex; align-items: center; gap: 5px;">
-                    <i class="fa-solid fa-wave-square"></i> A
-                </div>
-                <div style="flex: 1;"></div>
-                <div style="display: flex; align-items: center; gap: 5px; padding: 0 8px; font-size: 0.65em;">
-                    <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #888;">
-                        <input type="checkbox" id="channel-a-multi-motor" style="margin: 0;">
-                        <i class="fa-solid fa-fan" style="font-size: 0.8em;"></i>
-                    </label>
-                    <input type="number" id="channel-a-motor-count" min="1" max="8" value="2" style="width: 35px; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; color: #fff; text-align: center; display: none;">
-                </div>
-            </div>
-            <div class="timeline-track-lanes" data-channel="A" style="display: flex; flex-direction: column; flex: 1;">
-                <div class="timeline-track-lane" style="height: 28px; position: relative; background: rgba(0,0,0,0.2); cursor: pointer; border-bottom: 1px solid rgba(255,100,100,0.1);" data-channel="A" data-motor="1"></div>
-            </div>
-        </div>
+  <!-- Timeline Tracks -->
+<div id="intiface-timeline-tracks" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; padding-left: 76px;">
+  <!-- Track A -->
+  <div class="timeline-track-container" data-channel="A" style="display: flex; flex-direction: column; border-radius: 3px; border: 1px solid rgba(255,100,100,0.2); overflow: hidden;">
+    <div class="timeline-track-header" style="display: flex; align-items: center; height: 24px; background: rgba(255,100,100,0.1); margin-left: -76px; padding-left: 76px;">
+      <div style="width: 60px; padding: 0 8px; font-size: 0.7em; color: #ff6464; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+        <i class="fa-solid fa-wave-square"></i> A
+      </div>
+      <div style="flex: 1;"></div>
+      <div style="display: flex; align-items: center; gap: 5px; padding: 0 8px; font-size: 0.65em;">
+        <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #888;">
+          <input type="checkbox" id="channel-a-multi-motor" style="margin: 0;">
+          <i class="fa-solid fa-fan" style="font-size: 0.8em;"></i>
+        </label>
+        <input type="number" id="channel-a-motor-count" min="1" max="8" value="2" style="width: 35px; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; color: #fff; text-align: center; display: none;">
+      </div>
+    </div>
+    <div class="timeline-track-lanes" data-channel="A" style="display: flex; flex-direction: column; flex: 1;">
+      <div class="timeline-track-lane" style="height: 28px; position: relative; background: rgba(0,0,0,0.2); cursor: pointer; border-bottom: 1px solid rgba(255,100,100,0.1);" data-channel="A" data-motor="1"></div>
+    </div>
+  </div>
         <!-- Track B -->
         <div class="timeline-track-container" data-channel="B" style="display: flex; flex-direction: column; border-radius: 3px; border: 1px solid rgba(100,255,100,0.2); overflow: hidden;">
             <div class="timeline-track-header" style="display: flex; align-items: center; height: 24px; background: rgba(100,255,100,0.1);">

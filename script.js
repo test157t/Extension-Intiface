@@ -6588,18 +6588,31 @@ let timelineCurrentPosition = 0 // Current playback position in ms
 const TIMELINE_MIN_DURATION = 30000 // Minimum 30 seconds
 const TIMELINE_PADDING_MULTIPLIER = 2.0 // Double the content duration (100% extra space)
 
-// Calculate dynamic timeline duration based on blocks
+// Calculate dynamic timeline duration based on blocks (with padding for visual editing)
 function getTimelineDuration() {
   if (timelineBlocks.length === 0) {
     return TIMELINE_MIN_DURATION
   }
-  
+
   // Find the end time of the last block
   const lastEndTime = Math.max(...timelineBlocks.map(b => b.startTime + b.duration))
   // Add 100% extra space (double the content duration)
   const dynamicDuration = lastEndTime * TIMELINE_PADDING_MULTIPLIER
-  
+
   return Math.max(TIMELINE_MIN_DURATION, dynamicDuration)
+}
+
+// Get the actual content duration (longest pattern end time) without padding
+// This is used for playback slider max and funscript export
+function getContentDuration() {
+  if (timelineBlocks.length === 0) {
+    return 0
+  }
+
+  // Find the end time of the last block (actual content end, no padding)
+  const lastEndTime = Math.max(...timelineBlocks.map(b => b.startTime + b.duration))
+  
+  return lastEndTime
 }
 
 // Format milliseconds to mm:ss for timeline display
@@ -7041,13 +7054,23 @@ const categoryColors = {
 function renderTimeline() {
   // Clear existing blocks
   $('.timeline-block').remove()
+
+  // Get both durations: visual (padded) and content (actual)
+  const visualDuration = getTimelineDuration()
+  const contentDuration = getContentDuration()
   
-  // Update timeline duration based on content
-  const duration = getTimelineDuration()
-  $('#intiface-timeline-scrubber').attr('max', duration)
+  // Debug logging
+  console.log(`${NAME}: renderTimeline - visualDuration: ${visualDuration}ms (${formatDurationShort(visualDuration)}), contentDuration: ${contentDuration}ms (${formatDurationShort(contentDuration)})`)
+  timelineBlocks.forEach((b, i) => {
+    console.log(`${NAME}: Block ${i}: startTime=${b.startTime}ms, duration=${b.duration}ms, endTime=${b.startTime + b.duration}ms`)
+  })
   
-  // Update end time label
-  const totalSeconds = Math.floor(duration / 1000)
+  // Set scrubber max to content duration (not padded visual duration)
+  // This ensures playback stops at the actual end of patterns, not the padded end
+  $('#intiface-timeline-scrubber').attr('max', contentDuration)
+
+  // Update end time label to show actual content end time
+  const totalSeconds = Math.floor(contentDuration / 1000)
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
   if (minutes > 0) {
@@ -7055,11 +7078,12 @@ function renderTimeline() {
   } else {
     $('#intiface-timeline-end-time').text(`${seconds}s`)
   }
-  
-  // Update scale markers (0%, 25%, 50%, 75%, 100%)
+
+  // Update scale markers (0%, 25%, 50%, 75%, 100%) using visual (padded) duration
+  // This keeps the timeline visually usable for editing with extra space
   const scalePositions = [0, 0.25, 0.5, 0.75, 1.0]
   scalePositions.forEach((pos, index) => {
-    const timeMs = Math.round(duration * pos)
+    const timeMs = Math.round(visualDuration * pos)
     const timeSec = Math.floor(timeMs / 1000)
     const timeMin = Math.floor(timeSec / 60)
     const timeRem = timeSec % 60
@@ -7068,10 +7092,11 @@ function renderTimeline() {
   })
 
   // Render blocks on each track
+  // Use visual duration (padded) for positioning so blocks appear in correct visual positions
   timelineBlocks.forEach(block => {
     const displayName = block.patternName.replace(/_/g, ' ')
-    const leftPercent = (block.startTime / getTimelineDuration()) * 100
-    const widthPercent = (block.duration / getTimelineDuration()) * 100
+    const leftPercent = (block.startTime / visualDuration) * 100
+    const widthPercent = (block.duration / visualDuration) * 100
 
     // Use full display name - CSS will handle overflow with ellipsis
     const truncatedName = displayName
@@ -7153,6 +7178,8 @@ function convertTimelineToFunscripts() {
   const channels = ['A', 'B', 'C', 'D', '-']
   
   // Initialize funscripts for each channel
+  // Use content duration (not padded) for funscript metadata
+  const contentDuration = getContentDuration()
   channels.forEach(channel => {
     channelFunscripts[channel] = {
       actions: [],
@@ -7160,7 +7187,7 @@ function convertTimelineToFunscripts() {
       metadata: {
         creator: 'Extension-Intiface Timeline',
         description: `Timeline playback for channel ${channel}`,
-        duration: getTimelineDuration(),
+        duration: contentDuration,
         type: 'funscript'
       }
     }
@@ -7225,6 +7252,15 @@ function convertTimelineToFunscripts() {
   // Sort actions by timestamp for each channel
   channels.forEach(channel => {
     channelFunscripts[channel].actions.sort((a, b) => a.at - b.at)
+    
+    // Calculate actual max action time for this funscript (not the padded timeline duration)
+    const actions = channelFunscripts[channel].actions
+    if (actions.length > 0) {
+      const maxActionTime = actions[actions.length - 1].at
+      channelFunscripts[channel].metadata.duration = maxActionTime
+    } else {
+      channelFunscripts[channel].metadata.duration = 0
+    }
   })
   
   return channelFunscripts
@@ -7302,8 +7338,8 @@ async function playTimeline() {
     $('#intiface-timeline-scrubber').val(timelineCurrentPosition)
     $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
     
-    // Stop at end
-    if (timelineCurrentPosition >= getTimelineDuration()) {
+    // Stop at end of actual content (not padded visual duration)
+    if (timelineCurrentPosition >= getContentDuration()) {
       stopTimeline()
       timelineCurrentPosition = 0
       $('#intiface-timeline-scrubber').val(0)
@@ -7400,8 +7436,8 @@ async function resumeTimeline() {
     $('#intiface-timeline-scrubber').val(timelineCurrentPosition)
     $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
     
-    // Stop at end
-    if (timelineCurrentPosition >= getTimelineDuration()) {
+    // Stop at end of actual content (not padded visual duration)
+    if (timelineCurrentPosition >= getContentDuration()) {
       stopTimeline()
       timelineCurrentPosition = 0
       $('#intiface-timeline-scrubber').val(0)
@@ -7409,7 +7445,7 @@ async function resumeTimeline() {
       updateStatus('Timeline playback complete')
     }
   }, 50)
-  
+
   updateStatus('Timeline resumed')
 }
 
@@ -7596,16 +7632,16 @@ function attachLaneClickHandlers() {
   $(document).off('click', '.timeline-track-lane')
   $(document).on('click', '.timeline-track-lane', function(e) {
     if (e.target !== this) return
-    
+
     const lane = $(this)
     const channel = lane.data('channel')
     const motor = lane.data('motor') || 1
-    
+
     if (!timelineSelectedPattern) {
       updateStatus('Select a pattern first, then click on a timeline track')
       return
     }
-    
+
     // Calculate position from click
     const rect = this.getBoundingClientRect()
     const clickX = e.clientX - rect.left
@@ -7613,6 +7649,8 @@ function attachLaneClickHandlers() {
     const clickPercent = Math.max(0, Math.min(1, clickX / laneWidth))
     const startTime = Math.round(clickPercent * getTimelineDuration())
     
+    console.log(`${NAME}: Click on lane - clickX: ${clickX}, laneWidth: ${laneWidth}, clickPercent: ${clickPercent}, startTime: ${startTime}ms, visualDuration: ${getTimelineDuration()}ms`)
+
     // Add block with motor info
     addTimelineBlock(channel, startTime, motor)
   })
