@@ -155,15 +155,15 @@ Connect a device to see available patterns
 </div>
 
 <!-- Timeline Header - Time markers -->
-<div id="intiface-timeline-header" style="display: flex; align-items: center; margin-bottom: 5px; padding-left: 100px;">
-<div style="flex: 1; height: 20px; position: relative; background: rgba(0,0,0,0.2); border-radius: 2px;">
-<span style="position: absolute; left: 0; font-size: 0.6em; color: #666;">0:00</span>
-<span style="position: absolute; left: 25%; font-size: 0.6em; color: #666;">0:30</span>
-<span style="position: absolute; left: 50%; font-size: 0.6em; color: #666;">1:00</span>
-<span style="position: absolute; left: 75%; font-size: 0.6em; color: #666;">1:30</span>
-<span style="position: absolute; right: 0; font-size: 0.6em; color: #666;">2:00</span>
-</div>
-</div>
+        <div id="intiface-timeline-header" style="display: flex; align-items: center; margin-bottom: 5px; padding-left: 100px;">
+            <div id="intiface-timeline-scale" style="flex: 1; height: 20px; position: relative; background: rgba(0,0,0,0.2); border-radius: 2px;">
+                <span id="timeline-scale-0" style="position: absolute; left: 0; font-size: 0.6em; color: #666;">0:00</span>
+                <span id="timeline-scale-1" style="position: absolute; left: 25%; font-size: 0.6em; color: #666;">25%</span>
+                <span id="timeline-scale-2" style="position: absolute; left: 50%; font-size: 0.6em; color: #666;">50%</span>
+                <span id="timeline-scale-3" style="position: absolute; left: 75%; font-size: 0.6em; color: #666;">75%</span>
+                <span id="timeline-scale-4" style="position: absolute; right: 0; font-size: 0.6em; color: #666;">100%</span>
+            </div>
+        </div>
 
 <!-- Timeline Tracks -->
 <div id="intiface-timeline-tracks" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px;">
@@ -202,14 +202,14 @@ Connect a device to see available patterns
 <button id="intiface-timeline-play" class="menu_button" style="padding: 5px 15px; font-size: 0.8em; background: rgba(100,255,100,0.2);">
 <i class="fa-solid fa-play"></i> Play
 </button>
-<button id="intiface-timeline-stop" class="menu_button" style="padding: 5px 15px; font-size: 0.8em; background: rgba(255,100,100,0.2);">
-<i class="fa-solid fa-stop"></i> Stop
-</button>
+<button id="intiface-timeline-pause" class="menu_button" style="padding: 5px 15px; font-size: 0.8em; background: rgba(255,165,0,0.2);">
+                <i class="fa-solid fa-pause"></i> Pause
+            </button>
 <div style="flex: 1; display: flex; align-items: center; gap: 5px;">
 <div style="font-size: 0.7em; color: #888;">Time:</div>
 <div id="intiface-timeline-current-time" style="font-size: 0.8em; color: #64B5F6; min-width: 50px;">0.0s</div>
-<input type="range" id="intiface-timeline-scrubber" min="0" max="7200000" value="0" style="flex: 1;" title="Scrub timeline">
-<div style="font-size: 0.7em; color: #888;">2h</div>
+<input type="range" id="intiface-timeline-scrubber" min="0" max="30000" value="0" style="flex: 1;" title="Scrub timeline">
+            <div id="intiface-timeline-end-time" style="font-size: 0.7em; color: #888;">30s</div>
 </div>
 <button id="intiface-timeline-clear" class="menu_button" style="padding: 5px 10px; font-size: 0.75em;">
 <i class="fa-solid fa-trash"></i>
