@@ -6834,99 +6834,106 @@ executePlayModeSequence = async function(deviceIndex, modePreset) {
 
 // Get default values for any pattern (waveform or mode)
 function getPatternDefaults(patternName, category) {
-// Check if it's a waveform pattern
-if (WaveformPatterns[patternName]) {
-return {
-min: 20,
-max: 80,
-duration: 5000,
-cycles: 3
-}
-}
+  // Check if it's a waveform pattern
+  if (WaveformPatterns[patternName]) {
+    return {
+      min: 20,
+      max: 80,
+      duration: 5000,
+      cycles: 3
+    }
+  }
 
-// Check if it's a mode pattern
-const modeMap = {
-'denial': DenialDominaMode,
-'milking': MilkMaidMode,
-'training': PetTrainingMode,
-'robotic': RoboticRuinationMode,
-'sissy': SissySurrenderMode,
-'prejac': PrejacPrincessMode,
-'evil': EvilEdgingMistressMode,
-'frustration': FrustrationFairyMode,
-'hypno': HypnoHelperMode,
-'chastity': ChastityCaretakerMode
-}
-const modeConstant = modeMap[category]
-if (modeConstant && modeConstant[patternName]) {
-const preset = modeConstant[patternName]
-if (preset.sequence && preset.sequence.length > 0) {
-// Calculate average values from sequence
-let totalMin = 0, totalMax = 0, totalDuration = 0
-preset.sequence.forEach(step => {
-totalMin += step.min || 20
-totalMax += step.max || 80
-totalDuration += step.duration || 5000
-})
-const avgMin = Math.round(totalMin / preset.sequence.length)
-const avgMax = Math.round(totalMax / preset.sequence.length)
-const avgDuration = Math.round(totalDuration / preset.sequence.length)
-return {
-min: avgMin,
-max: avgMax,
-duration: avgDuration,
-cycles: preset.repeat ? 3 : 1
-}
-}
-}
+  // Check if it's a mode pattern
+  const modeMap = {
+    'denial': DenialDominaMode,
+    'milking': MilkMaidMode,
+    'training': PetTrainingMode,
+    'robotic': RoboticRuinationMode,
+    'sissy': SissySurrenderMode,
+    'prejac': PrejacPrincessMode,
+    'evil': EvilEdgingMistressMode,
+    'frustration': FrustrationFairyMode,
+    'hypno': HypnoHelperMode,
+    'chastity': ChastityCaretakerMode
+  }
+  const modeConstant = modeMap[category]
+  if (modeConstant && modeConstant[patternName]) {
+    const preset = modeConstant[patternName]
+    if (preset.sequence && preset.sequence.length > 0) {
+      // Calculate total duration and average min/max from sequence
+      let totalDuration = 0
+      let totalMin = 0, totalMax = 0
+      preset.sequence.forEach(step => {
+        totalDuration += step.duration || 5000
+        totalMin += step.min || 20
+        totalMax += step.max || 80
+      })
+      const avgMin = Math.round(totalMin / preset.sequence.length)
+      const avgMax = Math.round(totalMax / preset.sequence.length)
+      return {
+        min: avgMin,
+        max: avgMax,
+        duration: totalDuration, // One complete cycle duration
+        cycles: 1 // Always default to 1 cycle for auto-scaling
+      }
+    }
+  }
 
-// Basic patterns
-if (category === 'basic') {
-const basicPresets = {
-warmup: { min: 10, max: 30, duration: 5000, cycles: 3 },
-tease: { min: 20, max: 60, duration: 8000, cycles: 4 },
-pulse: { min: 30, max: 70, duration: 4000, cycles: 8 },
-edge: { min: 10, max: 90, duration: 12000, cycles: 2 }
-}
-if (basicPresets[patternName]) {
-return basicPresets[patternName]
-}
-}
+  // Basic patterns
+  if (category === 'basic') {
+    const basicPresets = {
+      warmup: { min: 10, max: 30, duration: 5000, cycles: 3 },
+      tease: { min: 20, max: 60, duration: 8000, cycles: 4 },
+      pulse: { min: 30, max: 70, duration: 4000, cycles: 8 },
+      edge: { min: 10, max: 90, duration: 12000, cycles: 2 }
+    }
+    if (basicPresets[patternName]) {
+      return basicPresets[patternName]
+    }
+  }
 
-// Default fallback
-return { min: 20, max: 80, duration: 5000, cycles: 3 }
+  // Default fallback
+  return { min: 20, max: 80, duration: 5000, cycles: 3 }
 }
 
 // Select a pattern from the palette (click to select, then click timeline to place)
 function selectPatternForTimeline(patternName, category) {
-timelineSelectedPattern = { patternName, category }
-
-// Show selected pattern indicator
-const displayName = patternName.replace(/_/g, ' ')
-const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
-$('#intiface-timeline-selected').show()
-$('#intiface-timeline-selected-text').text(`Click on Channel A, B, C, or D track to place "${displayName}" (${categoryLabel})`)
-
-// Highlight pattern buttons
-$('.pattern-btn').css('opacity', '0.5')
-$(`.pattern-btn[data-pattern="${patternName}"]`).css('opacity', '1')
-
-// Get pattern defaults and update sliders
+  // Get pattern defaults first
   const defaults = getPatternDefaults(patternName, category)
+  
+  timelineSelectedPattern = {
+    patternName,
+    category,
+    defaultDuration: defaults.duration, // Store for cycle calculation
+    defaultCycles: defaults.cycles // Store for multiplicative scaling
+  }
+
+  // Show selected pattern indicator
+  const displayName = patternName.replace(/_/g, ' ')
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
+  $('#intiface-timeline-selected').show()
+  $('#intiface-timeline-selected-text').text(`Click on Channel A, B, C, or D track to place "${displayName}" (${categoryLabel})`)
+
+  // Highlight pattern buttons
+  $('.pattern-btn').css('opacity', '0.5')
+  $(`.pattern-btn[data-pattern="${patternName}"]`).css('opacity', '1')
+
+  // Update sliders with defaults
   $('#intiface-pattern-duration').val(defaults.duration)
   $('#intiface-pattern-duration-display').text(formatDurationShort(defaults.duration))
-$('#intiface-pattern-min').val(defaults.min)
-$('#intiface-pattern-min-display').text(`${defaults.min}%`)
-$('#intiface-pattern-max').val(defaults.max)
-$('#intiface-pattern-max-display').text(`${defaults.max}%`)
-$('#intiface-pattern-cycles').val(defaults.cycles)
-$('#intiface-pattern-cycles-display').text(defaults.cycles)
+  $('#intiface-pattern-min').val(defaults.min)
+  $('#intiface-pattern-min-display').text(`${defaults.min}%`)
+  $('#intiface-pattern-max').val(defaults.max)
+  $('#intiface-pattern-max-display').text(`${defaults.max}%`)
+  $('#intiface-pattern-cycles').val(defaults.cycles)
+  $('#intiface-pattern-cycles-display').text(defaults.cycles)
 
-updateStatus(`Selected: ${displayName} - Click timeline track to place (${(defaults.duration/1000).toFixed(1)}s)`)
+  updateStatus(`Selected: ${displayName} - Click timeline track to place (${(defaults.duration/1000).toFixed(1)}s)`)
 }
 
 // Add pattern block to timeline
-function addTimelineBlock(channel, startTime) {
+function addTimelineBlock(channel, startTime, motor = 1) {
 if (!timelineSelectedPattern) {
 updateStatus('Select a pattern first, then click timeline track')
 return
@@ -6940,28 +6947,30 @@ const sliderMin = parseInt($('#intiface-pattern-min').val()) || 20
 const sliderMax = parseInt($('#intiface-pattern-max').val()) || 80
 const sliderCycles = parseInt($('#intiface-pattern-cycles').val()) || 3
 
-timelineBlockIdCounter++
-const block = {
-id: timelineBlockIdCounter,
-patternName: timelineSelectedPattern.patternName,
-category: timelineSelectedPattern.category,
-channel: channel,
-startTime: startTime,
-duration: sliderDuration, // Use slider value as default
-min: sliderMin,
-max: sliderMax,
-cycles: sliderCycles
-}
-
+  timelineBlockIdCounter++
+  const block = {
+    id: timelineBlockIdCounter,
+    patternName: timelineSelectedPattern.patternName,
+    category: timelineSelectedPattern.category,
+    channel: channel,
+    motor: motor,
+    startTime: startTime,
+    duration: sliderDuration, // Use slider value as default
+    min: sliderMin,
+    max: sliderMax,
+    cycles: sliderCycles
+  }
+  
   // The slider value is already set as block.duration (line 6846)
   // We don't override it with calculated duration - user adjustment takes precedence
   // Pattern sequences will be scaled/adapted to fit the user-selected duration during playback
-
+  
   timelineBlocks.push(block)
   renderTimeline()
-
+  
   const displayName = block.patternName.replace(/_/g, ' ')
-  updateStatus(`Added "${displayName}" to Channel ${channel} at ${formatTimelineTime(startTime)}`)
+  const motorText = motor > 1 ? ` (M${motor})` : ''
+  updateStatus(`Added "${displayName}" to Channel ${channel}${motorText} at ${formatTimelineTime(startTime)}`)
 
 // Clear selection
 // timelineSelectedPattern = null
@@ -6982,15 +6991,35 @@ async function clearTimeline() {
     await stopTimeline()
   }
   
+  // Clear ALL timeline-related state
   timelineBlocks = []
   timelineBlockIdCounter = 0
   timelineCurrentPosition = 0
   clearInterval(timelinePlaybackTimer)
   timelinePlaybackTimer = null
+  
+  // Clear funscript data to prevent stale state
+  mediaPlayer.currentFunscript = null
+  mediaPlayer.channelFunscripts = {}
+  
   $('#intiface-timeline-scrubber').val(0)
   $('#intiface-timeline-current-time').text('0:00')
   renderTimeline()
   updateStatus('Timeline cleared')
+}
+
+// Get motor count for a channel (returns 1 if multi-motor not enabled)
+function getChannelMotorCount(channel) {
+  const channelLower = channel.toLowerCase()
+  const checkbox = $(`#channel-${channelLower}-multi-motor`)
+  const input = $(`#channel-${channelLower}-motor-count`)
+  
+  if (checkbox.is(':checked')) {
+    const count = parseInt(input.val()) || 2
+    return Math.max(1, Math.min(8, count))
+  }
+  
+  return 1
 }
 
 // Category colors for timeline blocks (matching the UI theme)
@@ -7061,7 +7090,7 @@ function renderTimeline() {
     </div>
     `
 
-$(`.timeline-track-lane[data-channel="${block.channel}"]`).append(blockHtml)
+    $(`.timeline-track-lane[data-channel="${block.channel}"][data-motor="${block.motor || 1}"]`).append(blockHtml)
 })
 
 // Attach event handlers to blocks
@@ -7145,12 +7174,19 @@ function convertTimelineToFunscripts() {
     const funscript = channelFunscripts[block.channel]
     if (!funscript) return
     
+    // Get motor count for this channel
+    const motorCount = getChannelMotorCount(block.channel)
+    
     // Generate waveform values for this block
     const steps = Math.floor(block.duration / 100) // 100ms resolution
     const patternFunc = WaveformPatterns[block.patternName] || WaveformPatterns.sine
+    const cycles = block.cycles || 1
     
     for (let i = 0; i < steps; i++) {
-      const phase = i / steps
+      // Calculate phase across multiple cycles
+      // phase goes from 0 to cycles over the duration
+      const progress = i / steps
+      const phase = (progress * cycles) % 1
       const rawValue = patternFunc(phase, 1) // Get normalized pattern value
       
       // Scale to min/max range
@@ -7162,10 +7198,27 @@ function convertTimelineToFunscripts() {
       // Calculate timestamp
       const at = block.startTime + (i * 100)
       
-      funscript.actions.push({
-        at: at,
-        pos: Math.min(100, Math.max(0, pos))
-      })
+      if (motorCount > 1) {
+        // Multi-motor: generate phase-shifted patterns for each motor
+        const positions = []
+        for (let motor = 0; motor < motorCount; motor++) {
+          const motorPhase = (phase + (motor / motorCount)) % 1
+          const motorRawValue = patternFunc(motorPhase, 1)
+          const motorNormalized = (motorRawValue + 1) / 2
+          const motorPos = Math.round(min + (max - min) * motorNormalized)
+          positions.push(Math.min(100, Math.max(0, motorPos)))
+        }
+        funscript.actions.push({
+          at: at,
+          pos: positions // Array of positions for each motor
+        })
+      } else {
+        // Single motor: just use single value
+        funscript.actions.push({
+          at: at,
+          pos: Math.min(100, Math.max(0, pos))
+        })
+      }
     }
   })
   
@@ -7263,24 +7316,27 @@ async function playTimeline() {
 // Pause timeline playback (maintains position)
 async function pauseTimeline() {
   console.log(`${NAME}: pauseTimeline called`)
-  
+
   if (!mediaPlayer.isPlaying) {
     console.log(`${NAME}: Timeline not playing, nothing to pause`)
     return
   }
-  
+
   // Pause the unified playback
   mediaPlayer.isPlaying = false
-  
+
   // Clear timeline timer but keep position
   if (timelinePlaybackTimer) {
     clearInterval(timelinePlaybackTimer)
     timelinePlaybackTimer = null
   }
   
+  // Stop funscript sync to prevent background execution
+  stopFunscriptSync()
+
   // Stop device actions
   stopAllDeviceActions()
-  
+
   updateStatus('Timeline paused')
   $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition) + ' (paused)')
 }
@@ -7288,17 +7344,24 @@ async function pauseTimeline() {
 // Resume timeline playback from current position
 async function resumeTimeline() {
   console.log(`${NAME}: resumeTimeline called`)
-  
+
   if (mediaPlayer.isPlaying) {
     console.log(`${NAME}: Timeline already playing`)
     return
   }
   
+  // Check if there are actually timeline blocks to play
+  if (timelineBlocks.length === 0) {
+    console.log(`${NAME}: No timeline blocks to resume`)
+    updateStatus('Timeline is empty - add patterns first')
+    return
+  }
+
   // Check if we have timeline data loaded
   if (!mediaPlayer.currentFunscript || Object.keys(mediaPlayer.channelFunscripts).length === 0) {
     // No timeline loaded, need to convert blocks again
     const timelineFunscripts = convertTimelineToFunscripts()
-    
+
     // Load funscripts into media player channels
     mediaPlayer.channelFunscripts = {}
     Object.keys(timelineFunscripts).forEach(channel => {
@@ -7307,7 +7370,7 @@ async function resumeTimeline() {
         mediaPlayer.channelFunscripts[channel] = funscript
       }
     })
-    
+
     // Use the first available channel as the main funscript
     const availableChannels = Object.keys(mediaPlayer.channelFunscripts)
     if (availableChannels.length > 0) {
@@ -7353,21 +7416,25 @@ async function resumeTimeline() {
 // Stop timeline playback using unified system
 async function stopTimeline() {
   console.log(`${NAME}: stopTimeline called`)
-  
+
   // Use unified stop
   stopMediaPlayback()
-  
+
   // Clear timeline timer
   if (timelinePlaybackTimer) {
     clearInterval(timelinePlaybackTimer)
     timelinePlaybackTimer = null
   }
   
+  // Clear funscript data to prevent stale state
+  mediaPlayer.currentFunscript = null
+  mediaPlayer.channelFunscripts = {}
+
   // Reset position
   timelineCurrentPosition = 0
   $('#intiface-timeline-scrubber').val(0)
   $('#intiface-timeline-current-time').text('0:00')
-  
+
   updateStatus('Timeline stopped')
 }
 
@@ -7437,9 +7504,121 @@ scrubTimeline($(this).val())
   $("#intiface-pattern-duration").on("input", function() {
     const duration = parseInt($(this).val())
     $("#intiface-pattern-duration-display").text(formatDurationShort(duration))
+    
+    // Auto-calculate cycles multiplicatively
+    if (timelineSelectedPattern && timelineSelectedPattern.defaultDuration && timelineSelectedPattern.defaultCycles) {
+      const defaultDuration = timelineSelectedPattern.defaultDuration
+      const defaultCycles = timelineSelectedPattern.defaultCycles
+      // Multiplicative: cycles = defaultCycles * (duration / defaultDuration)
+      // Round to nearest integer, minimum 1
+      const cycles = Math.max(1, Math.round(defaultCycles * duration / defaultDuration))
+      $("#intiface-pattern-cycles").val(cycles)
+      $("#intiface-pattern-cycles-display").text(cycles)
+    }
   })
 
-// Pattern intensity range sliders
+// Channel motor count controls
+const channels = ['a', 'b', 'c', 'd']
+channels.forEach(channel => {
+  const checkbox = $(`#channel-${channel}-multi-motor`)
+  const input = $(`#channel-${channel}-motor-count`)
+  const channelUpper = channel.toUpperCase()
+  
+  checkbox.on('change', function() {
+    const isChecked = $(this).is(':checked')
+    const lanesContainer = $(`.timeline-track-lanes[data-channel="${channelUpper}"]`)
+    
+    if (isChecked) {
+      input.show()
+      if (!input.val() || parseInt(input.val()) < 2) {
+        input.val(2)
+      }
+      // Create multiple motor lanes
+      updateMotorLanes(channelUpper, parseInt(input.val()) || 2)
+    } else {
+      input.hide()
+      // Revert to single lane
+      updateMotorLanes(channelUpper, 1)
+    }
+  })
+  
+  input.on('change', function() {
+    let val = parseInt($(this).val())
+    if (val < 1) val = 1
+    if (val > 8) val = 8
+    $(this).val(val)
+    // Update lanes when motor count changes
+    if (checkbox.is(':checked')) {
+      updateMotorLanes(channelUpper, val)
+    }
+  })
+})
+
+// Update motor lanes for a channel
+function updateMotorLanes(channel, motorCount) {
+  const lanesContainer = $(`.timeline-track-lanes[data-channel="${channel}"]`)
+  const trackContainer = lanesContainer.closest('.timeline-track-container')
+  
+  // Get channel color
+  const channelColors = {
+    'A': '255,100,100',
+    'B': '100,255,100',
+    'C': '100,100,255',
+    'D': '255,0,255'
+  }
+  const color = channelColors[channel] || '100,100,100'
+  
+  // Clear existing lanes
+  lanesContainer.empty()
+  
+  // Create lanes for each motor
+  for (let i = 1; i <= motorCount; i++) {
+    const lane = $(`
+      <div class="timeline-track-lane" 
+           style="height: ${motorCount === 1 ? '28px' : '24px'}; position: relative; background: rgba(0,0,0,0.2); cursor: pointer; ${i < motorCount ? `border-bottom: 1px solid rgba(${color},0.15);` : ''}"
+           data-channel="${channel}" 
+           data-motor="${i}">
+        ${motorCount > 1 ? `<span style="position: absolute; left: 2px; top: 2px; font-size: 0.5em; color: rgba(${color},0.5);">${i}</span>` : ''}
+      </div>
+    `)
+    lanesContainer.append(lane)
+  }
+  
+  // Re-attach click handlers
+  attachLaneClickHandlers()
+  
+  // Re-render blocks if any exist
+  renderTimeline()
+}
+
+// Attach click handlers to timeline lanes
+function attachLaneClickHandlers() {
+  $(document).off('click', '.timeline-track-lane')
+  $(document).on('click', '.timeline-track-lane', function(e) {
+    if (e.target !== this) return
+    
+    const lane = $(this)
+    const channel = lane.data('channel')
+    const motor = lane.data('motor') || 1
+    
+    if (!timelineSelectedPattern) {
+      updateStatus('Select a pattern first, then click on a timeline track')
+      return
+    }
+    
+    // Calculate position from click
+    const rect = this.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const laneWidth = rect.width
+    const clickPercent = Math.max(0, Math.min(1, clickX / laneWidth))
+    const startTime = Math.round(clickPercent * getTimelineDuration())
+    
+    // Add block with motor info
+    addTimelineBlock(channel, startTime, motor)
+  })
+}
+
+  // Pattern intensity range sliders
 $("#intiface-pattern-min").on("input", function() {
 const min = parseInt($(this).val())
 $("#intiface-pattern-min-display").text(`${min}%`)
@@ -7467,27 +7646,11 @@ const cycles = parseInt($(this).val())
 $("#intiface-pattern-cycles-display").text(cycles)
 })
 
-// Timeline track click handlers (place pattern on track)
-$(document).on('click', '.timeline-track-lane', function(e) {
-if (e.target !== this) return // Clicked on a block, not the lane
-
-const lane = $(this)
-const channel = lane.data('channel')
-
-if (!timelineSelectedPattern) {
-updateStatus('Select a pattern first, then click on a timeline track')
-return
-}
-
-// Calculate position from click
-const rect = this.getBoundingClientRect()
-const clickX = e.clientX - rect.left
-const laneWidth = rect.width
-const clickPercent = Math.max(0, Math.min(1, clickX / laneWidth))
-const startTime = Math.round(clickPercent * getTimelineDuration())
-
-addTimelineBlock(channel, startTime)
-})
+  // Initialize all channels with single motor lanes
+  ['A', 'B', 'C', 'D'].forEach(channel => updateMotorLanes(channel, 1))
+  
+  // Attach initial lane click handlers
+  attachLaneClickHandlers()
 })
 
 // Play Mode UI Event Handlers
@@ -9040,72 +9203,81 @@ function stopFunscriptSyncTimer() {
 
 // Execute Funscript action
 async function executeFunscriptAction(action) {
-// Check if media is still playing before executing
-if (!mediaPlayer.isPlaying || !mediaPlayer.videoElement) return
-if (!client.connected || devices.length === 0) return
+  // Check if media is still playing before executing
+  if (!mediaPlayer.isPlaying || !mediaPlayer.videoElement) return
+  if (!client.connected || devices.length === 0) return
 
-// Send to devices based on their channel assignments
-const promises = []
-for (let i = 0; i < devices.length; i++) {
-const targetDevice = devices[i]
-const deviceIndex = targetDevice.index
-const deviceType = getDeviceType(targetDevice)
+  // Send to devices based on their channel assignments
+  const promises = []
+  for (let i = 0; i < devices.length; i++) {
+    const targetDevice = devices[i]
+    const deviceIndex = targetDevice.index
+    const deviceType = getDeviceType(targetDevice)
 
-// Get device channel assignment
-const channel = deviceAssignments[deviceIndex] || '-'
+    // Get device channel assignment
+    const channel = deviceAssignments[deviceIndex] || '-'
 
-// Get the appropriate funscript for this device
-let deviceFunscript = mediaPlayer.currentFunscript
-if (mediaPlayer.channelFunscripts[channel]) {
-deviceFunscript = mediaPlayer.channelFunscripts[channel]
-}
+    // Get the appropriate funscript for this device
+    let deviceFunscript = mediaPlayer.currentFunscript
+    if (mediaPlayer.channelFunscripts[channel]) {
+      deviceFunscript = mediaPlayer.channelFunscripts[channel]
+    }
 
-// If no device-specific funscript and channel is not '-', skip this device
-if (channel !== '-' && !mediaPlayer.channelFunscripts[channel]) {
-continue // Device has specific channel but no funscript for it
-}
+    // If no device-specific funscript and channel is not '-', skip this device
+    if (channel !== '-' && !mediaPlayer.channelFunscripts[channel]) {
+      continue // Device has specific channel but no funscript for it
+    }
 
-// Apply global intensity modifier using MultiFunPlayer's approach:
-// Scale the deviation from default (50%), not the raw value
-const defaultValue = 50 // Neutral point (50%)
-const scale = mediaPlayer.globalIntensity / 100 // Convert percentage to multiplier
-const scriptValue = action.pos // Funscript value (0-100)
+    // Handle multi-motor arrays
+    const isMultiMotor = Array.isArray(action.pos)
+    const positions = isMultiMotor ? action.pos : [action.pos]
+    
+    // Get motor count for this device
+    const motorCount = getMotorCount(targetDevice)
+    
+    // Apply global intensity modifier using MultiFunPlayer's approach:
+    // Scale the deviation from default (50%), not the raw value
+    const defaultValue = 50 // Neutral point (50%)
+    const scale = mediaPlayer.globalIntensity / 100 // Convert percentage to multiplier
+    
+    try {
+      // Choose control method based on device type
+      if (deviceType === 'stroker' && targetDevice.messageAttributes?.LinearCmd) {
+        // Linear device (stroker) - use first motor position
+        const scriptValue = positions[0] || 50
+        const scaledValue = defaultValue + (scriptValue - defaultValue) * scale
+        let adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
+        adjustedPos = applyInversion(adjustedPos)
+        promises.push(targetDevice.linear(adjustedPos / 100, 100))
+      } else if (targetDevice.vibrateAttributes?.length > 0) {
+        // Vibration device - can have multiple motors
+        const vibrateAttrs = targetDevice.vibrateAttributes
+        
+        for (let motorIndex = 0; motorIndex < Math.min(vibrateAttrs.length, positions.length); motorIndex++) {
+          const scriptValue = positions[motorIndex]
+          const scaledValue = defaultValue + (scriptValue - defaultValue) * scale
+          let adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
+          adjustedPos = applyInversion(adjustedPos)
+          
+          if (vibrateAttrs[motorIndex]) {
+            const scalarCmd = new buttplug.ScalarSubcommand(
+              vibrateAttrs[motorIndex].Index,
+              adjustedPos / 100,
+              "Vibrate"
+            )
+            promises.push(targetDevice.scalar(scalarCmd))
+          }
+        }
+      }
+    } catch (e) {
+      // Silent fail - don't spam errors during playback
+    }
+  }
 
-// Calculate scaled value: default + (deviation * scale)
-const scaledValue = defaultValue + (scriptValue - defaultValue) * scale
-
-// Clamp to valid device range (0-100)
-let adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
-
-// Apply device inversion if enabled
-adjustedPos = applyInversion(adjustedPos)
-
-try {
-// Choose control method based on device type
-if (deviceType === 'stroker' && targetDevice.messageAttributes?.LinearCmd) {
-// Linear device (stroker) - use position
-promises.push(targetDevice.linear(adjustedPos / 100, 100))
-} else if (targetDevice.vibrateAttributes?.length > 0) {
-// Vibration device - scale position to intensity
-const vibrateAttrs = targetDevice.vibrateAttributes
-if (vibrateAttrs[0]) {
-const scalarCmd = new buttplug.ScalarSubcommand(
-vibrateAttrs[0].Index,
-adjustedPos / 100,
-"Vibrate"
-)
-promises.push(targetDevice.scalar(scalarCmd))
-}
-}
-} catch (e) {
-// Silent fail - don't spam errors during playback
-}
-}
-
-// Execute all device commands in parallel
-if (promises.length > 0) {
-await Promise.all(promises)
-}
+  // Execute all device commands in parallel
+  if (promises.length > 0) {
+    await Promise.all(promises)
+  }
 }
 
 // Stop media playback
