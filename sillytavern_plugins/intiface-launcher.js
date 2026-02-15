@@ -146,14 +146,27 @@ async function init(router) {
     next();
   });
   
-  // Serve static files from asset directories
-  // This allows the browser to access videos directly
-  router.use('/assets/intiface_media', express.static(assetPaths.intifaceMedia));
-  router.use('/assets/funscript', express.static(assetPaths.funscript));
-  
-  console.log(`[Intiface Launcher] Serving static files from:`);
-  console.log(`  /assets/intiface_media -> ${assetPaths.intifaceMedia}`);
-  console.log(`  /assets/funscript -> ${assetPaths.funscript}`);
+// Serve static files from asset directories
+// This allows the browser to access videos directly
+console.log(`[Intiface Launcher] Setting up static file serving:`);
+console.log(` /assets/intiface_media -> ${assetPaths.intifaceMedia}`);
+console.log(` /assets/funscript -> ${assetPaths.funscript}`);
+console.log(`[Intiface Launcher] Checking if funscript directory exists:`, fs.existsSync(assetPaths.funscript));
+if (fs.existsSync(assetPaths.funscript)) {
+const files = fs.readdirSync(assetPaths.funscript);
+console.log(`[Intiface Launcher] Files in funscript dir:`, files.slice(0, 10));
+}
+
+// Custom middleware for funscript files to add logging
+router.use('/assets/funscript', (req, res, next) => {
+console.log(`[Intiface Launcher] Funscript request: ${req.url}`);
+const fullPath = path.join(assetPaths.funscript, decodeURIComponent(req.url));
+console.log(`[Intiface Launcher] Looking for file: ${fullPath}`);
+console.log(`[Intiface Launcher] File exists:`, fs.existsSync(fullPath));
+next();
+}, express.static(assetPaths.funscript));
+
+router.use('/assets/intiface_media', express.static(assetPaths.intifaceMedia));
 
 // Test endpoint - just returns success
     router.get('/test', (req, res) => {
@@ -358,26 +371,35 @@ async function init(router) {
     }
   });
 
-  // Endpoint to read Funscript file
-  router.get('/funscript', async (req, res) => {
-    try {
-      const { path: filePath } = req.query;
-      
-      if (!filePath) {
-        return res.status(400).json({
-          success: false,
-          error: 'No file path specified'
-        });
-      }
+// Endpoint to read Funscript file
+router.get('/funscript', async (req, res) => {
+try {
+const { path: filePath } = req.query;
 
-      // Security: Ensure the path is within allowed directories
-      const allowedPaths = [
-        path.join(process.cwd(), 'data', 'default-user', 'assets'),
-        path.join(process.cwd(), 'public', 'assets')
-      ];
-      
-      const requestedPath = path.resolve(filePath);
-      const isAllowed = allowedPaths.some(allowed => requestedPath.startsWith(allowed));
+if (!filePath) {
+return res.status(400).json({
+success: false,
+error: 'No file path specified'
+});
+}
+
+console.log('[Intiface Launcher] Funscript request:', filePath);
+
+// Security: Ensure the path is within allowed directories
+const allowedPaths = [
+path.join(process.cwd(), 'data', 'default-user', 'assets'),
+path.join(process.cwd(), 'public', 'assets')
+];
+
+const requestedPath = path.resolve(filePath);
+console.log('[Intiface Launcher] Resolved path:', requestedPath);
+console.log('[Intiface Launcher] Allowed paths:', allowedPaths);
+
+const isAllowed = allowedPaths.some(allowed => requestedPath.startsWith(allowed));
+
+if (!isAllowed) {
+console.log('[Intiface Launcher] Path not allowed:', requestedPath);
+}
       
       if (!isAllowed) {
         return res.status(403).json({
@@ -395,21 +417,31 @@ async function init(router) {
         });
       }
 
-      // Read and parse the file - check requested path first, then funscript directory
-      let fileToRead = requestedPath;
-      if (!fs.existsSync(requestedPath)) {
-        // Try the dedicated funscript directory
-        const baseName = path.basename(requestedPath, '.funscript');
-        const funscriptDirPath = path.join(assetPaths.funscript, `${baseName}.funscript`);
-        if (fs.existsSync(funscriptDirPath)) {
-          fileToRead = funscriptDirPath;
-        } else {
-          return res.status(404).json({
-            success: false,
-            error: 'File not found'
-          });
-        }
-      }
+// Read and parse the file - check requested path first, then funscript directory
+let fileToRead = requestedPath;
+console.log('[Intiface Launcher] Checking if file exists:', requestedPath);
+console.log('[Intiface Launcher] File exists:', fs.existsSync(requestedPath));
+
+if (!fs.existsSync(requestedPath)) {
+// Try the dedicated funscript directory
+const baseName = path.basename(requestedPath, '.funscript');
+const funscriptDirPath = path.join(assetPaths.funscript, `${baseName}.funscript`);
+console.log('[Intiface Launcher] Trying funscript directory:', funscriptDirPath);
+console.log('[Intiface Launcher] Funscript dir exists:', fs.existsSync(funscriptDirPath));
+
+if (fs.existsSync(funscriptDirPath)) {
+fileToRead = funscriptDirPath;
+console.log('[Intiface Launcher] Found file in funscript directory');
+} else {
+console.log('[Intiface Launcher] File not found in either location');
+return res.status(404).json({
+success: false,
+error: 'File not found'
+});
+}
+}
+
+console.log('[Intiface Launcher] Reading file:', fileToRead);
 
       const content = fs.readFileSync(fileToRead, 'utf8');
       const funscript = JSON.parse(content);
