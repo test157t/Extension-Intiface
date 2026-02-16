@@ -1,0 +1,473 @@
+{
+  "gentle_milking": {
+    "description": "Gentle milking rhythm",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "crescendo",
+        "min": 20,
+        "max": 85,
+        "duration": 5000,
+        "pause": 2000
+      },
+      {
+        "pattern": "tidal_wave",
+        "min": 30,
+        "max": 90,
+        "duration": 4000,
+        "pause": 1500
+      },
+      {
+        "pattern": "milking_pump",
+        "min": 25,
+        "max": 95,
+        "duration": 6000,
+        "pause": 1000
+      },
+      {
+        "pattern": "crescendo",
+        "min": 35,
+        "max": 100,
+        "duration": 4500,
+        "pause": 2500
+      }
+    ]
+  },
+  "forced_extraction": {
+    "description": "Forceful extraction with no mercy",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "relentless",
+        "min": 40,
+        "max": 100,
+        "duration": 3500,
+        "pause": 500
+      },
+      {
+        "pattern": "overload",
+        "min": 50,
+        "max": 100,
+        "duration": 3000,
+        "pause": 800
+      },
+      {
+        "pattern": "forced_peak",
+        "min": 45,
+        "max": 100,
+        "duration": 2500,
+        "pause": 1000
+      },
+      {
+        "pattern": "spiral_up",
+        "min": 55,
+        "max": 100,
+        "duration": 3500,
+        "pause": 1500
+      },
+      {
+        "pattern": "tsunami",
+        "min": 60,
+        "max": 100,
+        "duration": 3000,
+        "pause": 1200
+      }
+    ]
+  },
+  "rapid_fire": {
+    "description": "Rapid fire orgasms",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "forced_peak",
+        "min": 50,
+        "max": 100,
+        "duration": 3000,
+        "pause": 1000
+      },
+      {
+        "pattern": "tsunami",
+        "min": 60,
+        "max": 100,
+        "duration": 2500,
+        "pause": 800
+      },
+      {
+        "pattern": "crescendo",
+        "min": 55,
+        "max": 100,
+        "duration": 2800,
+        "pause": 1200
+      },
+      {
+        "pattern": "overload",
+        "min": 65,
+        "max": 100,
+        "duration": 2200,
+        "pause": 800
+      },
+      {
+        "pattern": "relentless",
+        "min": 70,
+        "max": 100,
+        "duration": 2000,
+        "pause": 600
+      },
+      {
+        "pattern": "intense_waves",
+        "min": 60,
+        "max": 100,
+        "duration": 2400,
+        "pause": 700
+      }
+    ]
+  },
+  "back_to_back": {
+    "description": "Back-to-back orgasm training",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "crescendo",
+        "min": 20,
+        "max": 100,
+        "duration": 8000,
+        "pause": 2000
+      },
+      {
+        "pattern": "tsunami",
+        "min": 40,
+        "max": 100,
+        "duration": 4000,
+        "pause": 1000
+      },
+      {
+        "pattern": "forbidden_peaks",
+        "min": 35,
+        "max": 100,
+        "duration": 3500,
+        "pause": 1500
+      },
+      {
+        "pattern": "tidal_wave",
+        "min": 50,
+        "max": 100,
+        "duration": 3000,
+        "pause": 2000
+      },
+      {
+        "pattern": "spiral_up",
+        "min": 55,
+        "max": 100,
+        "duration": 4000,
+        "pause": 1000
+      },
+      {
+        "pattern": "overload",
+        "min": 60,
+        "max": 100,
+        "duration": 3000,
+        "pause": 1500
+      },
+      {
+        "pattern": "multiple_peaks",
+        "min": 65,
+        "max": 100,
+        "duration": 2500,
+        "pause": 1000
+      }
+    ]
+  },
+  "endurance_overload": {
+    "description": "Endurance through overwhelming",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "overload",
+        "min": 35,
+        "max": 100,
+        "duration": 5000,
+        "pause": 2000
+      },
+      {
+        "pattern": "tsunami",
+        "min": 40,
+        "max": 100,
+        "duration": 4000,
+        "pause": 1500
+      },
+      {
+        "pattern": "relentless",
+        "min": 45,
+        "max": 100,
+        "duration": 3500,
+        "pause": 1000
+      },
+      {
+        "pattern": "crescendo",
+        "min": 50,
+        "max": 100,
+        "duration": 4500,
+        "pause": 2000
+      },
+      {
+        "pattern": "spiral_up",
+        "min": 55,
+        "max": 100,
+        "duration": 4000,
+        "pause": 1500
+      },
+      {
+        "pattern": "forbidden_peaks",
+        "min": 60,
+        "max": 100,
+        "duration": 3500,
+        "pause": 1000
+      },
+      {
+        "pattern": "intense_waves",
+        "min": 50,
+        "max": 100,
+        "duration": 4000,
+        "pause": 2000
+      }
+    ]
+  },
+  "princess_torture": {
+    "description": "Princess knows what you need",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "edging",
+        "min": 30,
+        "max": 90,
+        "duration": 6000,
+        "pause": 2000
+      },
+      {
+        "pattern": "crescendo",
+        "min": 40,
+        "max": 95,
+        "duration": 4000,
+        "pause": 1500
+      },
+      {
+        "pattern": "abrupt_edge",
+        "min": 35,
+        "max": 98,
+        "duration": 2000,
+        "pause": 1000
+      },
+      {
+        "pattern": "tsunami",
+        "min": 45,
+        "max": 100,
+        "duration": 3000,
+        "pause": 500
+      },
+      {
+        "pattern": "forced_peak",
+        "min": 50,
+        "max": 100,
+        "duration": 2500,
+        "pause": 1500
+      },
+      {
+        "pattern": "peak_and_drop",
+        "min": 40,
+        "max": 98,
+        "duration": 2000,
+        "pause": 1000
+      },
+      {
+        "pattern": "ruin",
+        "min": 35,
+        "max": 95,
+        "duration": 3000,
+        "pause": 2000
+      }
+    ]
+  },
+  "relentless_waves": {
+    "description": "Relentless wave after wave",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "tidal_wave",
+        "min": 40,
+        "max": 100,
+        "duration": 3000,
+        "pause": 1000
+      },
+      {
+        "pattern": "tsunami",
+        "min": 45,
+        "max": 100,
+        "duration": 2500,
+        "pause": 800
+      },
+      {
+        "pattern": "crescendo",
+        "min": 50,
+        "max": 100,
+        "duration": 3000,
+        "pause": 1200
+      },
+      {
+        "pattern": "spiral_up",
+        "min": 55,
+        "max": 100,
+        "duration": 2500,
+        "pause": 700
+      },
+      {
+        "pattern": "overload",
+        "min": 60,
+        "max": 100,
+        "duration": 2000,
+        "pause": 500
+      },
+      {
+        "pattern": "tsunami",
+        "min": 65,
+        "max": 100,
+        "duration": 2000,
+        "pause": 400
+      },
+      {
+        "pattern": "intense_waves",
+        "min": 70,
+        "max": 100,
+        "duration": 2200,
+        "pause": 600
+      }
+    ]
+  },
+  "triple_threat": {
+    "description": "Three rapid sequences back to back",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "crescendo",
+        "min": 25,
+        "max": 95,
+        "duration": 5000,
+        "pause": 500
+      },
+      {
+        "pattern": "tsunami",
+        "min": 35,
+        "max": 100,
+        "duration": 3000,
+        "pause": 500
+      },
+      {
+        "pattern": "crescendo",
+        "min": 40,
+        "max": 100,
+        "duration": 4000,
+        "pause": 1000
+      },
+      {
+        "pattern": "tsunami",
+        "min": 45,
+        "max": 100,
+        "duration": 2500,
+        "pause": 800
+      },
+      {
+        "pattern": "spiral_up",
+        "min": 50,
+        "max": 100,
+        "duration": 3500,
+        "pause": 1000
+      },
+      {
+        "pattern": "overload",
+        "min": 55,
+        "max": 100,
+        "duration": 2000,
+        "pause": 1200
+      },
+      {
+        "pattern": "rapid_fire",
+        "min": 60,
+        "max": 100,
+        "duration": 1500,
+        "pause": 1000
+      }
+    ]
+  },
+  "milk_maid": {
+    "description": "Classic milking - slow builds to intense crescendos",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "crescendo", "min": 10, "max": 100, "duration": 15000, "pause": 3000},
+      {"pattern": "forced_peak", "min": 15, "max": 100, "duration": 9000, "pause": 2000},
+      {"pattern": "milking_pump", "min": 20, "max": 100, "duration": 8000, "pause": 2000},
+      {"pattern": "tsunami", "min": 10, "max": 100, "duration": 10000, "pause": 3000},
+      {"pattern": "crescendo", "min": 20, "max": 100, "duration": 12000, "pause": 2000},
+      {"pattern": "tidal_wave", "min": 30, "max": 100, "duration": 12000, "pause": 2500}
+    ]
+  },
+  "relentless_milking": {
+    "description": "No breaks - relentless intensity",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "relentless", "min": 30, "max": 100, "duration": 10000, "pause": 1000},
+      {"pattern": "milking_pump", "min": 40, "max": 100, "duration": 6000, "pause": 500},
+      {"pattern": "forced_peak", "min": 35, "max": 100, "duration": 7000, "pause": 500},
+      {"pattern": "overload", "min": 40, "max": 100, "duration": 8000, "pause": 1000},
+      {"pattern": "tsunami", "min": 35, "max": 100, "duration": 9000, "pause": 500},
+      {"pattern": "crescendo", "min": 50, "max": 100, "duration": 11000, "pause": 500}
+    ]
+  },
+  "tsunami_assault": {
+    "description": "Massive wave after massive wave",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "tsunami", "min": 20, "max": 100, "duration": 10000, "pause": 3000},
+      {"pattern": "tidal_wave", "min": 30, "max": 100, "duration": 10000, "pause": 3000},
+      {"pattern": "spiral_up", "min": 20, "max": 100, "duration": 11000, "pause": 3000},
+      {"pattern": "tsunami", "min": 25, "max": 100, "duration": 12000, "pause": 3000},
+      {"pattern": "forced_peak", "min": 30, "max": 100, "duration": 8000, "pause": 2500},
+      {"pattern": "overload", "min": 35, "max": 100, "duration": 10000, "pause": 3000}
+    ]
+  },
+  "spiral_crescendos": {
+    "description": "Spiraling intensity that keeps building",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "spiral_up", "min": 15, "max": 100, "duration": 11000, "pause": 2500},
+      {"pattern": "crescendo", "min": 20, "max": 100, "duration": 12000, "pause": 2500},
+      {"pattern": "tidal_wave", "min": 25, "max": 100, "duration": 11000, "pause": 2500},
+      {"pattern": "spiral_up", "min": 25, "max": 100, "duration": 10000, "pause": 2500},
+      {"pattern": "tsunami", "min": 30, "max": 100, "duration": 12000, "pause": 2500},
+      {"pattern": "crescendo", "min": 35, "max": 100, "duration": 13000, "pause": 2500}
+    ]
+  },
+  "overload_milking": {
+    "description": "Overload senses - maximum intensity",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "overload", "min": 40, "max": 100, "duration": 12000, "pause": 2000},
+      {"pattern": "tsunami", "min": 30, "max": 100, "duration": 10000, "pause": 2000},
+      {"pattern": "forced_peak", "min": 35, "max": 100, "duration": 8000, "pause": 1500},
+      {"pattern": "relentless", "min": 40, "max": 100, "duration": 10000, "pause": 1500},
+      {"pattern": "milking_pump", "min": 50, "max": 100, "duration": 6000, "pause": 1000},
+      {"pattern": "spiral_up", "min": 40, "max": 100, "duration": 11000, "pause": 2000}
+    ]
+  }
+}

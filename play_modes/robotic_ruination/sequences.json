@@ -1,0 +1,123 @@
+{
+  "mechanical_edging": {
+    "description": "Robotic step-like builds to edge",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "mechanical", "min": 10, "max": 95, "duration": 8000, "pause": 3000 },
+      { "pattern": "mechanical", "min": 20, "max": 98, "duration": 6000, "pause": 4000 },
+      { "pattern": "mechanical", "min": 30, "max": 100, "duration": 4000, "pause": 5000 },
+      { "pattern": "mechanical", "min": 10, "max": 85, "duration": 7000, "pause": 3500 }
+    ]
+  },
+  "algorithm_ruin": {
+    "description": "Algorithmic builds to 100% then drop to 5%",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "algorithm", "min": 15, "max": 100, "duration": 10000, "pause": 2000 },
+      { "pattern": "algorithm", "min": 10, "max": 100, "duration": 9000, "pause": 3000 },
+      { "pattern": "algorithm", "min": 20, "max": 100, "duration": 8000, "pause": 2500 },
+      { "pattern": "algorithm", "min": 5, "max": 100, "duration": 7000, "pause": 3500 }
+    ]
+  },
+  "systematic_ruin": {
+    "description": "Systematic approach to ruin all attempts",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "systematic_ruin", "min": 10, "max": 100, "duration": 12000, "pause": 3000 },
+      { "pattern": "cold_calculation", "min": 15, "max": 100, "duration": 10000, "pause": 4000 },
+      { "pattern": "systematic_ruin", "min": 20, "max": 100, "duration": 9000, "pause": 3000 },
+      { "pattern": "mechanical", "min": 5, "max": 98, "duration": 8000, "pause": 5000 }
+    ]
+  },
+  "cold_programmer": {
+    "description": "Cold calculation determining your release",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "cold_calculation", "min": 10, "max": 95, "duration": 15000, "pause": 2500 },
+      { "pattern": "algorithm", "min": 15, "max": 100, "duration": 12000, "pause": 3000 },
+      { "pattern": "cold_calculation", "min": 20, "max": 100, "duration": 10000, "pause": 3500 },
+      { "pattern": "mechanical", "min": 5, "max": 98, "duration": 8000, "pause": 4000 }
+    ]
+  },
+  "machine_learning": {
+    "description": "Machine learns your edge points",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "algorithm", "min": 5, "max": 90, "duration": 10000, "pause": 4000 },
+      { "pattern": "systematic_ruin", "min": 10, "max": 95, "duration": 9000, "pause": 3500 },
+      { "pattern": "mechanical", "min": 15, "max": 100, "duration": 8000, "pause": 3000 },
+      { "pattern": "cold_calculation", "min": 20, "max": 100, "duration": 7000, "pause": 5000 }
+    ]
+  },
+  "precise_termination": {
+    "description": "Precision termination at peak",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "cold_calculation", "min": 10, "max": 85, "duration": 8000, "pause": 3000 },
+      { "pattern": "mechanical", "min": 15, "max": 92, "duration": 7000, "pause": 3500 },
+      { "pattern": "algorithm", "min": 20, "max": 98, "duration": 6000, "pause": 4000 },
+      { "pattern": "systematic_ruin", "min": 5, "max": 100, "duration": 5000, "pause": 6000 }
+    ]
+  },
+  "relentless_machine": {
+    "description": "Relentless machine that never tires",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "mechanical", "min": 20, "max": 90, "duration": 6000, "pause": 2000 },
+      { "pattern": "algorithm", "min": 25, "max": 95, "duration": 5000, "pause": 1500 },
+      { "pattern": "systematic_ruin", "min": 30, "max": 100, "duration": 4500, "pause": 2000 },
+      { "pattern": "cold_calculation", "min": 35, "max": 100, "duration": 4000, "pause": 2500 }
+    ]
+  },
+  "binary_ruiner": {
+    "description": "Binary pattern: 0 or 100 no middle ground",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "mechanical", "min": 5, "max": 100, "duration": 7000, "pause": 3000 },
+      { "pattern": "algorithm", "min": 5, "max": 100, "duration": 6000, "pause": 3500 },
+      { "pattern": "systematic_ruin", "min": 5, "max": 100, "duration": 5500, "pause": 3000 },
+      { "pattern": "cold_calculation", "min": 5, "max": 100, "duration": 5000, "pause": 4000 }
+    ]
+  },
+  "loop_hell": {
+    "description": "Endless loop of ruined peaks",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "algorithm", "min": 10, "max": 100, "duration": 9000, "pause": 2500 },
+      { "pattern": "systematic_ruin", "min": 15, "max": 100, "duration": 8000, "pause": 3000 },
+      { "pattern": "mechanical", "min": 20, "max": 100, "duration": 7500, "pause": 2500 },
+      { "pattern": "algorithm", "min": 10, "max": 100, "duration": 7000, "pause": 3500 }
+    ]
+  },
+  "precision_lockout": {
+    "description": "Precision lockout at critical moments",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "cold_calculation", "min": 15, "max": 95, "duration": 11000, "pause": 3000 },
+      { "pattern": "mechanical", "min": 10, "max": 98, "duration": 10000, "pause": 4000 },
+      { "pattern": "algorithm", "min": 20, "max": 100, "duration": 9000, "pause": 3500 },
+      { "pattern": "systematic_ruin", "min": 25, "max": 100, "duration": 8000, "pause": 5000 }
+    ]
+  },
+  "calibrated_ruin": {
+    "description": "Perfectly calibrated to ruin you",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "systematic_ruin", "min": 20, "max": 100, "duration": 10000, "pause": 2000 },
+      { "pattern": "algorithm", "min": 15, "max": 100, "duration": 9000, "pause": 2500 },
+      { "pattern": "cold_calculation", "min": 10, "max": 100, "duration": 8000, "pause": 3000 },
+      { "pattern": "mechanical", "min": 25, "max": 100, "duration": 7000, "pause": 3500 }
+    ]
+  }
+}

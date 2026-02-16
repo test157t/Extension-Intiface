@@ -1,0 +1,372 @@
+{
+    "good_boy": {
+        "description": "Reward for being a good boy",
+        "compatibleDevices": ["general", "cage", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "heartbeat", "min": 20, "max": 50, "duration": 6000, "pause": 2000 },
+            { "pattern": "flutter", "min": 25, "max": 60, "duration": 5000, "pause": 3000 },
+            { "pattern": "crescendo", "min": 30, "max": 85, "duration": 9000, "pause": 4000 },
+            { "pattern": "tsunami", "min": 35, "max": 100, "duration": 12000, "pause": 5000 }
+        ]
+    },
+    "sit_stay": {
+        "description": "Learn to sit and stay like a good pet",
+        "compatibleDevices": ["general", "cage", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "stop_start", "min": 10, "max": 40, "duration": 8000, "pause": 6000 },
+            { "pattern": "held_edge", "min": 15, "max": 70, "duration": 10000, "pause": 8000 },
+            { "pattern": "abrupt_edge", "min": 20, "max": 85, "duration": 6000, "pause": 10000 },
+            { "pattern": "mercy", "min": 10, "max": 35, "duration": 7000, "pause": 5000 }
+        ]
+    },
+    "reward_training": {
+        "description": "Training with rewards for obedience",
+        "compatibleDevices": ["general", "cage", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "crescendo", "min": 25, "max": 90, "duration": 10000, "pause": 3000 },
+            { "pattern": "spiral_up", "min": 30, "max": 95, "duration": 9000, "pause": 4000 },
+            { "pattern": "tidal_wave", "min": 35, "max": 100, "duration": 8000, "pause": 5000 },
+            { "pattern": "heartbeat", "min": 20, "max": 60, "duration": 7000, "pause": 6000 }
+        ]
+    },
+    "discipline_time": {
+        "description": "Time for discipline and correction",
+        "compatibleDevices": ["general", "cage", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "abrupt_edge", "min": 10, "max": 95, "duration": 5000, "pause": 4000 },
+            { "pattern": "peak_and_drop", "min": 15, "max": 98, "duration": 6000, "pause": 5000 },
+            { "pattern": "ruin", "min": 5, "max": 95, "duration": 8000, "pause": 6000 },
+            { "pattern": "build_and_ruin", "min": 10, "max": 92, "duration": 10000, "pause": 7000 }
+        ]
+    },
+    "patient_pet": {
+        "description": "Learn patience through denial",
+        "compatibleDevices": ["general", "cage", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "ghost_tease", "min": 3, "max": 20, "duration": 12000, "pause": 8000 },
+            { "pattern": "micro_tease", "min": 5, "max": 25, "duration": 10000, "pause": 10000 },
+            { "pattern": "flutter", "min": 8, "max": 30, "duration": 8000, "pause": 7000 },
+            { "pattern": "tickle", "min": 10, "max": 35, "duration": 9000, "pause": 6000 }
+        ]
+    },
+    "good_pet": {
+    "description": "Reward for good behavior - gentle milking",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "heartbeat",
+        "min": 15,
+        "max": 40,
+        "duration": 5000,
+        "pause": 3000
+      },
+      {
+        "pattern": "flutter",
+        "min": 10,
+        "max": 35,
+        "duration": 6000,
+        "pause": 2000
+      },
+      {
+        "pattern": "crescendo",
+        "min": 20,
+        "max": 80,
+        "duration": 8000,
+        "pause": 5000
+      },
+      {
+        "pattern": "tsunami",
+        "min": 25,
+        "max": 100,
+        "duration": 10000,
+        "pause": 4000
+      },
+      {
+        "pattern": "held_edge",
+        "min": 30,
+        "max": 90,
+        "duration": 8000,
+        "pause": 5000
+      }
+    ]
+  },
+  "bad_pet": {
+    "description": "Punishment for bad behavior - edging only",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "edging",
+        "min": 15,
+        "max": 92,
+        "duration": 15000,
+        "pause": 8000
+      },
+      {
+        "pattern": "abrupt_edge",
+        "min": 10,
+        "max": 95,
+        "duration": 6000,
+        "pause": 3000
+      },
+      {
+        "pattern": "peak_and_drop",
+        "min": 10,
+        "max": 95,
+        "duration": 7000,
+        "pause": 4000
+      },
+      {
+        "pattern": "ruin",
+        "min": 5,
+        "max": 95,
+        "duration": 8000,
+        "pause": 8000
+      },
+      {
+        "pattern": "build_and_ruin",
+        "min": 10,
+        "max": 92,
+        "duration": 12000,
+        "pause": 7000
+      }
+    ]
+  },
+  "begging": {
+    "description": "Beg for attention - teasing and denial",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "ghost_tease",
+        "min": 5,
+        "max": 30,
+        "duration": 5000,
+        "pause": 3000
+      },
+      {
+        "pattern": "micro_tease",
+        "min": 8,
+        "max": 35,
+        "duration": 4000,
+        "pause": 2000
+      },
+      {
+        "pattern": "flutter",
+        "min": 10,
+        "max": 40,
+        "duration": 5000,
+        "pause": 3000
+      },
+      {
+        "pattern": "tickle",
+        "min": 15,
+        "max": 45,
+        "duration": 6000,
+        "pause": 4000
+      },
+      {
+        "pattern": "teasing",
+        "min": 20,
+        "max": 50,
+        "duration": 7000,
+        "pause": 5000
+      }
+    ]
+  },
+  "lesson_time": {
+    "description": "Teaching obedience through denial",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "held_edge",
+        "min": 20,
+        "max": 90,
+        "duration": 8000,
+        "pause": 6000
+      },
+      {
+        "pattern": "abrupt_edge",
+        "min": 15,
+        "max": 95,
+        "duration": 5000,
+        "pause": 4000
+      },
+      {
+        "pattern": "edging",
+        "min": 20,
+        "max": 90,
+        "duration": 11000,
+        "pause": 7000
+      },
+      {
+        "pattern": "ghost_tease",
+        "min": 5,
+        "max": 25,
+        "duration": 6000,
+        "pause": 8000
+      },
+      {
+        "pattern": "mercy",
+        "min": 15,
+        "max": 40,
+        "duration": 7000,
+        "pause": 6000
+      }
+    ]
+  },
+  "endurance_test": {
+    "description": "How long can the pet endure?",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "flutter",
+        "min": 5,
+        "max": 20,
+        "duration": 4000,
+        "pause": 5000
+      },
+      {
+        "pattern": "ghost_tease",
+        "min": 3,
+        "max": 15,
+        "duration": 5000,
+        "pause": 6000
+      },
+      {
+        "pattern": "rapid_micro",
+        "min": 2,
+        "max": 10,
+        "duration": 5000,
+        "pause": 7000
+      },
+      {
+        "pattern": "pulse",
+        "min": 8,
+        "max": 18,
+        "duration": 6000,
+        "pause": 8000
+      },
+      {
+        "pattern": "heartbeat",
+        "min": 10,
+        "max": 20,
+        "duration": 7000,
+        "pause": 9000
+      }
+    ]
+  },
+  "who_owns_you": {
+    "description": "Reminder of ownership - intense control",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "stop_start",
+        "min": 25,
+        "max": 60,
+        "duration": 5000,
+        "pause": 3000
+      },
+      {
+        "pattern": "desperation",
+        "min": 20,
+        "max": 75,
+        "duration": 10000,
+        "pause": 4000
+      },
+      {
+        "pattern": "edging",
+        "min": 25,
+        "max": 90,
+        "duration": 12000,
+        "pause": 5000
+      },
+      {
+        "pattern": "held_edge",
+        "min": 30,
+        "max": 92,
+        "duration": 9000,
+        "pause": 6000
+      },
+      {
+        "pattern": "teasing",
+        "min": 20,
+        "max": 70,
+        "duration": 10000,
+        "pause": 5000
+      }
+    ]
+  },
+  "training_session": {
+    "description": "Full obedience training sequence",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "heartbeat",
+        "min": 10,
+        "max": 25,
+        "duration": 6000,
+        "pause": 5000
+      },
+      {
+        "pattern": "flutter",
+        "min": 5,
+        "max": 20,
+        "duration": 5000,
+        "pause": 4000
+      },
+      {
+        "pattern": "ghost_tease",
+        "min": 3,
+        "max": 15,
+        "duration": 5000,
+        "pause": 6000
+      },
+      {
+        "pattern": "pulse",
+        "min": 8,
+        "max": 18,
+        "duration": 5000,
+        "pause": 6000
+      },
+      {
+        "pattern": "mercy",
+        "min": 10,
+        "max": 25,
+        "duration": 6000,
+        "pause": 5000
+      },
+      {
+        "pattern": "held_edge",
+        "min": 15,
+        "max": 35,
+        "duration": 7000,
+        "pause": 5000
+      },
+      {
+        "pattern": "stop_start",
+        "min": 20,
+        "max": 45,
+        "duration": 5000,
+        "pause": 4000
+      },
+      {
+        "pattern": "tickle",
+        "min": 15,
+        "max": 40,
+        "duration": 6000,
+        "pause": 4000
+      }
+    ]
+  }
+}

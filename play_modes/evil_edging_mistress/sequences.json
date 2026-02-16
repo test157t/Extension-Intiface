@@ -1,0 +1,125 @@
+{
+  "wicked_torment": {
+    "description": "Wicked torment with evil edges",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "wicked_build", "min": 5, "max": 95, "duration": 12000, "pause": 3000 },
+      { "pattern": "evil_ripple", "min": 10, "max": 98, "duration": 10000, "pause": 3500 },
+      { "pattern": "vindictive_spikes", "min": 15, "max": 100, "duration": 8000, "pause": 2500 },
+      { "pattern": "malicious_flicker", "min": 5, "max": 90, "duration": 9000, "pause": 4000 }
+    ]
+  },
+  "cruel_edging": {
+    "description": "Cruel and relentless edging",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "cruel_sine", "min": 10, "max": 100, "duration": 15000, "pause": 4000 },
+      { "pattern": "wicked_build", "min": 20, "max": 98, "duration": 12000, "pause": 3000 },
+      { "pattern": "evil_ripple", "min": 15, "max": 100, "duration": 10000, "pause": 5000 },
+      { "pattern": "torment_wave", "min": 5, "max": 95, "duration": 8000, "pause": 3000 }
+    ]
+  },
+  "sadistic_games": {
+    "description": "Sadistic games with no release",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "malicious_flicker", "min": 5, "max": 85, "duration": 10000, "pause": 2000 },
+      { "pattern": "wicked_build", "min": 10, "max": 95, "duration": 8000, "pause": 1500 },
+      { "pattern": "vindictive_spikes", "min": 15, "max": 100, "duration": 6000, "pause": 1000 },
+      { "pattern": "evil_ripple", "min": 20, "max": 98, "duration": 7000, "pause": 2500 }
+    ]
+  },
+  "torment_cascade": {
+    "description": "Cascade of pure torment",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "torment_wave", "min": 10, "max": 90, "duration": 9000, "pause": 2000 },
+      { "pattern": "wicked_build", "min": 15, "max": 95, "duration": 8000, "pause": 1500 },
+      { "pattern": "cruel_sine", "min": 20, "max": 100, "duration": 7000, "pause": 1000 },
+      { "pattern": "evil_ripple", "min": 25, "max": 98, "duration": 6000, "pause": 2500 },
+      { "pattern": "vindictive_spikes", "min": 30, "max": 100, "duration": 5000, "pause": 1500 }
+    ]
+  },
+  "merciless": {
+    "description": "Show no mercy, only suffering",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "sadistic_hold", "min": 10, "max": 95, "duration": 10000, "pause": 4000 },
+      { "pattern": "vindictive_spikes", "min": 15, "max": 100, "duration": 8000, "pause": 3000 },
+      { "pattern": "wicked_build", "min": 20, "max": 98, "duration": 7000, "pause": 2500 },
+      { "pattern": "evil_ripple", "min": 25, "max": 100, "duration": 6000, "pause": 3500 }
+    ]
+  },
+  "infernal_edges": {
+    "description": "Edges from the depths of torment",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "evil_ripple", "min": 5, "max": 90, "duration": 11000, "pause": 3500 },
+      { "pattern": "torment_wave", "min": 10, "max": 95, "duration": 9000, "pause": 3000 },
+      { "pattern": "wicked_build", "min": 15, "max": 100, "duration": 7000, "pause": 2500 },
+      { "pattern": "malicious_flicker", "min": 20, "max": 98, "duration": 6000, "pause": 4000 }
+    ]
+  },
+  "torture_dance": {
+    "description": "Dance of pure torture",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "malicious_flicker", "min": 8, "max": 88, "duration": 8000, "pause": 2000 },
+      { "pattern": "vindictive_spikes", "min": 12, "max": 95, "duration": 6000, "pause": 1500 },
+      { "pattern": "cruel_sine", "min": 16, "max": 100, "duration": 5000, "pause": 1000 },
+      { "pattern": "torment_wave", "min": 20, "max": 98, "duration": 7000, "pause": 2500 }
+    ]
+  },
+  "sinister_teasing": {
+    "description": "Sinister teasing with cruel endings",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "cruel_sine", "min": 5, "max": 85, "duration": 12000, "pause": 4000 },
+      { "pattern": "evil_ripple", "min": 10, "max": 92, "duration": 10000, "pause": 3500 },
+      { "pattern": "wicked_build", "min": 15, "max": 98, "duration": 8000, "pause": 3000 },
+      { "pattern": "vindictive_spikes", "min": 20, "max": 100, "duration": 6000, "pause": 4500 }
+    ]
+  },
+  "eternal_torment": {
+    "description": "Eternal torment with no escape",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "torment_wave", "min": 10, "max": 95, "duration": 10000, "pause": 3000 },
+      { "pattern": "wicked_build", "min": 15, "max": 100, "duration": 8000, "pause": 2500 },
+      { "pattern": "evil_ripple", "min": 20, "max": 98, "duration": 7000, "pause": 2000 },
+      { "pattern": "cruel_sine", "min": 25, "max": 100, "duration": 6000, "pause": 3500 },
+      { "pattern": "vindictive_spikes", "min": 30, "max": 100, "duration": 5000, "pause": 2000 }
+    ]
+  },
+  "maleficent": {
+    "description": "Maleficent patterns of suffering",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "wicked_build", "min": 8, "max": 90, "duration": 11000, "pause": 3500 },
+      { "pattern": "evil_ripple", "min": 12, "max": 95, "duration": 9000, "pause": 3000 },
+      { "pattern": "torment_wave", "min": 16, "max": 100, "duration": 7000, "pause": 2500 },
+      { "pattern": "cruel_sine", "min": 20, "max": 98, "duration": 6000, "pause": 4000 }
+    ]
+  },
+  "abyssal_torment": {
+    "description": "Descend into torment from the abyss",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "evil_ripple", "min": 5, "max": 90, "duration": 12000, "pause": 4000 },
+      { "pattern": "vindictive_spikes", "min": 10, "max": 95, "duration": 10000, "pause": 3500 },
+      { "pattern": "wicked_build", "min": 15, "max": 100, "duration": 8000, "pause": 3000 },
+      { "pattern": "torment_wave", "min": 20, "max": 98, "duration": 7000, "pause": 4500 }
+    ]
+  }
+}

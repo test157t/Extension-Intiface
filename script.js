@@ -2,6 +2,7 @@
 
 import { renderExtensionTemplateAsync } from "../../../extensions.js"
 import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles, getRequestHeaders, messageFormatting, appendMediaToMessage, addCopyToCodeBlocks } from "../../../../script.js"
+import { PlayModeLoader } from "./play_modes/_loader.js"
 
 // @ts-ignore: Hack to suppress IDE errors
 const $ = window.$
@@ -1434,1121 +1435,10 @@ const DevicePresets = {
 // Active pattern tracking
 let activePatterns = new Map(); // deviceIndex -> { pattern, interval, controls }
 
-// Denial Domina Mode - Advanced denial sequences
-const DenialDominaMode = {
-  gentle_tease: {
-    description: 'Gentle teasing with soft pulses',
-    sequence: [
-      { pattern: 'tickle', min: 15, max: 35, duration: 3000, pause: 2000 },
-      { pattern: 'pulse', min: 20, max: 40, duration: 4000, pause: 3000 },
-      { pattern: 'heartbeat', min: 18, max: 30, duration: 5000, pause: 2000 },
-      { pattern: 'teasing', min: 20, max: 35, duration: 4000, pause: 2500 }
-    ],
-    repeat: true
-  },
-  mind_games: {
-    description: 'Random start-stop patterns',
-    sequence: [
-      { pattern: 'stop_start', min: 40, max: 70, duration: 6000, pause: 4000 },
-      { pattern: 'random_tease', min: 10, max: 60, duration: 8000, pause: 3000 },
-      { pattern: 'tease_escalate', min: 5, max: 65, duration: 10000, pause: 5000 },
-      { pattern: 'mercy', min: 30, max: 55, duration: 7000, pause: 3500 }
-    ],
-    repeat: true
-  },
-  edge_mania: {
-    description: 'Multiple edging sequences',
-    sequence: [
-      { pattern: 'ramp_up', min: 5, max: 85, duration: 8000, pause: 4000 },
-      { pattern: 'edging', min: 10, max: 90, duration: 12000, pause: 6000 },
-      { pattern: 'tease_escalate', min: 10, max: 88, duration: 10000, pause: 5000 },
-      { pattern: 'ruin', min: 5, max: 95, duration: 8000, pause: 7000 }
-    ],
-    repeat: true
-  },
-  desperation: {
-    description: 'Builds desperation with intense pauses',
-    sequence: [
-      { pattern: 'desperation', min: 10, max: 70, duration: 15000, pause: 8000 },
-      { pattern: 'stop_start', min: 50, max: 80, duration: 4000, pause: 6000 },
-      { pattern: 'teasing', min: 25, max: 75, duration: 8000, pause: 5000 },
-      { pattern: 'random_tease', min: 15, max: 85, duration: 12000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  mercy: {
-    description: 'Gentle patterns with rest periods',
-    sequence: [
-      { pattern: 'mercy', min: 25, max: 50, duration: 6000, pause: 5000 },
-      { pattern: 'heartbeat', min: 20, max: 40, duration: 7000, pause: 6000 },
-      { pattern: 'tickle', min: 15, max: 35, duration: 4000, pause: 8000 },
-      { pattern: 'teasing', min: 20, max: 45, duration: 5000, pause: 7000 }
-    ],
-    repeat: true
-  },
-  ultimate_tease: {
-    description: 'Ultimate tease - never allows release',
-    sequence: [
-      { pattern: 'tickle', min: 10, max: 30, duration: 3000, pause: 3000 },
-      { pattern: 'edging', min: 15, max: 88, duration: 14000, pause: 7000 },
-      { pattern: 'stop_start', min: 45, max: 75, duration: 5000, pause: 4000 },
-      { pattern: 'desperation', min: 20, max: 80, duration: 12000, pause: 8000 },
-      { pattern: 'tease_escalate', min: 10, max: 85, duration: 11000, pause: 6000 },
-      { pattern: 'ruin', min: 5, max: 90, duration: 9000, pause: 10000 }
-    ],
-    repeat: true
-  },
-  slow_burn: {
-    description: 'Very slow build with long pauses',
-    sequence: [
-      { pattern: 'sine', min: 10, max: 25, duration: 10000, pause: 8000 },
-      { pattern: 'triangle', min: 15, max: 35, duration: 12000, pause: 9000 },
-      { pattern: 'heartbeat', min: 18, max: 30, duration: 15000, pause: 7000 },
-      { pattern: 'edging', min: 20, max: 70, duration: 18000, pause: 10000 }
-    ],
-    repeat: true
-  },
-  micro_tickle: {
-    description: 'Inspired by community scripts - micro twitching',
-    sequence: [
-      { pattern: 'micro_tease', min: 5, max: 50, duration: 8000, pause: 2000 },
-      { pattern: 'rapid_micro', min: 2, max: 30, duration: 6000, pause: 3000 },
-      { pattern: 'flutter', min: 5, max: 40, duration: 4000, pause: 1500 },
-      { pattern: 'ghost_tease', min: 1, max: 60, duration: 7000, pause: 4000 },
-      { pattern: 'erratic', min: 1, max: 70, duration: 9000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  abrupt_edge: {
-    description: 'Peaks then abruptly stops - like tease.funscript',
-    sequence: [
-      { pattern: 'abrupt_edge', min: 10, max: 95, duration: 5000, pause: 3000 },
-      { pattern: 'peak_and_drop', min: 5, max: 95, duration: 6000, pause: 4000 },
-      { pattern: 'held_edge', min: 15, max: 90, duration: 8000, pause: 5000 },
-      { pattern: 'build_and_ruin', min: 5, max: 92, duration: 10000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  ghost_touches: {
-    description: 'Almost imperceptible touches with rare bursts',
-    sequence: [
-      { pattern: 'ghost_tease', min: 1, max: 15, duration: 5000, pause: 5000 },
-      { pattern: 'rapid_micro', min: 1, max: 5, duration: 6000, pause: 4000 },
-      { pattern: 'flutter', min: 1, max: 20, duration: 4000, pause: 6000 },
-      { pattern: 'micro_tease', min: 2, max: 25, duration: 8000, pause: 7000 },
-      { pattern: 'heartbeat', min: 10, max: 30, duration: 7000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  unpredictably_cruel: {
-    description: 'Chaotic mix of patterns - maximum confusion',
-    sequence: [
-      { pattern: 'erratic', min: 1, max: 70, duration: 5000, pause: 3000 },
-      { pattern: 'ghost_tease', min: 1, max: 80, duration: 4000, pause: 5000 },
-      { pattern: 'abrupt_edge', min: 10, max: 95, duration: 6000, pause: 2000 },
-      { pattern: 'micro_tease', min: 5, max: 60, duration: 7000, pause: 4000 },
-      { pattern: 'held_edge', min: 20, max: 90, duration: 8000, pause: 6000 },
-      { pattern: 'flutter', min: 5, max: 50, duration: 5000, pause: 3000 }
-    ],
-    repeat: true
-  }
-}
-
-// Milk Maid Mode - Forced release patterns
-const MilkMaidMode = {
-  milk_maid: {
-    description: 'Classic milking - slow builds to intense crescendos',
-    sequence: [
-      { pattern: 'crescendo', min: 10, max: 100, duration: 15000, pause: 3000 },
-      { pattern: 'forced_peak', min: 15, max: 100, duration: 9000, pause: 2000 },
-      { pattern: 'milking_pump', min: 20, max: 100, duration: 8000, pause: 2000 },
-      { pattern: 'tsunami', min: 10, max: 100, duration: 10000, pause: 3000 },
-      { pattern: 'crescendo', min: 20, max: 100, duration: 12000, pause: 2000 },
-      { pattern: 'tidal_wave', min: 30, max: 100, duration: 12000, pause: 2500 }
-    ],
-    repeat: true
-  },
-  relentless_milking: {
-    description: 'No breaks - relentless intensity',
-    sequence: [
-      { pattern: 'relentless', min: 30, max: 100, duration: 10000, pause: 1000 },
-      { pattern: 'milking_pump', min: 40, max: 100, duration: 6000, pause: 500 },
-      { pattern: 'forced_peak', min: 35, max: 100, duration: 7000, pause: 500 },
-      { pattern: 'overload', min: 40, max: 100, duration: 8000, pause: 1000 },
-      { pattern: 'tsunami', min: 35, max: 100, duration: 9000, pause: 500 },
-      { pattern: 'crescendo', min: 50, max: 100, duration: 11000, pause: 500 }
-    ],
-    repeat: true
-  },
-  tsunami_assault: {
-    description: 'Massive wave after massive wave',
-    sequence: [
-      { pattern: 'tsunami', min: 20, max: 100, duration: 10000, pause: 3000 },
-      { pattern: 'tidal_wave', min: 30, max: 100, duration: 10000, pause: 3000 },
-      { pattern: 'spiral_up', min: 20, max: 100, duration: 11000, pause: 3000 },
-      { pattern: 'tsunami', min: 25, max: 100, duration: 12000, pause: 3000 },
-      { pattern: 'forced_peak', min: 30, max: 100, duration: 8000, pause: 2500 },
-      { pattern: 'overload', min: 35, max: 100, duration: 10000, pause: 3000 }
-    ],
-    repeat: true
-  },
-  spiral_crescendos: {
-    description: 'Spiraling intensity that keeps building',
-    sequence: [
-      { pattern: 'spiral_up', min: 15, max: 100, duration: 11000, pause: 2500 },
-      { pattern: 'crescendo', min: 20, max: 100, duration: 12000, pause: 2500 },
-      { pattern: 'tidal_wave', min: 25, max: 100, duration: 11000, pause: 2500 },
-      { pattern: 'spiral_up', min: 25, max: 100, duration: 10000, pause: 2500 },
-      { pattern: 'tsunami', min: 30, max: 100, duration: 12000, pause: 2500 },
-      { pattern: 'crescendo', min: 35, max: 100, duration: 13000, pause: 2500 }
-    ],
-    repeat: true
-  },
-  overload_milking: {
-    description: 'Overload senses - maximum intensity',
-    sequence: [
-      { pattern: 'overload', min: 40, max: 100, duration: 12000, pause: 2000 },
-      { pattern: 'tsunami', min: 30, max: 100, duration: 10000, pause: 2000 },
-      { pattern: 'forced_peak', min: 35, max: 100, duration: 8000, pause: 1500 },
-      { pattern: 'relentless', min: 40, max: 100, duration: 10000, pause: 1500 },
-      { pattern: 'milking_pump', min: 50, max: 100, duration: 6000, pause: 1000 },
-      { pattern: 'spiral_up', min: 40, max: 100, duration: 11000, pause: 2000 }
-    ],
-    repeat: true
-  },
-  gentle_milking: {
-    description: 'Slower, more deliberate milking',
-    sequence: [
-      { pattern: 'crescendo', min: 20, max: 85, duration: 18000, pause: 5000 },
-      { pattern: 'tidal_wave', min: 25, max: 90, duration: 15000, pause: 4500 },
-      { pattern: 'milking_pump', min: 30, max: 95, duration: 10000, pause: 4000 },
-      { pattern: 'spiral_up', min: 25, max: 90, duration: 12000, pause: 4500 },
-      { pattern: 'crescendo', min: 30, max: 95, duration: 16000, pause: 4000 },
-      { pattern: 'forced_peak', min: 35, max: 100, duration: 10000, pause: 5000 }
-    ],
-    repeat: true
-  }
-}
-
-// Pet Training Mode - Obedience and discipline patterns
-const PetTrainingMode = {
-  sit_stay: {
-    description: 'Basic obedience - hold still and endure',
-    sequence: [
-      { pattern: 'heartbeat', min: 10, max: 25, duration: 8000, pause: 6000 },
-      { pattern: 'pulse', min: 15, max: 30, duration: 6000, pause: 5000 },
-      { pattern: 'mercy', min: 20, max: 35, duration: 7000, pause: 7000 },
-      { pattern: 'ghost_tease', min: 5, max: 15, duration: 5000, pause: 8000 },
-      { pattern: 'flutter', min: 10, max: 20, duration: 4000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  reward_training: {
-    description: 'Wait patiently for rewards',
-    sequence: [
-      { pattern: 'micro_tease', min: 5, max: 20, duration: 5000, pause: 4000 },
-      { pattern: 'rapid_micro', min: 2, max: 15, duration: 4000, pause: 3000 },
-      { pattern: 'flutter', min: 5, max: 25, duration: 6000, pause: 5000 },
-      { pattern: 'teasing', min: 10, max: 40, duration: 7000, pause: 4000 },
-      { pattern: 'tease_escalate', min: 5, max: 50, duration: 8000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  discipline_time: {
-    description: 'Discipline for disobedience',
-    sequence: [
-      { pattern: 'pulse', min: 40, max: 70, duration: 3000, pause: 2000 },
-      { pattern: 'abrupt_edge', min: 20, max: 80, duration: 4000, pause: 3000 },
-      { pattern: 'stop_start', min: 30, max: 75, duration: 5000, pause: 4000 },
-      { pattern: 'edging', min: 25, max: 85, duration: 9000, pause: 5000 },
-      { pattern: 'desperation', min: 20, max: 80, duration: 10000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  patient_pet: {
-    description: 'Testing patience and endurance',
-    sequence: [
-      { pattern: 'ghost_tease', min: 1, max: 20, duration: 6000, pause: 8000 },
-      { pattern: 'flutter', min: 5, max: 25, duration: 5000, pause: 7000 },
-      { pattern: 'mercy', min: 10, max: 30, duration: 7000, pause: 8000 },
-      { pattern: 'heartbeat', min: 10, max: 25, duration: 8000, pause: 7000 },
-      { pattern: 'tickle', min: 15, max: 35, duration: 6000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  good_boy: {
-    description: 'Reward for being a good pet',
-    sequence: [
-      { pattern: 'crescendo', min: 20, max: 95, duration: 12000, pause: 5000 },
-      { pattern: 'tidal_wave', min: 25, max: 100, duration: 10000, pause: 4000 },
-      { pattern: 'spiral_up', min: 20, max: 95, duration: 11000, pause: 5000 },
-      { pattern: 'tsunami', min: 25, max: 100, duration: 10000, pause: 4000 },
-      { pattern: 'held_edge', min: 30, max: 90, duration: 8000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  bad_pet: {
-    description: 'Punishment for bad behavior - edging only',
-    sequence: [
-      { pattern: 'edging', min: 15, max: 92, duration: 15000, pause: 8000 },
-      { pattern: 'abrupt_edge', min: 10, max: 95, duration: 6000, pause: 3000 },
-      { pattern: 'peak_and_drop', min: 10, max: 95, duration: 7000, pause: 4000 },
-      { pattern: 'ruin', min: 5, max: 95, duration: 8000, pause: 8000 },
-      { pattern: 'build_and_ruin', min: 10, max: 92, duration: 12000, pause: 7000 }
-    ],
-    repeat: true
-  },
-  begging: {
-    description: 'Beg for attention - teasing and denial',
-    sequence: [
-      { pattern: 'ghost_tease', min: 5, max: 30, duration: 5000, pause: 3000 },
-      { pattern: 'micro_tease', min: 8, max: 35, duration: 4000, pause: 2000 },
-      { pattern: 'flutter', min: 10, max: 40, duration: 5000, pause: 3000 },
-      { pattern: 'tickle', min: 15, max: 45, duration: 6000, pause: 4000 },
-      { pattern: 'teasing', min: 20, max: 50, duration: 7000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  lesson_time: {
-    description: 'Teaching obedience through denial',
-    sequence: [
-      { pattern: 'held_edge', min: 20, max: 90, duration: 8000, pause: 6000 },
-      { pattern: 'abrupt_edge', min: 15, max: 95, duration: 5000, pause: 4000 },
-      { pattern: 'edging', min: 20, max: 90, duration: 11000, pause: 7000 },
-      { pattern: 'ghost_tease', min: 5, max: 25, duration: 6000, pause: 8000 },
-      { pattern: 'mercy', min: 15, max: 40, duration: 7000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  endurance_test: {
-    description: 'How long can the pet endure?',
-    sequence: [
-      { pattern: 'flutter', min: 5, max: 20, duration: 4000, pause: 5000 },
-      { pattern: 'ghost_tease', min: 3, max: 15, duration: 5000, pause: 6000 },
-      { pattern: 'rapid_micro', min: 2, max: 10, duration: 5000, pause: 7000 },
-      { pattern: 'pulse', min: 8, max: 18, duration: 6000, pause: 8000 },
-      { pattern: 'heartbeat', min: 10, max: 20, duration: 7000, pause: 9000 }
-    ],
-    repeat: true
-  },
-  who_owns_you: {
-    description: 'Reminder of ownership - intense control',
-    sequence: [
-      { pattern: 'stop_start', min: 25, max: 60, duration: 5000, pause: 3000 },
-      { pattern: 'desperation', min: 20, max: 75, duration: 10000, pause: 4000 },
-      { pattern: 'edging', min: 25, max: 90, duration: 12000, pause: 5000 },
-      { pattern: 'held_edge', min: 30, max: 92, duration: 9000, pause: 6000 },
-      { pattern: 'teasing', min: 20, max: 70, duration: 10000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  training_session: {
-    description: 'Full obedience training sequence',
-    sequence: [
-      { pattern: 'heartbeat', min: 10, max: 25, duration: 6000, pause: 5000 },
-      { pattern: 'flutter', min: 5, max: 20, duration: 5000, pause: 4000 },
-      { pattern: 'ghost_tease', min: 3, max: 15, duration: 5000, pause: 6000 },
-      { pattern: 'pulse', min: 8, max: 18, duration: 5000, pause: 6000 },
-      { pattern: 'mercy', min: 10, max: 25, duration: 6000, pause: 5000 },
-      { pattern: 'held_edge', min: 15, max: 35, duration: 7000, pause: 5000 },
-      { pattern: 'stop_start', min: 20, max: 45, duration: 5000, pause: 4000 },
-      { pattern: 'tickle', min: 15, max: 40, duration: 6000, pause: 4000 }
-    ],
-    repeat: true
-  }
-}
-
-// Sissy Surrender Mode - Submission and teasing sensations
-const SissySurrenderMode = {
-  cage_taps: {
-    description: 'Light taps and touches on cage',
-    sequence: [
-      { pattern: 'pulse', min: 15, max: 35, duration: 1500, pause: 1000 },
-      { pattern: 'flutter', min: 10, max: 25, duration: 2000, pause: 1500 },
-      { pattern: 'rapid_micro', min: 5, max: 20, duration: 2500, pause: 2000 },
-      { pattern: 'ghost_tease', min: 3, max: 18, duration: 3000, pause: 2500 },
-      { pattern: 'tickle', min: 12, max: 28, duration: 2500, pause: 2000 }
-    ],
-    repeat: true
-  },
-  cage_rubs: {
-    description: 'Gentle rubbing sensations',
-    sequence: [
-      { pattern: 'sine', min: 20, max: 45, duration: 4000, pause: 3000 },
-      { pattern: 'triangle', min: 15, max: 40, duration: 3500, pause: 2500 },
-      { pattern: 'heartbeat', min: 18, max: 38, duration: 5000, pause: 3000 },
-      { pattern: 'teasing', min: 22, max: 42, duration: 4500, pause: 3500 },
-      { pattern: 'flutter', min: 20, max: 35, duration: 3000, pause: 2000 }
-    ],
-    repeat: true
-  },
-  cage_squeezes: {
-    description: 'Teasing squeezes',
-    sequence: [
-      { pattern: 'square', min: 25, max: 50, duration: 800, pause: 1200 },
-      { pattern: 'pulse', min: 30, max: 55, duration: 600, pause: 1000 },
-      { pattern: 'abrupt_edge', min: 20, max: 60, duration: 1000, pause: 800 },
-      { pattern: 'square', min: 28, max: 52, duration: 700, pause: 1100 },
-      { pattern: 'edging', min: 25, max: 55, duration: 8000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  submission_edging: {
-    description: 'Edge while submitting',
-    sequence: [
-      { pattern: 'flutter', min: 10, max: 30, duration: 4000, pause: 4000 },
-      { pattern: 'ghost_tease', min: 5, max: 20, duration: 5000, pause: 5000 },
-      { pattern: 'heartbeat', min: 12, max: 28, duration: 6000, pause: 6000 },
-      { pattern: 'held_edge', min: 15, max: 75, duration: 7000, pause: 7000 },
-      { pattern: 'abrupt_edge', min: 18, max: 80, duration: 5000, pause: 5000 },
-      { pattern: 'edging', min: 20, max: 85, duration: 10000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  denial_torment: {
-    description: 'Tease and torment with denial',
-    sequence: [
-      { pattern: 'mercy', min: 15, max: 30, duration: 5000, pause: 4000 },
-      { pattern: 'ghost_tease', min: 5, max: 25, duration: 4000, pause: 3000 },
-      { pattern: 'peak_and_drop', min: 15, max: 70, duration: 3000, pause: 2500 },
-      { pattern: 'abrupt_edge', min: 18, max: 75, duration: 3500, pause: 2000 },
-      { pattern: 'build_and_ruin', min: 12, max: 65, duration: 8000, pause: 5000 },
-      { pattern: 'flutter', min: 8, max: 22, duration: 5000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  surrender_now: {
-    description: 'Give in to the sensation',
-    sequence: [
-      { pattern: 'crescendo', min: 15, max: 75, duration: 8000, pause: 4000 },
-      { pattern: 'tidal_wave', min: 20, max: 80, duration: 7000, pause: 3500 },
-      { pattern: 'spiral_up', min: 18, max: 85, duration: 7500, pause: 4000 },
-      { pattern: 'held_edge', min: 25, max: 82, duration: 6000, pause: 3000 },
-      { pattern: 'tease_escalate', min: 20, max: 88, duration: 9000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  plug_thrusting: {
-    description: 'Deep thrusting sensations',
-    sequence: [
-      { pattern: 'sawtooth', min: 25, max: 75, duration: 3000, pause: 1500 },
-      { pattern: 'triangle', min: 30, max: 80, duration: 2800, pause: 1200 },
-      { pattern: 'sine', min: 28, max: 78, duration: 3200, pause: 1800 },
-      { pattern: 'sawtooth', min: 32, max: 82, duration: 2700, pause: 1300 },
-      { pattern: 'tidal_wave', min: 35, max: 85, duration: 5000, pause: 2000 }
-    ],
-    repeat: true
-  },
-  plug_rhythm: {
-    description: 'Steady rhythmic thrusting',
-    sequence: [
-      { pattern: 'sine', min: 20, max: 70, duration: 4000, pause: 1000 },
-      { pattern: 'sine', min: 25, max: 75, duration: 4000, pause: 1000 },
-      { pattern: 'sine', min: 28, max: 78, duration: 4000, pause: 1000 },
-      { pattern: 'triangle', min: 25, max: 80, duration: 3500, pause: 1500 },
-      { pattern: 'sawtooth', min: 30, max: 85, duration: 3200, pause: 2000 },
-      { pattern: 'heartbeat', min: 22, max: 72, duration: 6000, pause: 3000 }
-    ],
-    repeat: true
-  },
-  plug_wave: {
-    description: 'Wave-like thrusts',
-    sequence: [
-      { pattern: 'tidal_wave', min: 20, max: 80, duration: 6000, pause: 2000 },
-      { pattern: 'spiral_up', min: 25, max: 85, duration: 5500, pause: 1500 },
-      { pattern: 'crescendo', min: 22, max: 82, duration: 5000, pause: 2000 },
-      { pattern: 'wave', min: 20, max: 78, duration: 4500, pause: 2500 },
-      { pattern: 'ripple_thruster', min: 18, max: 75, duration: 4000, pause: 3000 },
-      { pattern: 'spiral_up', min: 30, max: 88, duration: 5200, pause: 2500 }
-    ],
-    repeat: true
-  },
-  plug_buildup: {
-    description: 'Build the thrusting intensity',
-    sequence: [
-      { pattern: 'triangle', min: 15, max: 45, duration: 3000, pause: 2000 },
-      { pattern: 'sawtooth', min: 20, max: 55, duration: 2800, pause: 1800 },
-      { pattern: 'triangle', min: 25, max: 65, duration: 2600, pause: 1600 },
-      { pattern: 'sine', min: 28, max: 75, duration: 2500, pause: 1400 },
-      { pattern: 'spiral_up', min: 30, max: 82, duration: 3500, pause: 2000 },
-      { pattern: 'tsunami', min: 35, max: 88, duration: 4000, pause: 1500 }
-    ],
-    repeat: true
-  },
-  full_surrender: {
-    description: 'Complete surrender - mix of all sensations',
-    sequence: [
-      { pattern: 'pulse', min: 10, max: 30, duration: 6000, pause: 4000 },
-      { pattern: 'sine', min: 15, max: 40, duration: 7000, pause: 5000 },
-      { pattern: 'flutter', min: 8, max: 22, duration: 5000, pause: 6000 },
-      { pattern: 'sawtooth', min: 20, max: 75, duration: 5000, pause: 3000 },
-      { pattern: 'crescendo', min: 25, max: 85, duration: 9000, pause: 5000 },
-      { pattern: 'ghost_tease', min: 10, max: 35, duration: 7000, pause: 6000 },
-      { pattern: 'stop_start', min: 20, max: 60, duration: 8000, pause: 4000 }
-    ],
-    repeat: true
-  }
-}
-
-// Prejac Princess Mode - Quick overwhelming, back-to-back orgasms
-const PrejacPrincessMode = {
-  quick_overload: {
-    description: 'Quick overwhelming stimulation',
-    sequence: [
-      { pattern: 'crescendo', min: 30, max: 100, duration: 5000, pause: 500 },
-      { pattern: 'tsunami', min: 40, max: 100, duration: 4000, pause: 300 },
-      { pattern: 'forbidden_peaks', min: 35, max: 100, duration: 3500, pause: 250 },
-      { pattern: 'overload', min: 45, max: 100, duration: 3000, pause: 200 },
-      { pattern: 'spiral_up', min: 50, max: 100, duration: 3500, pause: 300 },
-      { pattern: 'tidal_wave', min: 55, max: 100, duration: 3000, pause: 200 }
-    ],
-    repeat: true
-  },
-  rapid_fire: {
-    description: 'Rapid fire orgasms',
-    sequence: [
-      { pattern: 'forced_peak', min: 50, max: 100, duration: 3000, pause: 1000 },
-      { pattern: 'tsunami', min: 60, max: 100, duration: 2500, pause: 800 },
-      { pattern: 'crescendo', min: 55, max: 100, duration: 2800, pause: 1200 },
-      { pattern: 'overload', min: 65, max: 100, duration: 2200, pause: 800 },
-      { pattern: 'relentless', min: 70, max: 100, duration: 2000, pause: 600 },
-      { pattern: 'intense_waves', min: 60, max: 100, duration: 2400, pause: 700 }
-    ],
-    repeat: true
-  },
-  back_to_back: {
-    description: 'Back-to-back orgasm training',
-    sequence: [
-      { pattern: 'crescendo', min: 20, max: 100, duration: 8000, pause: 2000 },
-      { pattern: 'tsunami', min: 40, max: 100, duration: 4000, pause: 1000 },
-      { pattern: 'forbidden_peaks', min: 35, max: 100, duration: 3500, pause: 1500 },
-      { pattern: 'tidal_wave', min: 50, max: 100, duration: 3000, pause: 2000 },
-      { pattern: 'spiral_up', min: 55, max: 100, duration: 4000, pause: 1000 },
-      { pattern: 'overload', min: 60, max: 100, duration: 3000, pause: 1500 },
-      { pattern: 'multiple_peaks', min: 65, max: 100, duration: 2500, pause: 1000 }
-    ],
-    repeat: true
-  },
-  endurance_overload: {
-    description: 'Endurance through overwhelming',
-    sequence: [
-      { pattern: 'overload', min: 35, max: 100, duration: 5000, pause: 2000 },
-      { pattern: 'tsunami', min: 40, max: 100, duration: 4000, pause: 1500 },
-      { pattern: 'relentless', min: 45, max: 100, duration: 3500, pause: 1000 },
-      { pattern: 'crescendo', min: 50, max: 100, duration: 4500, pause: 2000 },
-      { pattern: 'spiral_up', min: 55, max: 100, duration: 4000, pause: 1500 },
-      { pattern: 'forbidden_peaks', min: 60, max: 100, duration: 3500, pause: 1000 },
-      { pattern: 'intense_waves', min: 50, max: 100, duration: 4000, pause: 2000 }
-    ],
-    repeat: true
-  },
-  princess_torture: {
-    description: 'Princess knows what you need',
-    sequence: [
-      { pattern: 'edging', min: 30, max: 90, duration: 6000, pause: 2000 },
-      { pattern: 'crescendo', min: 40, max: 95, duration: 4000, pause: 1500 },
-      { pattern: 'abrupt_edge', min: 35, max: 98, duration: 2000, pause: 1000 },
-      { pattern: 'tsunami', min: 45, max: 100, duration: 3000, pause: 500 },
-      { pattern: 'forced_peak', min: 50, max: 100, duration: 2500, pause: 1500 },
-      { pattern: 'peak_and_drop', min: 40, max: 98, duration: 2000, pause: 1000 },
-      { pattern: 'ruin', min: 35, max: 95, duration: 3000, pause: 2000 }
-    ],
-    repeat: true
-  },
-  relentless_waves: {
-    description: 'Relentless wave after wave',
-    sequence: [
-      { pattern: 'tidal_wave', min: 40, max: 100, duration: 3000, pause: 1000 },
-      { pattern: 'tsunami', min: 45, max: 100, duration: 2500, pause: 800 },
-      { pattern: 'crescendo', min: 50, max: 100, duration: 3000, pause: 1200 },
-      { pattern: 'spiral_up', min: 55, max: 100, duration: 2500, pause: 700 },
-      { pattern: 'overload', min: 60, max: 100, duration: 2000, pause: 500 },
-      { pattern: 'tsunami', min: 65, max: 100, duration: 2000, pause: 400 },
-      { pattern: 'intense_waves', min: 70, max: 100, duration: 2200, pause: 600 }
-    ],
-    repeat: true
-  },
-  triple_threat: {
-    description: 'Three rapid sequences back to back',
-    sequence: [
-      { pattern: 'crescendo', min: 25, max: 95, duration: 5000, pause: 500 },
-      { pattern: 'tsunami', min: 35, max: 100, duration: 3000, pause: 500 },
-      { pattern: 'crescendo', min: 40, max: 100, duration: 4000, pause: 1000 },
-      { pattern: 'tsunami', min: 45, max: 100, duration: 2500, pause: 800 },
-      { pattern: 'spiral_up', min: 50, max: 100, duration: 3500, pause: 1000 },
-      { pattern: 'overload', min: 55, max: 100, duration: 2000, pause: 1200 },
-      { pattern: 'rapid_fire', min: 60, max: 100, duration: 1500, pause: 1000 }
-    ],
-    repeat: true
-  }
-}
-
-const RoboticRuinationMode = {
-  mechanical_edging: {
-    description: 'Robotic step-like builds to edge',
-    sequence: [
-      { pattern: 'mechanical', min: 10, max: 95, duration: 8000, pause: 3000 },
-      { pattern: 'mechanical', min: 20, max: 98, duration: 6000, pause: 4000 },
-      { pattern: 'mechanical', min: 30, max: 100, duration: 4000, pause: 5000 },
-      { pattern: 'mechanical', min: 10, max: 85, duration: 7000, pause: 3500 }
-    ],
-    repeat: true
-  },
-  algorithm_ruin: {
-    description: 'Algorithmic builds to 100% then drop to 5%',
-    sequence: [
-      { pattern: 'algorithm', min: 15, max: 100, duration: 10000, pause: 2000 },
-      { pattern: 'algorithm', min: 10, max: 100, duration: 9000, pause: 3000 },
-      { pattern: 'algorithm', min: 20, max: 100, duration: 8000, pause: 2500 },
-      { pattern: 'algorithm', min: 5, max: 100, duration: 7000, pause: 3500 }
-    ],
-    repeat: true
-  },
-  systematic_ruin: {
-    description: 'Systematic approach to ruin all attempts',
-    sequence: [
-      { pattern: 'systematic_ruin', min: 10, max: 100, duration: 12000, pause: 3000 },
-      { pattern: 'cold_calculation', min: 15, max: 100, duration: 10000, pause: 4000 },
-      { pattern: 'systematic_ruin', min: 20, max: 100, duration: 9000, pause: 3000 },
-      { pattern: 'mechanical', min: 5, max: 98, duration: 8000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  cold_programmer: {
-    description: 'Cold calculation determining your release',
-    sequence: [
-      { pattern: 'cold_calculation', min: 10, max: 95, duration: 15000, pause: 2500 },
-      { pattern: 'algorithm', min: 15, max: 100, duration: 12000, pause: 3000 },
-      { pattern: 'cold_calculation', min: 20, max: 100, duration: 10000, pause: 3500 },
-      { pattern: 'mechanical', min: 5, max: 98, duration: 8000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  machine_learning: {
-    description: 'Machine learns your edge points',
-    sequence: [
-      { pattern: 'algorithm', min: 5, max: 90, duration: 10000, pause: 4000 },
-      { pattern: 'systematic_ruin', min: 10, max: 95, duration: 9000, pause: 3500 },
-      { pattern: 'mechanical', min: 15, max: 100, duration: 8000, pause: 3000 },
-      { pattern: 'cold_calculation', min: 20, max: 100, duration: 7000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  precise_termination: {
-    description: 'Precision termination at peak',
-    sequence: [
-      { pattern: 'cold_calculation', min: 10, max: 85, duration: 8000, pause: 3000 },
-      { pattern: 'mechanical', min: 15, max: 92, duration: 7000, pause: 3500 },
-      { pattern: 'algorithm', min: 20, max: 98, duration: 6000, pause: 4000 },
-      { pattern: 'systematic_ruin', min: 5, max: 100, duration: 5000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  relentless_machine: {
-    description: 'Relentless machine that never tires',
-    sequence: [
-      { pattern: 'mechanical', min: 20, max: 90, duration: 6000, pause: 2000 },
-      { pattern: 'algorithm', min: 25, max: 95, duration: 5000, pause: 1500 },
-      { pattern: 'systematic_ruin', min: 30, max: 100, duration: 4500, pause: 2000 },
-      { pattern: 'cold_calculation', min: 35, max: 100, duration: 4000, pause: 2500 }
-    ],
-    repeat: true
-  },
-  binary_ruiner: {
-    description: 'Binary pattern: 0 or 100 no middle ground',
-    sequence: [
-      { pattern: 'mechanical', min: 5, max: 100, duration: 7000, pause: 3000 },
-      { pattern: 'algorithm', min: 5, max: 100, duration: 6000, pause: 3500 },
-      { pattern: 'systematic_ruin', min: 5, max: 100, duration: 5500, pause: 3000 },
-      { pattern: 'cold_calculation', min: 5, max: 100, duration: 5000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  loop_hell: {
-    description: 'Endless loop of ruined peaks',
-    sequence: [
-      { pattern: 'algorithm', min: 10, max: 100, duration: 9000, pause: 2500 },
-      { pattern: 'systematic_ruin', min: 15, max: 100, duration: 8000, pause: 3000 },
-      { pattern: 'mechanical', min: 20, max: 100, duration: 7500, pause: 2500 },
-      { pattern: 'algorithm', min: 10, max: 100, duration: 7000, pause: 3500 }
-    ],
-    repeat: true
-  },
-  precision_lockout: {
-    description: 'Precision lockout at critical moments',
-    sequence: [
-      { pattern: 'cold_calculation', min: 15, max: 95, duration: 11000, pause: 3000 },
-      { pattern: 'mechanical', min: 10, max: 98, duration: 10000, pause: 4000 },
-      { pattern: 'algorithm', min: 20, max: 100, duration: 9000, pause: 3500 },
-      { pattern: 'systematic_ruin', min: 25, max: 100, duration: 8000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  calibrated_ruin: {
-    description: 'Perfectly calibrated to ruin you',
-    sequence: [
-      { pattern: 'systematic_ruin', min: 20, max: 100, duration: 10000, pause: 2000 },
-      { pattern: 'algorithm', min: 15, max: 100, duration: 9000, pause: 2500 },
-      { pattern: 'cold_calculation', min: 10, max: 100, duration: 8000, pause: 3000 },
-      { pattern: 'mechanical', min: 25, max: 100, duration: 7000, pause: 3500 }
-    ],
-    repeat: true
-  }
-}
-
-const EvilEdgingMistressMode = {
-  wicked_torment: {
-    description: 'Wicked torment with evil edges',
-    sequence: [
-      { pattern: 'wicked_build', min: 5, max: 95, duration: 12000, pause: 3000 },
-      { pattern: 'evil_ripple', min: 10, max: 98, duration: 10000, pause: 3500 },
-      { pattern: 'vindictive_spikes', min: 15, max: 100, duration: 8000, pause: 2500 },
-      { pattern: 'malicious_flicker', min: 5, max: 90, duration: 9000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  cruel_edging: {
-    description: 'Cruel and relentless edging',
-    sequence: [
-      { pattern: 'cruel_sine', min: 10, max: 100, duration: 15000, pause: 4000 },
-      { pattern: 'wicked_build', min: 20, max: 98, duration: 12000, pause: 3000 },
-      { pattern: 'evil_ripple', min: 15, max: 100, duration: 10000, pause: 5000 },
-      { pattern: 'torment_wave', min: 5, max: 95, duration: 8000, pause: 3000 }
-    ],
-    repeat: true
-  },
-  sadistic_games: {
-    description: 'Sadistic games with no release',
-    sequence: [
-      { pattern: 'malicious_flicker', min: 5, max: 85, duration: 10000, pause: 2000 },
-      { pattern: 'wicked_build', min: 10, max: 95, duration: 8000, pause: 1500 },
-      { pattern: 'vindictive_spikes', min: 15, max: 100, duration: 6000, pause: 1000 },
-      { pattern: 'evil_ripple', min: 20, max: 98, duration: 7000, pause: 2500 }
-    ],
-    repeat: true
-  },
-  torment_cascade: {
-    description: 'Cascade of pure torment',
-    sequence: [
-      { pattern: 'torment_wave', min: 10, max: 90, duration: 9000, pause: 2000 },
-      { pattern: 'wicked_build', min: 15, max: 95, duration: 8000, pause: 1500 },
-      { pattern: 'cruel_sine', min: 20, max: 100, duration: 7000, pause: 1000 },
-      { pattern: 'evil_ripple', min: 25, max: 98, duration: 6000, pause: 2500 },
-      { pattern: 'vindictive_spikes', min: 30, max: 100, duration: 5000, pause: 1500 }
-    ],
-    repeat: true
-  },
-  merciless: {
-    description: 'Show no mercy, only suffering',
-    sequence: [
-      { pattern: 'sadistic_hold', min: 10, max: 95, duration: 10000, pause: 4000 },
-      { pattern: 'vindictive_spikes', min: 15, max: 100, duration: 8000, pause: 3000 },
-      { pattern: 'wicked_build', min: 20, max: 98, duration: 7000, pause: 2500 },
-      { pattern: 'evil_ripple', min: 25, max: 100, duration: 6000, pause: 3500 }
-    ],
-    repeat: true
-  },
-  infernal_edges: {
-    description: 'Edges from the depths of torment',
-    sequence: [
-      { pattern: 'evil_ripple', min: 5, max: 90, duration: 11000, pause: 3500 },
-      { pattern: 'torment_wave', min: 10, max: 95, duration: 9000, pause: 3000 },
-      { pattern: 'wicked_build', min: 15, max: 100, duration: 7000, pause: 2500 },
-      { pattern: 'malicious_flicker', min: 20, max: 98, duration: 6000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  torture_dance: {
-    description: 'Dance of pure torture',
-    sequence: [
-      { pattern: 'malicious_flicker', min: 8, max: 88, duration: 8000, pause: 2000 },
-      { pattern: 'vindictive_spikes', min: 12, max: 95, duration: 6000, pause: 1500 },
-      { pattern: 'cruel_sine', min: 16, max: 100, duration: 5000, pause: 1000 },
-      { pattern: 'torment_wave', min: 20, max: 98, duration: 7000, pause: 2500 }
-    ],
-    repeat: true
-  },
-  sinister_teasing: {
-    description: 'Sinister teasing with cruel endings',
-    sequence: [
-      { pattern: 'cruel_sine', min: 5, max: 85, duration: 12000, pause: 4000 },
-      { pattern: 'evil_ripple', min: 10, max: 92, duration: 10000, pause: 3500 },
-      { pattern: 'wicked_build', min: 15, max: 98, duration: 8000, pause: 3000 },
-      { pattern: 'vindictive_spikes', min: 20, max: 100, duration: 6000, pause: 4500 }
-    ],
-    repeat: true
-  },
-  eternal_torment: {
-    description: 'Eternal torment with no escape',
-    sequence: [
-      { pattern: 'torment_wave', min: 10, max: 95, duration: 10000, pause: 3000 },
-      { pattern: 'wicked_build', min: 15, max: 100, duration: 8000, pause: 2500 },
-      { pattern: 'evil_ripple', min: 20, max: 98, duration: 7000, pause: 2000 },
-      { pattern: 'cruel_sine', min: 25, max: 100, duration: 6000, pause: 3500 },
-      { pattern: 'vindictive_spikes', min: 30, max: 100, duration: 5000, pause: 2000 }
-    ],
-    repeat: true
-  },
-  maleficent: {
-    description: 'Maleficent patterns of suffering',
-    sequence: [
-      { pattern: 'wicked_build', min: 8, max: 90, duration: 11000, pause: 3500 },
-      { pattern: 'evil_ripple', min: 12, max: 95, duration: 9000, pause: 3000 },
-      { pattern: 'torment_wave', min: 16, max: 100, duration: 7000, pause: 2500 },
-      { pattern: 'cruel_sine', min: 20, max: 98, duration: 6000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  abyssal_torment: {
-    description: 'Descend into torment from the abyss',
-    sequence: [
-      { pattern: 'evil_ripple', min: 5, max: 90, duration: 12000, pause: 4000 },
-      { pattern: 'vindictive_spikes', min: 10, max: 95, duration: 10000, pause: 3500 },
-      { pattern: 'wicked_build', min: 15, max: 100, duration: 8000, pause: 3000 },
-      { pattern: 'torment_wave', min: 20, max: 98, duration: 7000, pause: 4500 }
-    ],
-    repeat: true
-  }
-}
-
-const FrustrationFairyMode = {
-  fairy_dust_tickle: {
-    description: 'Light fairy dust tickles building sensitivity',
-    sequence: [
-      { pattern: 'fairy_dust', min: 1, max: 8, duration: 15000, pause: 4000 },
-      { pattern: 'impish_flutter', min: 2, max: 10, duration: 12000, pause: 3500 },
-      { pattern: 'maddening_tickle', min: 3, max: 12, duration: 10000, pause: 3000 },
-      { pattern: 'fairy_dust', min: 4, max: 15, duration: 8000, pause: 4500 }
-    ],
-    repeat: true
-  },
-  phantom_touches: {
-    description: 'Almost imperceptible phantom touches',
-    sequence: [
-      { pattern: 'phantom_touch', min: 1, max: 10, duration: 18000, pause: 5000 },
-      { pattern: 'teasing_whisper', min: 1, max: 12, duration: 15000, pause: 4000 },
-      { pattern: 'maddening_ripples', min: 2, max: 15, duration: 12000, pause: 3500 },
-      { pattern: 'phantom_touch', min: 3, max: 18, duration: 10000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  frustrating_flutters: {
-    description: 'Incredibly frustrating flutters',
-    sequence: [
-      { pattern: 'frustrating_flutter', min: 2, max: 10, duration: 12000, pause: 3000 },
-      { pattern: 'impish_flutter', min: 3, max: 12, duration: 10000, pause: 2500 },
-      { pattern: 'fairy_dust', min: 4, max: 15, duration: 9000, pause: 3500 },
-      { pattern: 'maddening_ripples', min: 5, max: 18, duration: 8000, pause: 3000 }
-    ],
-    repeat: true
-  },
-  unbearable_lightness: {
-    description: 'Unbearably light touches building sensitivity',
-    sequence: [
-      { pattern: 'unbearable_lightness', min: 1, max: 8, duration: 14000, pause: 4000 },
-      { pattern: 'frustrating_flutter', min: 2, max: 10, duration: 12000, pause: 3500 },
-      { pattern: 'teasing_whisper', min: 3, max: 12, duration: 10000, pause: 4500 },
-      { pattern: 'impish_flutter', min: 4, max: 15, duration: 9000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  maddening_sensitivity: {
-    description: 'Maddening sensitivity build',
-    sequence: [
-      { pattern: 'maddening_tickle', min: 1, max: 8, duration: 13000, pause: 3500 },
-      { pattern: 'infuriating_flicker', min: 2, max: 10, duration: 11000, pause: 4000 },
-      { pattern: 'fairy_dust', min: 3, max: 12, duration: 10000, pause: 3000 },
-      { pattern: 'phantom_touch', min: 4, max: 15, duration: 9000, pause: 4500 }
-    ],
-    repeat: true
-  },
-  teasing_inferno: {
-    description: 'Teasing inferno with minimal contact',
-    sequence: [
-      { pattern: 'infuriating_flicker', min: 2, max: 10, duration: 15000, pause: 4000 },
-      { pattern: 'maddening_riddles', min: 3, max: 12, duration: 12000, pause: 3500 },
-      { pattern: 'frustrating_flutter', min: 4, max: 15, duration: 10000, pause: 3000 },
-      { pattern: 'fairy_dust', min: 5, max: 18, duration: 9000, pause: 4500 }
-    ],
-    repeat: true
-  },
-  phantom_sensations: {
-    description: 'Phantom sensations everywhere',
-    sequence: [
-      { pattern: 'phantom_touch', min: 1, max: 8, duration: 16000, pause: 4500 },
-      { pattern: 'teasing_whisper', min: 2, max: 10, duration: 14000, pause: 4000 },
-      { pattern: 'maddening_ripples', min: 3, max: 12, duration: 12000, pause: 3500 },
-      { pattern: 'unbearable_lightness', min: 4, max: 15, duration: 10000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  fairy_torture: {
-    description: 'Fairy torture with barely any contact',
-    sequence: [
-      { pattern: 'fairy_dust', min: 1, max: 6, duration: 17000, pause: 5000 },
-      { pattern: 'impish_flutter', min: 2, max: 8, duration: 15000, pause: 4000 },
-      { pattern: 'maddening_tickle', min: 2, max: 10, duration: 13000, pause: 4500 },
-      { pattern: 'phantom_touch', min: 3, max: 12, duration: 11000, pause: 5500 }
-    ],
-    repeat: true
-  },
-  sensitivity_overload: {
-    description: 'Overload sensitivity with feather touches',
-    sequence: [
-      { pattern: 'infuriating_flicker', min: 2, max: 10, duration: 14000, pause: 4000 },
-      { pattern: 'frustrating_flutter', min: 3, max: 12, duration: 12000, pause: 3500 },
-      { pattern: 'teasing_whisper', min: 4, max: 15, duration: 10000, pause: 3000 },
-      { pattern: 'maddening_ripples', min: 5, max: 18, duration: 9000, pause: 4500 }
-    ],
-    repeat: true
-  },
-  unbearable_tease: {
-    description: 'Unbearable teasing intensity',
-    sequence: [
-      { pattern: 'unbearable_lightness', min: 1, max: 8, duration: 15000, pause: 4500 },
-      { pattern: 'phantom_touch', min: 2, max: 10, duration: 13000, pause: 4000 },
-      { pattern: 'frustrating_flutter', min: 3, max: 12, duration: 11000, pause: 3500 },
-      { pattern: 'fairy_dust', min: 4, max: 15, duration: 10000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  maddening_dream: {
-    description: 'Maddening dream of sensations',
-    sequence: [
-      { pattern: 'teasing_whisper', min: 1, max: 8, duration: 16000, pause: 5000 },
-      { pattern: 'phantom_touch', min: 2, max: 10, duration: 14000, pause: 4500 },
-      { pattern: 'maddening_ripples', min: 3, max: 12, duration: 12000, pause: 4000 },
-      { pattern: 'unbearable_lightness', min: 4, max: 15, duration: 10000, pause: 5500 }
-    ],
-    repeat: true
-  }
-}
-
-const HypnoHelperMode = {
-  dreamy_trance: {
-    description: 'Dreamy hypnotic trance with slow build',
-    sequence: [
-      { pattern: 'hypno_wave', min: 10, max: 60, duration: 20000, pause: 5000 },
-      { pattern: 'trance_rhythm', min: 15, max: 65, duration: 18000, pause: 4000 },
-      { pattern: 'sleepy_spiral', min: 18, max: 70, duration: 16000, pause: 4500 },
-      { pattern: 'dreamy_flow', min: 20, max: 75, duration: 15000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  hypnotic_pulse: {
-    description: 'Hypnotic pulsing trance',
-    sequence: [
-      { pattern: 'hypnotic_pulse', min: 12, max: 65, duration: 15000, pause: 4000 },
-      { pattern: 'trance_rhythm', min: 15, max: 70, duration: 13000, pause: 3500 },
-      { pattern: 'hypno_wave', min: 18, max: 75, duration: 12000, pause: 4500 },
-      { pattern: 'entrancement_zone', min: 20, max: 80, duration: 11000, pause: 4000 }
-    ],
-    repeat: true
-  },
-  sleepy_build: {
-    description: 'Sleepy hypnotic build that never peaks',
-    sequence: [
-      { pattern: 'sleepy_build', min: 8, max: 55, duration: 18000, pause: 5000 },
-      { pattern: 'trance_oscillation', min: 12, max: 60, duration: 16000, pause: 4500 },
-      { pattern: 'hypnotic_drift', min: 15, max: 65, duration: 14000, pause: 4000 },
-      { pattern: 'dreamy_flow', min: 18, max: 70, duration: 12000, pause: 5500 }
-    ],
-    repeat: true
-  },
-  entrancing_flow: {
-    description: 'Entrancing flow with hypnotic waves',
-    sequence: [
-      { pattern: 'entrancement_zone', min: 10, max: 60, duration: 17000, pause: 4500 },
-      { pattern: 'hypno_wave', min: 13, max: 65, duration: 15000, pause: 4000 },
-      { pattern: 'trance_rhythm', min: 16, max: 70, duration: 13000, pause: 5000 },
-      { pattern: 'hypnotic_pulse', min: 18, max: 75, duration: 11000, pause: 4500 }
-    ],
-    repeat: true
-  },
-  edge_trance: {
-    description: 'Trance that keeps you in the edge zone',
-    sequence: [
-      { pattern: 'edge_trance', min: 12, max: 65, duration: 19000, pause: 5000 },
-      { pattern: 'entrancement_zone', min: 15, max: 70, duration: 17000, pause: 4500 },
-      { pattern: 'trance_oscillation', min: 18, max: 75, duration: 15000, pause: 4000 },
-      { pattern: 'hypnotic_drift', min: 20, max: 80, duration: 13000, pause: 5500 }
-    ],
-    repeat: true
-  },
-  hypnotic_entrance: {
-    description: 'Hypnotic entrance into deep trance',
-    sequence: [
-      { pattern: 'hypno_wave', min: 8, max: 55, duration: 20000, pause: 6000 },
-      { pattern: 'sleepy_spiral', min: 12, max: 60, duration: 18000, pause: 5000 },
-      { pattern: 'trance_rhythm', min: 15, max: 65, duration: 16000, pause: 4500 },
-      { pattern: 'dreamy_flow', min: 18, max: 70, duration: 14000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  sleepy_waves: {
-    description: 'Sleepy waves that build arousal slowly',
-    sequence: [
-      { pattern: 'sleepy_spiral', min: 10, max: 55, duration: 16000, pause: 4500 },
-      { pattern: 'hypnotic_pulse', min: 13, max: 60, duration: 14000, pause: 4000 },
-      { pattern: 'trance_oscillation', min: 16, max: 65, duration: 12000, pause: 5000 },
-      { pattern: 'hypnotic_drift', min: 18, max: 70, duration: 10000, pause: 4500 }
-    ],
-    repeat: true
-  },
-  trance_state: {
-    description: 'Deep trance state maintaining arousal',
-    sequence: [
-      { pattern: 'entrancement_zone', min: 15, max: 60, duration: 18000, pause: 5000 },
-      { pattern: 'hypnotic_pulse', min: 18, max: 65, duration: 16000, pause: 4500 },
-      { pattern: 'trance_rhythm', min: 20, max: 70, duration: 14000, pause: 4000 },
-      { pattern: 'dreamy_flow', min: 22, max: 75, duration: 12000, pause: 5500 }
-    ],
-    repeat: true
-  },
-  hypnotic_sustain: {
-    description: 'Sustain hypnotic arousal without peaking',
-    sequence: [
-      { pattern: 'hypnotic_drift', min: 12, max: 58, duration: 20000, pause: 6000 },
-      { pattern: 'entrancement_zone', min: 15, max: 62, duration: 18000, pause: 5000 },
-      { pattern: 'trance_oscillation', min: 18, max: 68, duration: 16000, pause: 4500 },
-      { pattern: 'hypno_wave', min: 20, max: 72, duration: 14000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  dreamy_edging: {
-    description: 'Dreamy edging that never releases',
-    sequence: [
-      { pattern: 'dreamy_flow', min: 10, max: 55, duration: 22000, pause: 5000 },
-      { pattern: 'edge_trance', min: 13, max: 60, duration: 20000, pause: 4500 },
-      { pattern: 'sleepy_spiral', min: 15, max: 65, duration: 18000, pause: 5500 },
-      { pattern: 'trance_rhythm', min: 18, max: 70, duration: 16000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  hypnotic_loop: {
-    description: 'Hypnotic loop of endless build',
-    sequence: [
-      { pattern: 'hypno_wave', min: 8, max: 55, duration: 20000, pause: 6000 },
-      { pattern: 'trance_rhythm', min: 11, max: 60, duration: 18000, pause: 5000 },
-      { pattern: 'sleepy_build', min: 14, max: 65, duration: 16000, pause: 4500 },
-      { pattern: 'entrancement_zone', min: 16, max: 70, duration: 14000, pause: 6000 }
-    ],
-    repeat: true
-  }
-}
-
-const ChastityCaretakerMode = {
-  gentle_checkup: {
-    description: 'Gentle checkup on the cage',
-    sequence: [
-      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 5000 },
-      { pattern: 'loving_check', min: 1, max: 12, duration: 12000, pause: 6000 },
-      { pattern: 'caring_tap', min: 3, max: 18, duration: 8000, pause: 4000 },
-      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 5000 }
-    ],
-    repeat: true
-  },
-  daily_care: {
-    description: 'Daily caretaker routine',
-    sequence: [
-      { pattern: 'daily_routine', min: 3, max: 20, duration: 15000, pause: 6000 },
-      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 12000, pause: 5000 },
-      { pattern: 'cage_nurse', min: 3, max: 18, duration: 10000, pause: 7000 },
-      { pattern: 'caretaker_hums', min: 2, max: 16, duration: 14000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  denial_with_love: {
-    description: 'Denial with loving care',
-    sequence: [
-      { pattern: 'gentle_denial', min: 3, max: 18, duration: 12000, pause: 5000 },
-      { pattern: 'tender_flutter', min: 2, max: 15, duration: 10000, pause: 6000 },
-      { pattern: 'gentle_checkup', min: 4, max: 20, duration: 14000, pause: 7000 },
-      { pattern: 'loving_check', min: 3, max: 18, duration: 12000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  tender_torment: {
-    description: 'Sweet torment with care',
-    sequence: [
-      { pattern: 'tender_torment', min: 2, max: 20, duration: 16000, pause: 7000 },
-      { pattern: 'sweet_frustration', min: 3, max: 18, duration: 14000, pause: 6000 },
-      { pattern: 'caring_tap', min: 4, max: 22, duration: 12000, pause: 5000 },
-      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  gentle_edges: {
-    description: 'Gentle edging with care',
-    sequence: [
-      { pattern: 'gentle_denial', min: 4, max: 20, duration: 13000, pause: 6000 },
-      { pattern: 'tender_flutter', min: 3, max: 18, duration: 11000, pause: 5000 },
-      { pattern: 'nurturing_pulse', min: 5, max: 22, duration: 10000, pause: 7000 },
-      { pattern: 'caretaker_hums', min: 4, max: 20, duration: 12000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  good_cage: {
-    description: 'Good cage check and care',
-    sequence: [
-      { pattern: 'cage_nurse', min: 3, max: 18, duration: 12000, pause: 6000 },
-      { pattern: 'gentle_checkup', min: 2, max: 15, duration: 10000, pause: 5000 },
-      { pattern: 'loving_check', min: 4, max: 20, duration: 14000, pause: 7000 },
-      { pattern: 'caring_tap', min: 3, max: 18, duration: 11000, pause: 6000 }
-    ],
-    repeat: true
-  },
-  caretaker_love: {
-    description: 'Loving caretaker mode',
-    sequence: [
-      { pattern: 'caretaker_hums', min: 2, max: 15, duration: 14000, pause: 7000 },
-      { pattern: 'gentle_checkup', min: 3, max: 18, duration: 12000, pause: 6000 },
-      { pattern: 'tender_flutter', min: 4, max: 20, duration: 10000, pause: 5000 },
-      { pattern: 'loving_check', min: 3, max: 18, duration: 13000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  sweet_frustration: {
-    description: 'Sweetly frustrating',
-    sequence: [
-      { pattern: 'sweet_frustration', min: 3, max: 18, duration: 15000, pause: 7000 },
-      { pattern: 'tender_torment', min: 4, max: 20, duration: 13000, pause: 6000 },
-      { pattern: 'gentle_denial', min: 5, max: 22, duration: 11000, pause: 5000 },
-      { pattern: 'caring_tap', min: 4, max: 20, duration: 12000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  nurturing_build: {
-    description: 'Slow nurturing build',
-    sequence: [
-      { pattern: 'tender_flutter', min: 2, max: 15, duration: 14000, pause: 7000 },
-      { pattern: 'gentle_denial', min: 3, max: 18, duration: 12000, pause: 6000 },
-      { pattern: 'caretaker_hums', min: 4, max: 20, duration: 10000, pause: 5000 },
-      { pattern: 'gentle_checkup', min: 5, max: 22, duration: 11000, pause: 7000 }
-    ],
-    repeat: true
-  },
-  caring_check: {
-    description: 'Caring check-in session',
-    sequence: [
-      { pattern: 'loving_check', min: 2, max: 15, duration: 13000, pause: 7000 },
-      { pattern: 'gentle_checkup', min: 3, max: 18, duration: 11000, pause: 6000 },
-      { pattern: 'cage_nurse', min: 4, max: 20, duration: 10000, pause: 5000 },
-      { pattern: 'tender_flutter', min: 3, max: 18, duration: 12000, pause: 8000 }
-    ],
-    repeat: true
-  },
-  gentle_denial_session: {
-    description: 'Gentle denial session',
-    sequence: [
-      { pattern: 'gentle_denial', min: 4, max: 20, duration: 14000, pause: 7000 },
-      { pattern: 'sweet_frustration', min: 5, max: 22, duration: 12000, pause: 6000 },
-      { pattern: 'tender_torment', min: 6, max: 25, duration: 10000, pause: 5000 },
-      { pattern: 'gentle_checkup', min: 4, max: 20, duration: 11000, pause: 8000 }
-    ],
-    repeat: true
-  }
-}
+// NOTE: All play modes have been migrated to the modular system
+// Each mode has its own directory in play_modes/ with mode.json, patterns.js, and sequences.json
+// The PlayModeLoader dynamically loads and manages these modes
+// Access modes via: PlayModeLoader.getSequence(modeId, sequenceName)
 
 function applyMaxVibrate(value, motorIndex = 0) {
   // No max limit anymore, just return the value clamped to 0-100
@@ -2890,7 +1780,20 @@ async function executeTeaseAndDenialMode(deviceIndex, modeName) {
     return
   }
 
-  const mode = DenialDominaMode[modeName] || MilkMaidMode[modeName] || PetTrainingMode[modeName] || SissySurrenderMode[modeName] || PrejacPrincessMode[modeName] || RoboticRuinationMode[modeName] || EvilEdgingMistressMode[modeName] || FrustrationFairyMode[modeName] || HypnoHelperMode[modeName] || ChastityCaretakerMode[modeName]
+  // Search for sequence across all enabled modes
+  let mode = null
+  let foundModeId = null
+  const enabledModes = PlayModeLoader.getEnabledModes()
+  
+  for (const modeId of enabledModes) {
+    const sequence = PlayModeLoader.getSequence(modeId, modeName)
+    if (sequence) {
+      mode = sequence
+      foundModeId = modeId
+      break
+    }
+  }
+  
   if (!mode) {
     console.error(`${NAME}: Unknown mode: ${modeName}`)
     return
@@ -4911,210 +3814,7 @@ deviceDiv.append(motorsHtml)
 
 // Play Mode patterns are now shown in the unified Play Mode section in the menu
 // Old per-device mode buttons removed - now centralized in menu
-if (false) {
-const deviceIndex = devices.length - 1
 
-// Build modes content
-let modesContent = ''
-
-// Denial Domina
-if (modeSettings.denialDomina) {
-const denyModes = DenialDominaMode
-const modeNames = Object.keys(denyModes)
-if (modeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,100,100,0.1); border-radius: 4px; border: 1px solid rgba(255,100,100,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #ff6464; margin-bottom: 6px;"><i class="fa-solid fa-heart"></i> Denial Domina</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${modeNames.map(mode =>
-`<button class="menu_button deny-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(200,50,50,0.2); border: 1px solid rgba(200,50,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Milk Maid
-if (modeSettings.milkMaid) {
-const milkModes = MilkMaidMode
-const milkModeNames = Object.keys(milkModes)
-if (milkModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(100,200,100,0.1); border-radius: 4px; border: 1px solid rgba(100,200,100,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #64ff64; margin-bottom: 6px;"><i class="fa-solid fa-cow"></i> Milk Maid</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${milkModeNames.map(mode =>
-`<button class="menu_button milk-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(50,200,50,0.2); border: 1px solid rgba(50,200,50,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Pet Training
-if (modeSettings.petTraining) {
-const petModes = PetTrainingMode
-const petModeNames = Object.keys(petModes)
-if (petModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(100,100,255,0.1); border-radius: 4px; border: 1px solid rgba(100,100,255,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #6464ff; margin-bottom: 6px;"><i class="fa-solid fa-paw"></i> Pet Training</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${petModeNames.map(mode =>
-`<button class="menu_button pet-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(50,50,200,0.2); border: 1px solid rgba(50,50,200,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Sissy Surrender
-if (modeSettings.sissySurrender) {
-const sissyModes = SissySurrenderMode
-const sissyModeNames = Object.keys(sissyModes)
-if (sissyModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,100,200,0.1); border-radius: 4px; border: 1px solid rgba(255,100,200,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #ff64c8; margin-bottom: 6px;"><i class="fa-solid fa-gem"></i> Sissy Surrender</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${sissyModeNames.map(mode =>
-`<button class="menu_button sissy-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(200,50,100,0.2); border: 1px solid rgba(200,50,100,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Prejac Princess
-if (modeSettings.prejacPrincess) {
-const prejacModes = PrejacPrincessMode
-const prejacModeNames = Object.keys(prejacModes)
-if (prejacModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(0,255,255,0.1); border-radius: 4px; border: 1px solid rgba(0,255,255,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #00ffff; margin-bottom: 6px;"><i class="fa-solid fa-crown"></i> Prejac Princess</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${prejacModeNames.map(mode =>
-`<button class="menu_button prejac-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(0,200,255,0.2); border: 1px solid rgba(0,200,255,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Robotic Ruination
-if (modeSettings.roboticRuination) {
-const roboticModes = RoboticRuinationMode
-const roboticModeNames = Object.keys(roboticModes)
-if (roboticModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(200,200,200,0.1); border-radius: 4px; border: 1px solid rgba(200,200,200,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #ff00ff; margin-bottom: 6px;"><i class="fa-solid fa-robot"></i> Robotic Ruination</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${roboticModeNames.map(mode =>
-`<button class="menu_button robotic-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(150,150,150,0.2); border: 1px solid rgba(150,150,150,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Evil Edging Mistress
-if (modeSettings.evilEdgingMistress) {
-const evilModes = EvilEdgingMistressMode
-const evilModeNames = Object.keys(evilModes)
-if (evilModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(128,0,128,0.1); border-radius: 4px; border: 1px solid rgba(128,0,128,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #bf00ff; margin-bottom: 6px;"><i class="fa-solid fa-skull"></i> Evil Edging Mistress</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${evilModeNames.map(mode =>
-`<button class="menu_button evil-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(100,0,100,0.2); border: 1px solid rgba(100,0,100,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Frustration Fairy
-if (modeSettings.frustrationFairy) {
-const frustrationModes = FrustrationFairyMode
-const frustrationModeNames = Object.keys(frustrationModes)
-if (frustrationModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(255,255,0,0.1); border-radius: 4px; border: 1px solid rgba(255,255,0,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #ffff00; margin-bottom: 6px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Frustration Fairy</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${frustrationModeNames.map(mode =>
-`<button class="menu_button frustration-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(255,255,0,0.2); border: 1px solid rgba(255,255,0,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Hypno Helper
-if (modeSettings.hypnoHelper) {
-const hypnoModes = HypnoHelperMode
-const hypnoModeNames = Object.keys(hypnoModes)
-if (hypnoModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 12px; padding: 8px; background: rgba(138,43,226,0.1); border-radius: 4px; border: 1px solid rgba(138,43,226,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #dda0dd; margin-bottom: 6px;"><i class="fa-solid fa-eye"></i> Hypno Helper</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${hypnoModeNames.map(mode =>
-`<button class="menu_button hypno-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(138,43,226,0.2); border: 1px solid rgba(138,43,226,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Chastity Caretaker
-if (modeSettings.chastityCaretaker) {
-const chastityModes = ChastityCaretakerMode
-const chastityModeNames = Object.keys(chastityModes)
-if (chastityModeNames.length > 0) {
-modesContent += `
-<div style="margin-bottom: 8px; padding: 8px; background: rgba(255,192,203,0.1); border-radius: 4px; border: 1px solid rgba(255,192,203,0.2);">
-<div style="font-size: 0.8em; font-weight: bold; color: #ffc0cb; margin-bottom: 6px;"><i class="fa-solid fa-heart"></i> Chastity Caretaker</div>
-<div style="display: flex; flex-wrap: wrap; gap: 4px;">
-${chastityModeNames.map(mode =>
-`<button class="menu_button chastity-mode-btn" data-mode="${mode}" data-device="${deviceIndex}"
-style="padding: 3px 6px; font-size: 0.65em; border-radius: 3px; background: rgba(255,192,203,0.2); border: 1px solid rgba(255,192,203,0.4);">${mode.replace(/_/g, ' ')}</button>`
-).join('')}
-</div>
-</div>`
-}
-}
-
-// Only add the Modes section if there's content
-if (modesContent) {
-const modesHtml = `
-<div style="margin-top: 10px;">
-<div id="intiface-modes-toggle-${deviceIndex}" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(100,100,255,0.15); border-radius: 4px; border: 1px solid rgba(100,100,255,0.3);">
-<span style="display: flex; justify-content: space-between; align-items: center;">
-<span style="font-size: 0.85em; font-weight: bold;"><i class="fa-solid fa-gamepad"></i> Play Modes</span>
-<span id="intiface-modes-arrow-${deviceIndex}" style="transition: transform 0.3s;">▼</span>
-</span>
-</div>
-<div id="intiface-modes-content-${deviceIndex}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px; max-height: 400px; overflow-y: auto;">
-${modesContent}
-</div>
-</div>
-`
-deviceDiv.append(modesHtml)
-}
-}
 // Removed old per-device Play Modes section
 
 devicesEl.append(deviceDiv)
@@ -6681,97 +5381,128 @@ sissy: ['sine', 'triangle', 'gentle', 'wave', 'flutter', 'teasing'],
 prejac: ['rapid_micro', 'rapid_fire', 'flutter', 'sine', 'pulse']
 }
 
-populatePatternButtons = function(deviceType = 'general') {
-const container = $('#intiface-pattern-buttons')
-container.empty()
+    populatePatternButtons = function(deviceType = 'general') {
+        const container = $('#intiface-pattern-buttons')
+        container.empty()
 
-// Get presets for current category
-let presets = {}
+        // Check if PlayModeLoader is initialized
+        if (!PlayModeLoader || typeof PlayModeLoader.getEnabledSequences !== 'function') {
+            container.html('<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">Loading modes...</div>')
+            return
+        }
 
-if (currentPatternCategory === 'basic') {
-// Basic patterns - simple presets
-presets = {
-warmup: PatternLibrary.presets.warmup,
-tease: PatternLibrary.presets.tease,
-pulse: PatternLibrary.presets.pulse,
-edge: PatternLibrary.presets.edge
-}
-// Add device-specific presets
-if (deviceType === 'cage') {
-presets.cage_tease = PatternLibrary.presets.cage_tease
-presets.cage_denial = PatternLibrary.presets.cage_denial
-} else if (deviceType === 'stroker') {
-presets.stroker_slow = PatternLibrary.presets.stroker_slow
-presets.stroker_fast = PatternLibrary.presets.stroker_fast
-presets.stroker_edge = PatternLibrary.presets.stroker_edge
-}
-} else {
-// Map category names to mode constants
-const modeMap = {
-'denial': DenialDominaMode,
-'milking': MilkMaidMode,
-'training': PetTrainingMode,
-'robotic': RoboticRuinationMode,
-'sissy': SissySurrenderMode,
-'prejac': PrejacPrincessMode,
-'evil': EvilEdgingMistressMode,
-'frustration': FrustrationFairyMode,
-'hypno': HypnoHelperMode,
-'chastity': ChastityCaretakerMode
-}
-const modeConstant = modeMap[currentPatternCategory]
-if (modeConstant) {
-presets = modeConstant
-}
-}
+        // Get presets for current category
+        let presets = {}
 
-// Add waveform patterns for this category as simple presets
-const categoryWaveforms = WaveformPatternsByCategory[currentPatternCategory] || []
-categoryWaveforms.forEach(waveformName => {
-if (WaveformPatterns[waveformName] && !presets[waveformName]) {
-presets[waveformName] = {
-type: 'waveform',
-pattern: waveformName,
-min: 20,
-max: 80,
-duration: 5000,
-cycles: 3,
-compatibleDevices: ['general', 'cage', 'plug', 'stroker']
-}
-}
-})
-    
-    // Create buttons for each preset
-Object.entries(presets).forEach(([key, preset]) => {
-const isCompatible = preset.compatibleDevices ?
-preset.compatibleDevices.includes(deviceType) || preset.compatibleDevices.includes('general') :
-true
+        if (currentPatternCategory === 'basic') {
+            // Basic category: show basic presets + basic waveform patterns
+            presets = {
+                warmup: PatternLibrary.presets.warmup,
+                tease: PatternLibrary.presets.tease,
+                pulse: PatternLibrary.presets.pulse,
+                edge: PatternLibrary.presets.edge
+            }
+            // Add device-specific presets
+            if (deviceType === 'cage') {
+                presets.cage_tease = PatternLibrary.presets.cage_tease
+                presets.cage_denial = PatternLibrary.presets.cage_denial
+            } else if (deviceType === 'stroker') {
+                presets.stroker_slow = PatternLibrary.presets.stroker_slow
+                presets.stroker_fast = PatternLibrary.presets.stroker_fast
+                presets.stroker_edge = PatternLibrary.presets.stroker_edge
+            }
+            // Add basic waveform patterns (only in basic category)
+            const basicPatterns = ['sine', 'sawtooth', 'square', 'triangle', 'random', 'ramp_up', 'ramp_down']
+            basicPatterns.forEach(patternName => {
+                presets[patternName] = {
+                    type: 'waveform',
+                    pattern: patternName,
+                    min: 20,
+                    max: 80,
+                    duration: 5000,
+                    cycles: 3,
+                    compatibleDevices: ['general', 'cage', 'plug', 'stroker']
+                }
+            })
+        } else {
+            // Other categories: only show category-specific patterns and sequences
+            // Map category to mode ID
+            const categoryToModeId = {
+                'denial': 'denial_domina',
+                'milking': 'milk_maid',
+                'training': 'pet_training',
+                'robotic': 'robotic_ruination',
+                'sissy': 'sissy_surrender',
+                'prejac': 'prejac_princess',
+                'evil': 'evil_edging_mistress',
+                'frustration': 'frustration_fairy',
+                'hypno': 'hypno_helper',
+                'chastity': 'chastity_caretaker'
+            }
+            
+            const modeId = categoryToModeId[currentPatternCategory]
+            
+            if (modeId && PlayModeLoader.sequences[modeId]) {
+                // Add sequences from this mode
+                const modeSequences = PlayModeLoader.sequences[modeId]
+                for (const [seqName, seqData] of Object.entries(modeSequences)) {
+                    presets[seqName] = {
+                        type: 'sequence',
+                        sequence: seqData.steps,
+                        repeat: seqData.repeat !== false,
+                        description: seqData.description || seqName,
+                        compatibleDevices: seqData.compatibleDevices || ['general', 'cage', 'plug', 'stroker']
+                    }
+                }
+            }
+            
+            // Add category-specific waveform patterns (NOT basic patterns)
+            if (modeId && PlayModeLoader.patterns[modeId]) {
+                const modePatterns = PlayModeLoader.patterns[modeId]
+                Object.entries(modePatterns).forEach(([patternName, patternFunc]) => {
+                    presets[patternName] = {
+                        type: 'waveform',
+                        pattern: patternName,
+                        min: 20,
+                        max: 80,
+                        duration: 5000,
+                        cycles: 3,
+                        compatibleDevices: ['general', 'cage', 'plug', 'stroker']
+                    }
+                })
+            }
+        }
 
-const displayName = key.replace(/_/g, ' ')
-const categoryLabel = currentPatternCategory.charAt(0).toUpperCase() + currentPatternCategory.slice(1)
+        // Create buttons for each preset
+        Object.entries(presets).forEach(([key, preset]) => {
+            const isCompatible = preset.compatibleDevices ?
+                preset.compatibleDevices.includes(deviceType) || preset.compatibleDevices.includes('general') :
+                true
 
-const btnHtml = `
-<button class="menu_button pattern-btn" data-pattern="${key}" data-category="${currentPatternCategory}"
-title="${displayName} - Click to add to scene"
-style="padding: 6px 12px; font-size: 0.75em; border-radius: 4px; ${!isCompatible ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
-${displayName}
-</button>
-`
-const btn = $(btnHtml)
+            const displayName = key.replace(/_/g, ' ')
 
-if (isCompatible) {
-btn.on('click', () => {
-selectPatternForTimeline(key, currentPatternCategory)
-})
-}
+            const btnHtml = `
+                <button class="menu_button pattern-btn" data-pattern="${key}" data-category="${currentPatternCategory}"
+                    title="${displayName} - Click to add to scene"
+                    style="padding: 6px 12px; font-size: 0.75em; border-radius: 4px; ${!isCompatible ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                    ${displayName}
+                </button>
+            `
+            const btn = $(btnHtml)
 
-container.append(btn)
-})
-    
-    if (Object.keys(presets).length === 0) {
-        container.html('<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">No patterns available for this category</div>')
+            if (isCompatible) {
+                btn.on('click', () => {
+                    selectPatternForTimeline(key, currentPatternCategory)
+                })
+            }
+
+            container.append(btn)
+        })
+
+        if (Object.keys(presets).length === 0) {
+            container.html('<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">No patterns available for this category</div>')
+        }
     }
-}
 
 // Execute a Play Mode sequence
 executePlayModeSequence = async function(deviceIndex, modePreset) {
@@ -6857,38 +5588,28 @@ function getPatternDefaults(patternName, category) {
     }
   }
 
-  // Check if it's a mode pattern
-  const modeMap = {
-    'denial': DenialDominaMode,
-    'milking': MilkMaidMode,
-    'training': PetTrainingMode,
-    'robotic': RoboticRuinationMode,
-    'sissy': SissySurrenderMode,
-    'prejac': PrejacPrincessMode,
-    'evil': EvilEdgingMistressMode,
-    'frustration': FrustrationFairyMode,
-    'hypno': HypnoHelperMode,
-    'chastity': ChastityCaretakerMode
-  }
-  const modeConstant = modeMap[category]
-  if (modeConstant && modeConstant[patternName]) {
-    const preset = modeConstant[patternName]
-    if (preset.sequence && preset.sequence.length > 0) {
-      // Calculate total duration and average min/max from sequence
-      let totalDuration = 0
-      let totalMin = 0, totalMax = 0
-      preset.sequence.forEach(step => {
-        totalDuration += step.duration || 5000
-        totalMin += step.min || 20
-        totalMax += step.max || 80
-      })
-      const avgMin = Math.round(totalMin / preset.sequence.length)
-      const avgMax = Math.round(totalMax / preset.sequence.length)
-      return {
-        min: avgMin,
-        max: avgMax,
-        duration: totalDuration, // One complete cycle duration
-        cycles: 1 // Always default to 1 cycle for auto-scaling
+  // Check if it's a sequence from PlayModeLoader
+  const enabledSequences = PlayModeLoader.getEnabledSequences()
+  for (const [modeId, modeData] of Object.entries(enabledSequences)) {
+    if (modeData.mode && modeData.mode.category === category) {
+      const sequence = modeData.sequences[patternName]
+      if (sequence && sequence.steps && sequence.steps.length > 0) {
+        // Calculate total duration and average min/max from sequence
+        let totalDuration = 0
+        let totalMin = 0, totalMax = 0
+        sequence.steps.forEach(step => {
+          totalDuration += step.duration || 5000
+          totalMin += step.min || 20
+          totalMax += step.max || 80
+        })
+        const avgMin = Math.round(totalMin / sequence.steps.length)
+        const avgMax = Math.round(totalMax / sequence.steps.length)
+        return {
+          min: avgMin,
+          max: avgMax,
+          duration: totalDuration, // One complete cycle duration
+          cycles: 1 // Always default to 1 cycle for auto-scaling
+        }
       }
     }
   }
@@ -7486,31 +6207,32 @@ function scrubTimeline(value) {
 
 // Get pattern duration for display
 function getPatternDuration(patternName, category) {
-const modeMap = {
-'denial': DenialDominaMode,
-'milking': MilkMaidMode,
-'training': PetTrainingMode,
-'robotic': RoboticRuinationMode,
-'sissy': SissySurrenderMode,
-'prejac': PrejacPrincessMode,
-'evil': EvilEdgingMistressMode,
-'frustration': FrustrationFairyMode,
-'hypno': HypnoHelperMode,
-'chastity': ChastityCaretakerMode
-}
-
-const modeData = modeMap[category]
-if (modeData && modeData[patternName]) {
-const pattern = modeData[patternName]
-if (pattern.sequence) {
-return pattern.sequence.reduce((sum, step) => sum + step.duration + (step.pause || 0), 0)
-}
-}
-return 5000 // Default 5 seconds
+  // Search in PlayModeLoader
+  const enabledSequences = PlayModeLoader.getEnabledSequences()
+  for (const [modeId, modeData] of Object.entries(enabledSequences)) {
+    if (modeData.mode && modeData.mode.category === category) {
+      const sequence = modeData.sequences[patternName]
+      if (sequence && sequence.steps) {
+        return sequence.steps.reduce((sum, step) => sum + step.duration + (step.pause || 0), 0)
+      }
+    }
+  }
+  return 5000 // Default 5 seconds
 }
 
 // Timeline Sequencer Event Handlers (must be after function definitions)
-$(document).ready(function() {
+$(document).ready(async function() {
+  // Initialize PlayModeLoader first before any UI setup
+  try {
+    if (typeof PlayModeLoader !== 'undefined' && PlayModeLoader.init) {
+      await PlayModeLoader.init()
+      console.log(`${NAME}: PlayModeLoader initialized with ${Object.keys(PlayModeLoader.modes || {}).length} modes`)
+    } else {
+      console.warn(`${NAME}: PlayModeLoader not available`)
+    }
+  } catch (e) {
+    console.error(`${NAME}: Failed to initialize PlayModeLoader:`, e)
+  }
   // Timeline control buttons
   $("#intiface-timeline-play").on("click", async function() {
     console.log(`${NAME}: Timeline play button clicked`)
@@ -7685,7 +6407,13 @@ $("#intiface-pattern-cycles-display").text(cycles)
 })
 
   // Initialize all channels with single motor lanes
-  ['A', 'B', 'C', 'D'].forEach(channel => updateMotorLanes(channel, 1))
+  try {
+    if (typeof updateMotorLanes === 'function') {
+      ['A', 'B', 'C', 'D'].forEach(channel => updateMotorLanes(channel, 1))
+    }
+  } catch (e) {
+    console.error(`${NAME}: Error initializing motor lanes:`, e)
+  }
   
   // Attach initial lane click handlers
   attachLaneClickHandlers()

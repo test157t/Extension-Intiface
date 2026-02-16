@@ -1,0 +1,191 @@
+{
+  "warmup": {
+    "description": "Gentle warming up pattern",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "gentle",
+        "min": 10,
+        "max": 30,
+        "duration": 5000,
+        "pause": 1000
+      },
+      {
+        "pattern": "wave",
+        "min": 15,
+        "max": 40,
+        "duration": 5000,
+        "pause": 500
+      }
+    ]
+  },
+  "tease": {
+    "description": "Playful teasing pattern",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "teasing",
+        "min": 20,
+        "max": 60,
+        "duration": 8000,
+        "pause": 2000
+      },
+      {
+        "pattern": "tickle",
+        "min": 25,
+        "max": 55,
+        "duration": 4000,
+        "pause": 1500
+      }
+    ]
+  },
+  "pulse": {
+    "description": "Rhythmic pulsing",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "pulse",
+        "min": 30,
+        "max": 70,
+        "duration": 4000,
+        "pause": 1000
+      },
+      {
+        "pattern": "heartbeat",
+        "min": 35,
+        "max": 75,
+        "duration": 6000,
+        "pause": 500
+      }
+    ]
+  },
+  "edge": {
+    "description": "Build to edge",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "ramp_up",
+        "min": 10,
+        "max": 90,
+        "duration": 12000,
+        "pause": 2000
+      },
+      {
+        "pattern": "sine",
+        "min": 70,
+        "max": 95,
+        "duration": 8000,
+        "pause": 1000
+      }
+    ]
+  },
+  "cage_tease": {
+    "description": "Teasing pattern for cages - gentle and frustrating",
+    "compatibleDevices": ["cage"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "teasing",
+        "min": 5,
+        "max": 40,
+        "duration": 6000,
+        "pause": 2000
+      },
+      {
+        "pattern": "micro_tease",
+        "min": 2,
+        "max": 25,
+        "duration": 5000,
+        "pause": 1500
+      }
+    ]
+  },
+  "cage_denial": {
+    "description": "Denial pattern for cages - keeps them frustrated",
+    "compatibleDevices": ["cage"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "abrupt_edge",
+        "min": 10,
+        "max": 50,
+        "duration": 4000,
+        "pause": 3000
+      },
+      {
+        "pattern": "micro_tease",
+        "min": 5,
+        "max": 30,
+        "duration": 6000,
+        "pause": 2000
+      }
+    ]
+  },
+  "stroker_slow": {
+    "description": "Slow stroking rhythm",
+    "compatibleDevices": ["stroker"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "crescendo",
+        "min": 20,
+        "max": 70,
+        "duration": 4000,
+        "pause": 1000
+      },
+      {
+        "pattern": "ramp_down",
+        "min": 30,
+        "max": 60,
+        "duration": 3000,
+        "pause": 500
+      }
+    ]
+  },
+  "stroker_fast": {
+    "description": "Fast stroking pattern",
+    "compatibleDevices": ["stroker"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "rapid_fire",
+        "min": 40,
+        "max": 80,
+        "duration": 3000,
+        "pause": 500
+      },
+      {
+        "pattern": "intense_waves",
+        "min": 35,
+        "max": 75,
+        "duration": 4000,
+        "pause": 500
+      }
+    ]
+  },
+  "stroker_edge": {
+    "description": "Edging pattern for strokers",
+    "compatibleDevices": ["stroker"],
+    "repeat": false,
+    "steps": [
+      {
+        "pattern": "build_and_ruin",
+        "min": 30,
+        "max": 95,
+        "duration": 5000,
+        "pause": 2000
+      },
+      {
+        "pattern": "held_edge",
+        "min": 40,
+        "max": 90,
+        "duration": 6000,
+        "pause": 1500
+      }
+    ]
+  }
+}

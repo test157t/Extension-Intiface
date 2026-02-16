@@ -1,0 +1,123 @@
+{
+  "gentle_checkup": {
+    "description": "Gentle checkup on the cage",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "gentle_checkup", "min": 2, "max": 15, "duration": 10000, "pause": 5000 },
+      { "pattern": "loving_check", "min": 1, "max": 12, "duration": 12000, "pause": 6000 },
+      { "pattern": "caring_tap", "min": 3, "max": 18, "duration": 8000, "pause": 4000 },
+      { "pattern": "gentle_checkup", "min": 2, "max": 15, "duration": 10000, "pause": 5000 }
+    ]
+  },
+  "daily_care": {
+    "description": "Daily caretaker routine",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "daily_routine", "min": 3, "max": 20, "duration": 15000, "pause": 6000 },
+      { "pattern": "gentle_checkup", "min": 2, "max": 15, "duration": 12000, "pause": 5000 },
+      { "pattern": "cage_nurse", "min": 3, "max": 18, "duration": 10000, "pause": 7000 },
+      { "pattern": "caretaker_hums", "min": 2, "max": 16, "duration": 14000, "pause": 6000 }
+    ]
+  },
+  "denial_with_love": {
+    "description": "Denial with loving care",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "gentle_denial", "min": 3, "max": 18, "duration": 12000, "pause": 5000 },
+      { "pattern": "tender_flutter", "min": 2, "max": 15, "duration": 10000, "pause": 6000 },
+      { "pattern": "gentle_checkup", "min": 4, "max": 20, "duration": 14000, "pause": 7000 },
+      { "pattern": "loving_check", "min": 3, "max": 18, "duration": 12000, "pause": 8000 }
+    ]
+  },
+  "tender_torment": {
+    "description": "Sweet torment with care",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "tender_torment", "min": 2, "max": 20, "duration": 16000, "pause": 7000 },
+      { "pattern": "sweet_frustration", "min": 3, "max": 18, "duration": 14000, "pause": 6000 },
+      { "pattern": "caring_tap", "min": 4, "max": 22, "duration": 12000, "pause": 5000 },
+      { "pattern": "gentle_checkup", "min": 2, "max": 15, "duration": 10000, "pause": 8000 }
+    ]
+  },
+  "gentle_edges": {
+    "description": "Gentle edging with care",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "gentle_denial", "min": 4, "max": 20, "duration": 13000, "pause": 6000 },
+      { "pattern": "tender_flutter", "min": 3, "max": 18, "duration": 11000, "pause": 5000 },
+      { "pattern": "nurturing_pulse", "min": 5, "max": 22, "duration": 10000, "pause": 7000 },
+      { "pattern": "caretaker_hums", "min": 4, "max": 20, "duration": 12000, "pause": 8000 }
+    ]
+  },
+  "good_cage": {
+    "description": "Good cage check and care",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "cage_nurse", "min": 3, "max": 18, "duration": 12000, "pause": 6000 },
+      { "pattern": "gentle_checkup", "min": 2, "max": 15, "duration": 10000, "pause": 5000 },
+      { "pattern": "loving_check", "min": 4, "max": 20, "duration": 14000, "pause": 7000 },
+      { "pattern": "caring_tap", "min": 3, "max": 18, "duration": 11000, "pause": 6000 }
+    ]
+  },
+  "caretaker_love": {
+    "description": "Loving caretaker mode",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "caretaker_hums", "min": 2, "max": 15, "duration": 14000, "pause": 7000 },
+      { "pattern": "gentle_checkup", "min": 3, "max": 18, "duration": 12000, "pause": 6000 },
+      { "pattern": "tender_flutter", "min": 4, "max": 20, "duration": 10000, "pause": 5000 },
+      { "pattern": "loving_check", "min": 3, "max": 18, "duration": 13000, "pause": 8000 }
+    ]
+  },
+  "sweet_frustration": {
+    "description": "Sweetly frustrating",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "sweet_frustration", "min": 3, "max": 18, "duration": 15000, "pause": 7000 },
+      { "pattern": "tender_torment", "min": 4, "max": 20, "duration": 13000, "pause": 6000 },
+      { "pattern": "gentle_denial", "min": 5, "max": 22, "duration": 11000, "pause": 5000 },
+      { "pattern": "caring_tap", "min": 4, "max": 20, "duration": 12000, "pause": 8000 }
+    ]
+  },
+  "nurturing_build": {
+    "description": "Slow nurturing build",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "tender_flutter", "min": 2, "max": 15, "duration": 14000, "pause": 7000 },
+      { "pattern": "gentle_denial", "min": 3, "max": 18, "duration": 12000, "pause": 6000 },
+      { "pattern": "caretaker_hums", "min": 4, "max": 20, "duration": 10000, "pause": 5000 },
+      { "pattern": "gentle_checkup", "min": 5, "max": 22, "duration": 11000, "pause": 7000 }
+    ]
+  },
+  "caring_check": {
+    "description": "Caring check-in session",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "loving_check", "min": 2, "max": 15, "duration": 13000, "pause": 7000 },
+      { "pattern": "gentle_checkup", "min": 3, "max": 18, "duration": 11000, "pause": 6000 },
+      { "pattern": "cage_nurse", "min": 4, "max": 20, "duration": 10000, "pause": 5000 },
+      { "pattern": "tender_flutter", "min": 3, "max": 18, "duration": 12000, "pause": 8000 }
+    ]
+  },
+  "gentle_denial_session": {
+    "description": "Gentle denial session",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "gentle_denial", "min": 4, "max": 20, "duration": 14000, "pause": 7000 },
+      { "pattern": "sweet_frustration", "min": 5, "max": 22, "duration": 12000, "pause": 6000 },
+      { "pattern": "tender_torment", "min": 6, "max": 25, "duration": 10000, "pause": 5000 },
+      { "pattern": "gentle_checkup", "min": 4, "max": 20, "duration": 11000, "pause": 8000 }
+    ]
+  }
+}

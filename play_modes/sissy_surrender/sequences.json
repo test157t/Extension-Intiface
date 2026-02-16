@@ -1,0 +1,454 @@
+{
+  "cage_taps": {
+    "description": "Light taps and touches on cage",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "pulse",
+        "min": 15,
+        "max": 35,
+        "duration": 1500,
+        "pause": 1000
+      },
+      {
+        "pattern": "flutter",
+        "min": 10,
+        "max": 25,
+        "duration": 2000,
+        "pause": 1500
+      },
+      {
+        "pattern": "rapid_micro",
+        "min": 5,
+        "max": 20,
+        "duration": 2500,
+        "pause": 2000
+      },
+      {
+        "pattern": "ghost_tease",
+        "min": 3,
+        "max": 18,
+        "duration": 3000,
+        "pause": 2500
+      },
+      {
+        "pattern": "tickle",
+        "min": 12,
+        "max": 28,
+        "duration": 2500,
+        "pause": 2000
+      }
+    ]
+  },
+  "cage_rubs": {
+    "description": "Gentle rubbing sensations",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "sine",
+        "min": 20,
+        "max": 45,
+        "duration": 4000,
+        "pause": 3000
+      },
+      {
+        "pattern": "triangle",
+        "min": 15,
+        "max": 40,
+        "duration": 3500,
+        "pause": 2500
+      },
+      {
+        "pattern": "heartbeat",
+        "min": 18,
+        "max": 38,
+        "duration": 5000,
+        "pause": 3000
+      },
+      {
+        "pattern": "teasing",
+        "min": 22,
+        "max": 42,
+        "duration": 4500,
+        "pause": 3500
+      },
+      {
+        "pattern": "flutter",
+        "min": 20,
+        "max": 35,
+        "duration": 3000,
+        "pause": 2000
+      }
+    ]
+  },
+    "cage_squeezes": {
+        "description": "Teasing squeezes",
+        "compatibleDevices": ["general", "cage", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "square", "min": 25, "max": 50, "duration": 800, "pause": 1200 },
+            { "pattern": "pulse", "min": 30, "max": 55, "duration": 600, "pause": 1000 },
+            { "pattern": "abrupt_edge", "min": 20, "max": 60, "duration": 1000, "pause": 800 },
+            { "pattern": "square", "min": 28, "max": 52, "duration": 700, "pause": 1100 },
+            { "pattern": "edging", "min": 25, "max": 55, "duration": 8000, "pause": 6000 }
+        ]
+    },
+    "plug_rhythm": {
+        "description": "Rhythmic plug stimulation",
+        "compatibleDevices": ["general", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "pulse", "min": 20, "max": 60, "duration": 4000, "pause": 2000 },
+            { "pattern": "heartbeat", "min": 25, "max": 65, "duration": 5000, "pause": 2500 },
+            { "pattern": "triangle", "min": 30, "max": 70, "duration": 4500, "pause": 2000 },
+            { "pattern": "sine", "min": 20, "max": 60, "duration": 5000, "pause": 3000 },
+            { "pattern": "flutter", "min": 25, "max": 75, "duration": 6000, "pause": 3500 }
+        ]
+    },
+    "plug_wave": {
+        "description": "Wave-like plug sensations",
+        "compatibleDevices": ["general", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "sine", "min": 30, "max": 70, "duration": 6000, "pause": 3000 },
+            { "pattern": "tidal_wave", "min": 35, "max": 75, "duration": 5500, "pause": 2500 },
+            { "pattern": "sawtooth", "min": 40, "max": 80, "duration": 5000, "pause": 2000 },
+            { "pattern": "crescendo", "min": 25, "max": 85, "duration": 7000, "pause": 3000 },
+            { "pattern": "spiral_up", "min": 30, "max": 90, "duration": 6000, "pause": 3500 }
+        ]
+    },
+    "plug_buildup": {
+        "description": "Gradual buildup with plug",
+        "compatibleDevices": ["general", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "ramp_up", "min": 15, "max": 50, "duration": 5000, "pause": 2000 },
+            { "pattern": "triangle", "min": 25, "max": 60, "duration": 4000, "pause": 1500 },
+            { "pattern": "crescendo", "min": 35, "max": 75, "duration": 6000, "pause": 2500 },
+            { "pattern": "spiral_up", "min": 45, "max": 90, "duration": 7000, "pause": 3000 },
+            { "pattern": "tsunami", "min": 30, "max": 95, "duration": 8000, "pause": 3500 }
+        ]
+    },
+    "full_surrender": {
+        "description": "Complete surrender to pleasure",
+        "compatibleDevices": ["general", "cage", "plug", "stroker"],
+        "repeat": true,
+        "steps": [
+            { "pattern": "crescendo", "min": 30, "max": 100, "duration": 10000, "pause": 3000 },
+            { "pattern": "tidal_wave", "min": 40, "max": 100, "duration": 9000, "pause": 3500 },
+            { "pattern": "relentless", "min": 35, "max": 100, "duration": 8000, "pause": 2500 },
+            { "pattern": "spiral_up", "min": 45, "max": 100, "duration": 7000, "pause": 2000 },
+            { "pattern": "tsunami", "min": 50, "max": 100, "duration": 6000, "pause": 3000 }
+        ]
+    },
+    "submission_edging": {
+    "description": "Edge while submitting",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "flutter",
+        "min": 10,
+        "max": 30,
+        "duration": 4000,
+        "pause": 4000
+      },
+      {
+        "pattern": "ghost_tease",
+        "min": 5,
+        "max": 20,
+        "duration": 5000,
+        "pause": 5000
+      },
+      {
+        "pattern": "heartbeat",
+        "min": 12,
+        "max": 28,
+        "duration": 6000,
+        "pause": 6000
+      },
+      {
+        "pattern": "held_edge",
+        "min": 15,
+        "max": 75,
+        "duration": 7000,
+        "pause": 7000
+      },
+      {
+        "pattern": "abrupt_edge",
+        "min": 18,
+        "max": 80,
+        "duration": 5000,
+        "pause": 5000
+      },
+      {
+        "pattern": "edging",
+        "min": 20,
+        "max": 85,
+        "duration": 10000,
+        "pause": 8000
+      }
+    ]
+  },
+  "denial_torment": {
+    "description": "Tease and torment with denial",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "mercy",
+        "min": 15,
+        "max": 30,
+        "duration": 5000,
+        "pause": 4000
+      },
+      {
+        "pattern": "ghost_tease",
+        "min": 5,
+        "max": 25,
+        "duration": 4000,
+        "pause": 3000
+      },
+      {
+        "pattern": "peak_and_drop",
+        "min": 15,
+        "max": 70,
+        "duration": 3000,
+        "pause": 2500
+      },
+      {
+        "pattern": "abrupt_edge",
+        "min": 18,
+        "max": 75,
+        "duration": 3500,
+        "pause": 2000
+      },
+      {
+        "pattern": "build_and_ruin",
+        "min": 12,
+        "max": 65,
+        "duration": 8000,
+        "pause": 5000
+      },
+      {
+        "pattern": "flutter",
+        "min": 8,
+        "max": 22,
+        "duration": 5000,
+        "pause": 6000
+      }
+    ]
+  },
+  "surrender_now": {
+    "description": "Give in to the sensation",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "crescendo",
+        "min": 15,
+        "max": 75,
+        "duration": 8000,
+        "pause": 4000
+      },
+      {
+        "pattern": "tidal_wave",
+        "min": 20,
+        "max": 80,
+        "duration": 7000,
+        "pause": 3500
+      },
+      {
+        "pattern": "spiral_up",
+        "min": 18,
+        "max": 85,
+        "duration": 7500,
+        "pause": 4000
+      },
+      {
+        "pattern": "held_edge",
+        "min": 25,
+        "max": 82,
+        "duration": 6000,
+        "pause": 3000
+      },
+      {
+        "pattern": "tease_escalate",
+        "min": 20,
+        "max": 88,
+        "duration": 9000,
+        "pause": 4000
+      }
+    ]
+  },
+  "plug_thrusting": {
+    "description": "Deep thrusting sensations",
+    "compatibleDevices": ["general", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "sawtooth",
+        "min": 25,
+        "max": 75,
+        "duration": 3000,
+        "pause": 1500
+      },
+      {
+        "pattern": "ramp_up",
+        "min": 30,
+        "max": 80,
+        "duration": 2500,
+        "pause": 1000
+      },
+      {
+        "pattern": "ramp_down",
+        "min": 35,
+        "max": 85,
+        "duration": 3500,
+        "pause": 2000
+      },
+      {
+        "pattern": "triangle",
+        "min": 20,
+        "max": 70,
+        "duration": 3000,
+        "pause": 1500
+      },
+      {
+        "pattern": "crescendo",
+        "min": 40,
+        "max": 90,
+        "duration": 4000,
+        "pause": 2500
+      }
+    ]
+  },
+  "cage_tease": {
+    "description": "Light teasing on cage",
+    "compatibleDevices": ["cage"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "pulse",
+        "min": 10,
+        "max": 30,
+        "duration": 2000,
+        "pause": 3000
+      },
+      {
+        "pattern": "flutter",
+        "min": 5,
+        "max": 25,
+        "duration": 2500,
+        "pause": 3500
+      },
+      {
+        "pattern": "ghost_tease",
+        "min": 2,
+        "max": 20,
+        "duration": 3000,
+        "pause": 4000
+      },
+      {
+        "pattern": "tickle",
+        "min": 8,
+        "max": 28,
+        "duration": 2500,
+        "pause": 3000
+      },
+      {
+        "pattern": "teasing",
+        "min": 12,
+        "max": 35,
+        "duration": 3500,
+        "pause": 4000
+      }
+    ]
+  },
+  "gentle_surrender": {
+    "description": "Gentle surrender to pleasure",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "gentle",
+        "min": 15,
+        "max": 45,
+        "duration": 6000,
+        "pause": 4000
+      },
+      {
+        "pattern": "sine",
+        "min": 20,
+        "max": 55,
+        "duration": 7000,
+        "pause": 3000
+      },
+      {
+        "pattern": "wave",
+        "min": 25,
+        "max": 65,
+        "duration": 8000,
+        "pause": 2000
+      },
+      {
+        "pattern": "teasing",
+        "min": 30,
+        "max": 75,
+        "duration": 6000,
+        "pause": 3000
+      },
+      {
+        "pattern": "flutter",
+        "min": 20,
+        "max": 60,
+        "duration": 5000,
+        "pause": 2500
+      }
+    ]
+  },
+  "sissy_training": {
+    "description": "Complete sissy training sequence",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {
+        "pattern": "teasing",
+        "min": 10,
+        "max": 40,
+        "duration": 5000,
+        "pause": 4000
+      },
+      {
+        "pattern": "tickle",
+        "min": 5,
+        "max": 30,
+        "duration": 4000,
+        "pause": 3000
+      },
+      {
+        "pattern": "cage_taps",
+        "min": 15,
+        "max": 50,
+        "duration": 6000,
+        "pause": 2000
+      },
+      {
+        "pattern": "edging",
+        "min": 20,
+        "max": 80,
+        "duration": 8000,
+        "pause": 3000
+      },
+      {
+        "pattern": "gentle",
+        "min": 10,
+        "max": 60,
+        "duration": 7000,
+        "pause": 4000
+      }
+    ]
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "dreamy_trance": {
+    "description": "Dreamy hypnotic trance with slow build",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "hypno_wave", "min": 10, "max": 60, "duration": 20000, "pause": 5000 },
+      { "pattern": "trance_rhythm", "min": 15, "max": 65, "duration": 18000, "pause": 4000 },
+      { "pattern": "sleepy_spiral", "min": 18, "max": 70, "duration": 16000, "pause": 4500 },
+      { "pattern": "dreamy_flow", "min": 20, "max": 75, "duration": 15000, "pause": 5000 }
+    ]
+  },
+  "hypnotic_pulse": {
+    "description": "Hypnotic pulsing trance",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "hypnotic_pulse", "min": 12, "max": 65, "duration": 15000, "pause": 4000 },
+      { "pattern": "trance_rhythm", "min": 15, "max": 70, "duration": 13000, "pause": 3500 },
+      { "pattern": "hypno_wave", "min": 18, "max": 75, "duration": 12000, "pause": 4500 },
+      { "pattern": "entrancement_zone", "min": 20, "max": 80, "duration": 11000, "pause": 4000 }
+    ]
+  },
+  "sleepy_build": {
+    "description": "Sleepy hypnotic build that never peaks",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "sleepy_build", "min": 8, "max": 55, "duration": 18000, "pause": 5000 },
+      { "pattern": "trance_oscillation", "min": 12, "max": 60, "duration": 16000, "pause": 4500 },
+      { "pattern": "hypnotic_drift", "min": 15, "max": 65, "duration": 14000, "pause": 4000 },
+      { "pattern": "dreamy_flow", "min": 18, "max": 70, "duration": 12000, "pause": 5500 }
+    ]
+  },
+  "entrancing_flow": {
+    "description": "Entrancing flow with hypnotic waves",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "entrancement_zone", "min": 10, "max": 60, "duration": 17000, "pause": 4500 },
+      { "pattern": "hypno_wave", "min": 13, "max": 65, "duration": 15000, "pause": 4000 },
+      { "pattern": "trance_rhythm", "min": 16, "max": 70, "duration": 13000, "pause": 5000 },
+      { "pattern": "hypnotic_pulse", "min": 18, "max": 75, "duration": 11000, "pause": 4500 }
+    ]
+  },
+  "edge_trance": {
+    "description": "Trance that keeps you in the edge zone",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "edge_trance", "min": 12, "max": 65, "duration": 19000, "pause": 5000 },
+      { "pattern": "entrancement_zone", "min": 15, "max": 70, "duration": 17000, "pause": 4500 },
+      { "pattern": "trance_oscillation", "min": 18, "max": 75, "duration": 15000, "pause": 4000 },
+      { "pattern": "hypnotic_drift", "min": 20, "max": 80, "duration": 13000, "pause": 5500 }
+    ]
+  },
+  "hypnotic_entrance": {
+    "description": "Hypnotic entrance into deep trance",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "hypno_wave", "min": 8, "max": 55, "duration": 20000, "pause": 6000 },
+      { "pattern": "sleepy_spiral", "min": 12, "max": 60, "duration": 18000, "pause": 5000 },
+      { "pattern": "trance_rhythm", "min": 15, "max": 65, "duration": 16000, "pause": 4500 },
+      { "pattern": "dreamy_flow", "min": 18, "max": 70, "duration": 14000, "pause": 6000 }
+    ]
+  },
+  "sleepy_waves": {
+    "description": "Sleepy waves that build arousal slowly",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "sleepy_spiral", "min": 10, "max": 55, "duration": 16000, "pause": 4500 },
+      { "pattern": "hypnotic_pulse", "min": 13, "max": 60, "duration": 14000, "pause": 4000 },
+      { "pattern": "trance_oscillation", "min": 16, "max": 65, "duration": 12000, "pause": 5000 },
+      { "pattern": "hypnotic_drift", "min": 18, "max": 70, "duration": 10000, "pause": 4500 }
+    ]
+  },
+  "trance_state": {
+    "description": "Deep trance state maintaining arousal",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "entrancement_zone", "min": 15, "max": 60, "duration": 18000, "pause": 5000 },
+      { "pattern": "hypnotic_pulse", "min": 18, "max": 65, "duration": 16000, "pause": 4500 },
+      { "pattern": "trance_rhythm", "min": 20, "max": 70, "duration": 14000, "pause": 4000 },
+      { "pattern": "dreamy_flow", "min": 22, "max": 75, "duration": 12000, "pause": 5500 }
+    ]
+  },
+  "hypnotic_sustain": {
+    "description": "Sustain hypnotic arousal without peaking",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "hypnotic_drift", "min": 12, "max": 58, "duration": 20000, "pause": 6000 },
+      { "pattern": "entrancement_zone", "min": 15, "max": 62, "duration": 18000, "pause": 5000 },
+      { "pattern": "trance_oscillation", "min": 18, "max": 68, "duration": 16000, "pause": 4500 },
+      { "pattern": "hypno_wave", "min": 20, "max": 72, "duration": 14000, "pause": 6000 }
+    ]
+  },
+  "dreamy_edging": {
+    "description": "Dreamy edging that never releases",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "dreamy_flow", "min": 10, "max": 55, "duration": 22000, "pause": 5000 },
+      { "pattern": "edge_trance", "min": 13, "max": 60, "duration": 20000, "pause": 4500 },
+      { "pattern": "sleepy_spiral", "min": 15, "max": 65, "duration": 18000, "pause": 5500 },
+      { "pattern": "trance_rhythm", "min": 18, "max": 70, "duration": 16000, "pause": 5000 }
+    ]
+  },
+  "hypnotic_loop": {
+    "description": "Hypnotic loop of endless build",
+    "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"],
+    "repeat": true,
+    "steps": [
+      { "pattern": "hypno_wave", "min": 8, "max": 55, "duration": 20000, "pause": 6000 },
+      { "pattern": "trance_rhythm", "min": 11, "max": 60, "duration": 18000, "pause": 5000 },
+      { "pattern": "sleepy_build", "min": 14, "max": 65, "duration": 16000, "pause": 4500 },
+      { "pattern": "entrancement_zone", "min": 16, "max": 70, "duration": 14000, "pause": 6000 }
+    ]
+  }
+}

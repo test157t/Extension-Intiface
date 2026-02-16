@@ -1,0 +1,20 @@
+{
+  "id": "basic",
+  "name": "Basic Waveforms",
+  "description": "Fundamental mathematical waveforms available to all modes",
+  "version": "1.0.0",
+  "category": "basic",
+  "author": "Extension-Intiface",
+  "intensityMultiplier": 1.0,
+  "aiPrompts": {
+    "system": "Basic waveform patterns for device control.",
+    "commands": []
+  },
+  "ui": {
+    "color": "#646464",
+    "icon": "fa-wave-square",
+    "defaultEnabled": true,
+    "toggleable": false
+  },
+  "compatibleDevices": ["general", "cage", "plug", "stroker", "vibrator"]
+}

@@ -1,0 +1,129 @@
+{
+  "gentle_tease": {
+    "description": "Gentle teasing with soft pulses",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "tickle", "min": 15, "max": 35, "duration": 3000, "pause": 2000},
+      {"pattern": "pulse", "min": 20, "max": 40, "duration": 4000, "pause": 3000},
+      {"pattern": "heartbeat", "min": 18, "max": 30, "duration": 5000, "pause": 2000},
+      {"pattern": "teasing", "min": 20, "max": 35, "duration": 4000, "pause": 2500}
+    ]
+  },
+  "mind_games": {
+    "description": "Random start-stop patterns",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "stop_start", "min": 40, "max": 70, "duration": 6000, "pause": 4000},
+      {"pattern": "random_tease", "min": 10, "max": 60, "duration": 8000, "pause": 3000},
+      {"pattern": "tease_escalate", "min": 5, "max": 65, "duration": 10000, "pause": 5000},
+      {"pattern": "mercy", "min": 30, "max": 55, "duration": 7000, "pause": 3500}
+    ]
+  },
+  "edge_mania": {
+    "description": "Multiple edging sequences",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "ramp_up", "min": 5, "max": 85, "duration": 8000, "pause": 4000},
+      {"pattern": "edging", "min": 10, "max": 90, "duration": 12000, "pause": 6000},
+      {"pattern": "tease_escalate", "min": 10, "max": 88, "duration": 10000, "pause": 5000},
+      {"pattern": "ruin", "min": 5, "max": 95, "duration": 8000, "pause": 7000}
+    ]
+  },
+  "desperation": {
+    "description": "Builds desperation with intense pauses",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "desperation", "min": 10, "max": 70, "duration": 15000, "pause": 8000},
+      {"pattern": "stop_start", "min": 50, "max": 80, "duration": 4000, "pause": 6000},
+      {"pattern": "teasing", "min": 25, "max": 75, "duration": 8000, "pause": 5000},
+      {"pattern": "random_tease", "min": 15, "max": 85, "duration": 12000, "pause": 4000}
+    ]
+  },
+  "mercy": {
+    "description": "Gentle patterns with rest periods",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "mercy", "min": 25, "max": 50, "duration": 6000, "pause": 5000},
+      {"pattern": "heartbeat", "min": 20, "max": 40, "duration": 7000, "pause": 6000},
+      {"pattern": "tickle", "min": 15, "max": 35, "duration": 4000, "pause": 8000},
+      {"pattern": "teasing", "min": 20, "max": 45, "duration": 5000, "pause": 7000}
+    ]
+  },
+  "ultimate_tease": {
+    "description": "Ultimate tease - never allows release",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "tickle", "min": 10, "max": 30, "duration": 3000, "pause": 3000},
+      {"pattern": "edging", "min": 15, "max": 88, "duration": 14000, "pause": 7000},
+      {"pattern": "stop_start", "min": 45, "max": 75, "duration": 5000, "pause": 4000},
+      {"pattern": "desperation", "min": 20, "max": 80, "duration": 12000, "pause": 8000},
+      {"pattern": "tease_escalate", "min": 10, "max": 85, "duration": 11000, "pause": 6000},
+      {"pattern": "ruin", "min": 5, "max": 90, "duration": 9000, "pause": 10000}
+    ]
+  },
+  "slow_burn": {
+    "description": "Very slow build with long pauses",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "sine", "min": 10, "max": 25, "duration": 10000, "pause": 8000},
+      {"pattern": "triangle", "min": 15, "max": 35, "duration": 12000, "pause": 9000},
+      {"pattern": "heartbeat", "min": 18, "max": 30, "duration": 15000, "pause": 7000},
+      {"pattern": "edging", "min": 20, "max": 70, "duration": 18000, "pause": 10000}
+    ]
+  },
+  "micro_tickle": {
+    "description": "Inspired by community scripts - micro twitching",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "micro_tease", "min": 5, "max": 50, "duration": 8000, "pause": 2000},
+      {"pattern": "rapid_micro", "min": 2, "max": 30, "duration": 6000, "pause": 3000},
+      {"pattern": "flutter", "min": 5, "max": 40, "duration": 4000, "pause": 1500},
+      {"pattern": "ghost_tease", "min": 1, "max": 60, "duration": 7000, "pause": 4000},
+      {"pattern": "erratic", "min": 1, "max": 70, "duration": 9000, "pause": 5000}
+    ]
+  },
+  "abrupt_edge": {
+    "description": "Peaks then abruptly stops - like tease.funscript",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "abrupt_edge", "min": 10, "max": 95, "duration": 5000, "pause": 3000},
+      {"pattern": "peak_and_drop", "min": 5, "max": 95, "duration": 6000, "pause": 4000},
+      {"pattern": "held_edge", "min": 15, "max": 90, "duration": 8000, "pause": 5000},
+      {"pattern": "build_and_ruin", "min": 5, "max": 92, "duration": 10000, "pause": 6000}
+    ]
+  },
+  "ghost_touches": {
+    "description": "Almost imperceptible touches with rare bursts",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "ghost_tease", "min": 1, "max": 15, "duration": 5000, "pause": 5000},
+      {"pattern": "rapid_micro", "min": 1, "max": 5, "duration": 6000, "pause": 4000},
+      {"pattern": "flutter", "min": 1, "max": 20, "duration": 4000, "pause": 6000},
+      {"pattern": "micro_tease", "min": 2, "max": 25, "duration": 8000, "pause": 7000},
+      {"pattern": "heartbeat", "min": 10, "max": 30, "duration": 7000, "pause": 8000}
+    ]
+  },
+  "unpredictably_cruel": {
+    "description": "Chaotic mix of patterns - maximum confusion",
+    "compatibleDevices": ["general", "cage", "plug", "stroker"],
+    "repeat": true,
+    "steps": [
+      {"pattern": "erratic", "min": 1, "max": 70, "duration": 5000, "pause": 3000},
+      {"pattern": "ghost_tease", "min": 1, "max": 80, "duration": 4000, "pause": 5000},
+      {"pattern": "abrupt_edge", "min": 10, "max": 95, "duration": 6000, "pause": 2000},
+      {"pattern": "micro_tease", "min": 5, "max": 60, "duration": 7000, "pause": 4000},
+      {"pattern": "held_edge", "min": 20, "max": 90, "duration": 8000, "pause": 6000},
+      {"pattern": "flutter", "min": 5, "max": 50, "duration": 5000, "pause": 3000}
+    ]
+  }
+}
