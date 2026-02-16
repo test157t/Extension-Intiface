@@ -1300,7 +1300,76 @@ all: []
       hold: 3000,
       description: 'Edge and hold',
       compatibleDevices: ['stroker']
-    }
+    },
+
+    // Cage-specific presets
+    cage_pulse: { type: 'waveform', pattern: 'square', min: 20, max: 60, duration: 2000, cycles: 10, description: 'Rhythmic pulses', compatibleDevices: ['cage'] },
+    cage_edge: { type: 'gradient', start: 0, end: 90, duration: 15000, hold: 5000, release: 3000, description: 'Edge pattern', compatibleDevices: ['cage'] },
+    cage_random: { type: 'waveform', pattern: 'random', min: 15, max: 50, duration: 8000, cycles: 2, description: 'Random sensations', compatibleDevices: ['cage'] },
+    cage_heartbeat: { type: 'waveform', pattern: 'heartbeat', min: 15, max: 50, duration: 6000, cycles: 8, description: 'Heartbeat rhythm', compatibleDevices: ['cage'] },
+    cage_tickle: { type: 'waveform', pattern: 'tickle', min: 20, max: 60, duration: 4000, cycles: 10, description: 'Random light touches', compatibleDevices: ['cage'] },
+    cage_edging: { type: 'waveform', pattern: 'edging', min: 10, max: 90, duration: 12000, cycles: 2, description: 'Edge to 90% then stop', compatibleDevices: ['cage'] },
+    cage_ruin: { type: 'waveform', pattern: 'ruin', min: 5, max: 95, duration: 8000, cycles: 1, description: 'Ruin at peak (drops to 20%)', compatibleDevices: ['cage'] },
+    cage_desperation: { type: 'waveform', pattern: 'desperation', min: 10, max: 80, duration: 15000, cycles: 2, description: 'Builds desperation', compatibleDevices: ['cage'] },
+    cage_mercy: { type: 'waveform', pattern: 'mercy', min: 30, max: 60, duration: 8000, cycles: 4, description: 'Alternates rest and play', compatibleDevices: ['cage'] },
+    cage_tease_escalate: { type: 'waveform', pattern: 'tease_escalate', min: 5, max: 85, duration: 12000, cycles: 2, description: 'Escalating tease', compatibleDevices: ['cage'] },
+    cage_stop_start: { type: 'waveform', pattern: 'stop_start', min: 40, max: 80, duration: 6000, cycles: 3, description: 'Stop/start pattern', compatibleDevices: ['cage'] },
+    cage_random_tease: { type: 'waveform', pattern: 'random_tease', min: 10, max: 75, duration: 10000, cycles: 4, description: 'Random on/off', compatibleDevices: ['cage'] },
+    cage_micro_tease: { type: 'waveform', pattern: 'micro_tease', min: 5, max: 50, duration: 8000, cycles: 4, description: 'Micro twitching', compatibleDevices: ['cage'] },
+    cage_abrupt_edge: { type: 'waveform', pattern: 'abrupt_edge', min: 10, max: 95, duration: 5000, cycles: 3, description: 'Peak then stop', compatibleDevices: ['cage'] },
+    cage_build_and_ruin: { type: 'waveform', pattern: 'build_and_ruin', min: 5, max: 92, duration: 10000, cycles: 2, description: 'Build then ruin', compatibleDevices: ['cage'] },
+    cage_rapid_micro: { type: 'waveform', pattern: 'rapid_micro', min: 2, max: 30, duration: 6000, cycles: 10, description: 'Rapid micros', compatibleDevices: ['cage'] },
+    cage_ghost_tease: { type: 'waveform', pattern: 'ghost_tease', min: 1, max: 60, duration: 7000, cycles: 5, description: 'Ghost touches', compatibleDevices: ['cage'] },
+    cage_erratic: { type: 'waveform', pattern: 'erratic', min: 1, max: 70, duration: 5000, cycles: 4, description: 'Unpredictable', compatibleDevices: ['cage'] },
+    cage_held_edge: { type: 'waveform', pattern: 'held_edge', min: 15, max: 90, duration: 8000, cycles: 2, description: 'Hold at edge', compatibleDevices: ['cage'] },
+    cage_crescendo: { type: 'waveform', pattern: 'crescendo', min: 10, max: 100, duration: 15000, cycles: 2, description: 'Slow build to peak', compatibleDevices: ['cage'] },
+    cage_tidal_wave: { type: 'waveform', pattern: 'tidal_wave', min: 20, max: 100, duration: 12000, cycles: 3, description: 'Rising wave', compatibleDevices: ['cage'] },
+    cage_milking_pump: { type: 'waveform', pattern: 'milking_pump', min: 10, max: 100, duration: 8000, cycles: 5, description: 'Pumping rhythm', compatibleDevices: ['cage'] },
+    cage_relentless: { type: 'waveform', pattern: 'relentless', min: 15, max: 100, duration: 10000, cycles: 3, description: 'Relentless building', compatibleDevices: ['cage'] },
+    cage_overload: { type: 'waveform', pattern: 'overload', min: 20, max: 100, duration: 12000, cycles: 4, description: 'Overload', compatibleDevices: ['cage'] },
+    cage_forced_peak: { type: 'waveform', pattern: 'forced_peak', min: 10, max: 100, duration: 9000, cycles: 4, description: 'Forced peak cycles', compatibleDevices: ['cage'] },
+    cage_spiral_up: { type: 'waveform', pattern: 'spiral_up', min: 10, max: 100, duration: 11000, cycles: 3, description: 'Spiraling intensity', compatibleDevices: ['cage'] },
+    cage_tsunami: { type: 'waveform', pattern: 'tsunami', min: 10, max: 100, duration: 10000, cycles: 4, description: 'Massive waves', compatibleDevices: ['cage'] },
+    cage_ripple_thruster: { type: 'waveform', pattern: 'ripple_thruster', min: 15, max: 85, duration: 4000, cycles: 4, description: 'Thrusts with ripples', compatibleDevices: ['cage'] },
+    cage_forbidden_peaks: { type: 'waveform', pattern: 'forbidden_peaks', min: 30, max: 100, duration: 3500, cycles: 4, description: 'Forbidden peaks', compatibleDevices: ['cage'] },
+    cage_multiple_peaks: { type: 'waveform', pattern: 'multiple_peaks', min: 25, max: 100, duration: 6000, cycles: 4, description: 'Multiple peaks', compatibleDevices: ['cage'] },
+    cage_intense_waves: { type: 'waveform', pattern: 'intense_waves', min: 30, max: 100, duration: 4000, cycles: 4, description: 'Intense combined waves', compatibleDevices: ['cage'] },
+    cage_rapid_fire: { type: 'waveform', pattern: 'rapid_fire', min: 40, max: 100, duration: 1500, cycles: 6, description: 'Rapid fire', compatibleDevices: ['cage'] },
+
+    // Plug-specific presets
+    plug_gentle: { type: 'waveform', pattern: 'sine', min: 10, max: 30, duration: 3000, cycles: 5, description: 'Gentle sway', compatibleDevices: ['plug'] },
+    plug_pulse: { type: 'waveform', pattern: 'pulse', min: 20, max: 70, duration: 1500, cycles: 8, description: 'Pulse rhythm', compatibleDevices: ['plug'] },
+    plug_wave: { type: 'waveform', pattern: 'sawtooth', min: 15, max: 55, duration: 4000, cycles: 4, description: 'Wave pattern', compatibleDevices: ['plug'] },
+    plug_intense: { type: 'waveform', pattern: 'square', min: 40, max: 90, duration: 2500, cycles: 6, description: 'Intense bursts', compatibleDevices: ['plug'] },
+    plug_tickle: { type: 'waveform', pattern: 'tickle', min: 25, max: 65, duration: 5000, cycles: 8, description: 'Light tickling', compatibleDevices: ['plug'] },
+    plug_heartbeat: { type: 'waveform', pattern: 'heartbeat', min: 20, max: 55, duration: 8000, cycles: 6, description: 'Heartbeat', compatibleDevices: ['plug'] },
+    plug_edging: { type: 'waveform', pattern: 'edging', min: 15, max: 85, duration: 14000, cycles: 2, description: 'Edge play', compatibleDevices: ['plug'] },
+    plug_teasing: { type: 'waveform', pattern: 'teasing', min: 30, max: 70, duration: 11000, cycles: 3, description: 'Irregular tease', compatibleDevices: ['plug'] },
+    plug_crescendo: { type: 'waveform', pattern: 'crescendo', min: 15, max: 100, duration: 15000, cycles: 2, description: 'Slow build to peak', compatibleDevices: ['plug'] },
+    plug_tidal_wave: { type: 'waveform', pattern: 'tidal_wave', min: 25, max: 100, duration: 12000, cycles: 3, description: 'Rising wave', compatibleDevices: ['plug'] },
+    plug_milking_pump: { type: 'waveform', pattern: 'milking_pump', min: 20, max: 100, duration: 8000, cycles: 5, description: 'Pumping rhythm', compatibleDevices: ['plug'] },
+    plug_forced_peak: { type: 'waveform', pattern: 'forced_peak', min: 15, max: 100, duration: 9000, cycles: 4, description: 'Forced peaks', compatibleDevices: ['plug'] },
+    plug_tsunami: { type: 'waveform', pattern: 'tsunami', min: 15, max: 100, duration: 10000, cycles: 4, description: 'Massive waves', compatibleDevices: ['plug'] },
+
+    // Stroker-specific presets
+    stroker_medium: { type: 'linear_waveform', pattern: 'sawtooth', positions: [20, 80], duration: 2000, cycles: 8, description: 'Medium strokes', compatibleDevices: ['stroker'] },
+    stroker_tease: { type: 'linear_waveform', pattern: 'pulse', positions: [30, 70], duration: 1500, cycles: 12, description: 'Short stroke pulses', compatibleDevices: ['stroker'] },
+    stroker_tease_edge: { type: 'linear_gradient', positions: [5, 98], duration: 12000, hold: 2000, release: 4000, description: 'Tease edge sequence', compatibleDevices: ['stroker'] },
+    stroker_partial: { type: 'linear_waveform', pattern: 'sawtooth', positions: [30, 70], duration: 800, cycles: 20, description: 'Partial strokes only', compatibleDevices: ['stroker'] },
+    stroker_stop_start: { type: 'linear_waveform', pattern: 'square', positions: [20, 80], duration: 1200, cycles: 10, description: 'Stop/start strokes', compatibleDevices: ['stroker'] },
+    stroker_tickle: { type: 'linear_waveform', pattern: 'triangle', positions: [40, 60], duration: 400, cycles: 30, description: 'Short quick strokes', compatibleDevices: ['stroker'] },
+    stroker_edging: { type: 'linear_gradient', positions: [10, 92], duration: 10000, hold: 3000, release: 5000, description: 'Long edge session', compatibleDevices: ['stroker'] },
+    stroker_milking: { type: 'linear_waveform', pattern: 'sine', positions: [5, 95], duration: 2000, cycles: 20, description: 'Milking strokes', compatibleDevices: ['stroker'] },
+    stroker_full: { type: 'linear_waveform', pattern: 'sawtooth', positions: [10, 90], duration: 1500, cycles: 25, description: 'Full deep strokes', compatibleDevices: ['stroker'] },
+    stroker_crescendo: { type: 'linear_gradient', positions: [5, 98], duration: 15000, hold: 4000, release: 3000, description: 'Build to edge', compatibleDevices: ['stroker'] },
+    stroker_tsunami: { type: 'linear_waveform', pattern: 'sine', positions: [2, 98], duration: 1200, cycles: 30, description: 'Massive waves', compatibleDevices: ['stroker'] },
+
+    // General patterns for all devices
+    build: { type: 'waveform', pattern: 'ramp_up', min: 30, max: 80, duration: 12000, cycles: 1, description: 'Gradual build', compatibleDevices: ['cage', 'plug', 'stroker', 'general'] },
+    peak: { type: 'waveform', pattern: 'square', min: 70, max: 100, duration: 3000, cycles: 3, description: 'Peak intensity', compatibleDevices: ['cage', 'plug', 'general'] },
+    cooldown: { type: 'gradient', start: 60, end: 10, duration: 8000, description: 'Cool down', compatibleDevices: ['cage', 'plug', 'stroker', 'general'] },
+    peak_and_drop: { type: 'waveform', pattern: 'peak_and_drop', min: 5, max: 95, duration: 6000, cycles: 3, description: 'Peak to 95% then drop', compatibleDevices: ['cage', 'plug', 'general'] },
+    flutter: { type: 'waveform', pattern: 'flutter', min: 5, max: 50, duration: 4000, cycles: 8, description: 'Light fluttering', compatibleDevices: ['cage', 'plug', 'general'] }
   },
 
 
@@ -1327,110 +1396,7 @@ all: []
 // Populate compatibility array after PatternLibrary is fully initialized
 PatternLibrary.compatibility.all = Object.keys(PatternLibrary.waveforms);
 
-// Device-specific preset patterns (legacy compatibility layer)
-const DevicePresets = {
-  cage: {
-    tease: { type: 'waveform', pattern: 'pulse', min: 10, max: 40, duration: 5000, cycles: 3, description: 'Gentle pulses' },
-    denial: { type: 'waveform', pattern: 'ramp_up', min: 5, max: 80, duration: 10000, cycles: 1, description: 'Build then nothing' },
-    pulse: { type: 'waveform', pattern: 'square', min: 20, max: 60, duration: 2000, cycles: 10, description: 'Rhythmic pulses' },
-    edge: { type: 'gradient', start: 0, end: 90, duration: 15000, hold: 5000, release: 3000, description: 'Edge pattern' },
-    random: { type: 'waveform', pattern: 'random', min: 15, max: 50, duration: 8000, cycles: 2, description: 'Random sensations' },
-    heartbeat: { type: 'waveform', pattern: 'heartbeat', min: 15, max: 50, duration: 6000, cycles: 8, description: 'Heartbeat rhythm' },
-    tickle: { type: 'waveform', pattern: 'tickle', min: 20, max: 60, duration: 4000, cycles: 10, description: 'Random light touches' },
-    edging: { type: 'waveform', pattern: 'edging', min: 10, max: 90, duration: 12000, cycles: 2, description: 'Edge to 90% then stop' },
-    ruin: { type: 'waveform', pattern: 'ruin', min: 5, max: 95, duration: 8000, cycles: 1, description: 'Ruin at peak (drops to 20%)' },
-    teasing: { type: 'waveform', pattern: 'teasing', min: 20, max: 70, duration: 10000, cycles: 3, description: 'Irregular teasing' },
-    desperation: { type: 'waveform', pattern: 'desperation', min: 10, max: 80, duration: 15000, cycles: 2, description: 'Builds desperation' },
-    mercy: { type: 'waveform', pattern: 'mercy', min: 30, max: 60, duration: 8000, cycles: 4, description: 'Alternates rest and play' },
-    tease_escalate: { type: 'waveform', pattern: 'tease_escalate', min: 5, max: 85, duration: 12000, cycles: 2, description: 'Escalating tease' },
-    stop_start: { type: 'waveform', pattern: 'stop_start', min: 40, max: 80, duration: 6000, cycles: 3, description: 'Stop/start pattern' },
-    random_tease: { type: 'waveform', pattern: 'random_tease', min: 10, max: 75, duration: 10000, cycles: 4, description: 'Random on/off' },
-    micro_tease: { type: 'waveform', pattern: 'micro_tease', min: 5, max: 50, duration: 8000, cycles: 4, description: 'Micro twitching' },
-    abrupt_edge: { type: 'waveform', pattern: 'abrupt_edge', min: 10, max: 95, duration: 5000, cycles: 3, description: 'Peak then stop' },
-    build_and_ruin: { type: 'waveform', pattern: 'build_and_ruin', min: 5, max: 92, duration: 10000, cycles: 2, description: 'Build then ruin' },
-    rapid_micro: { type: 'waveform', pattern: 'rapid_micro', min: 2, max: 30, duration: 6000, cycles: 10, description: 'Rapid micros' },
-    ghost_tease: { type: 'waveform', pattern: 'ghost_tease', min: 1, max: 60, duration: 7000, cycles: 5, description: 'Ghost touches' },
-    erratic: { type: 'waveform', pattern: 'erratic', min: 1, max: 70, duration: 5000, cycles: 4, description: 'Unpredictable' },
-    held_edge: { type: 'waveform', pattern: 'held_edge', min: 15, max: 90, duration: 8000, cycles: 2, description: 'Hold at edge' },
-    crescendo: { type: 'waveform', pattern: 'crescendo', min: 10, max: 100, duration: 15000, cycles: 2, description: 'Slow build to peak' },
-    tidal_wave: { type: 'waveform', pattern: 'tidal_wave', min: 20, max: 100, duration: 12000, cycles: 3, description: 'Rising wave' },
-    milking_pump: { type: 'waveform', pattern: 'milking_pump', min: 10, max: 100, duration: 8000, cycles: 5, description: 'Pumping rhythm' },
-    relentless: { type: 'waveform', pattern: 'relentless', min: 15, max: 100, duration: 10000, cycles: 3, description: 'Relentless building' },
-    overload: { type: 'waveform', pattern: 'overload', min: 20, max: 100, duration: 12000, cycles: 4, description: 'Overload' },
-    forced_peak: { type: 'waveform', pattern: 'forced_peak', min: 10, max: 100, duration: 9000, cycles: 4, description: 'Forced peak cycles' },
-    spiral_up: { type: 'waveform', pattern: 'spiral_up', min: 10, max: 100, duration: 11000, cycles: 3, description: 'Spiraling intensity' },
-    tsunami: { type: 'waveform', pattern: 'tsunami', min: 10, max: 100, duration: 10000, cycles: 4, description: 'Massive waves' },
-    ripple_thruster: { type: 'waveform', pattern: 'ripple_thruster', min: 15, max: 85, duration: 4000, cycles: 4, description: 'Thrusts with ripples' },
-    forbidden_peaks: { type: 'waveform', pattern: 'forbidden_peaks', min: 30, max: 100, duration: 3500, cycles: 4, description: 'Forbidden peaks' },
-    multiple_peaks: { type: 'waveform', pattern: 'multiple_peaks', min: 25, max: 100, duration: 6000, cycles: 4, description: 'Multiple peaks' },
-    intense_waves: { type: 'waveform', pattern: 'intense_waves', min: 30, max: 100, duration: 4000, cycles: 4, description: 'Intense combined waves' },
-    rapid_fire: { type: 'waveform', pattern: 'rapid_fire', min: 40, max: 100, duration: 1500, cycles: 6, description: 'Rapid fire' }
-  },
-  plug: {
-    gentle: { type: 'waveform', pattern: 'sine', min: 10, max: 30, duration: 3000, cycles: 5, description: 'Gentle sway' },
-    pulse: { type: 'waveform', pattern: 'pulse', min: 20, max: 70, duration: 1500, cycles: 8, description: 'Pulse rhythm' },
-    wave: { type: 'waveform', pattern: 'sawtooth', min: 15, max: 55, duration: 4000, cycles: 4, description: 'Wave pattern' },
-    intense: { type: 'waveform', pattern: 'square', min: 40, max: 90, duration: 2500, cycles: 6, description: 'Intense bursts' },
-    tickle: { type: 'waveform', pattern: 'tickle', min: 25, max: 65, duration: 5000, cycles: 8, description: 'Light tickling' },
-    heartbeat: { type: 'waveform', pattern: 'heartbeat', min: 20, max: 55, duration: 8000, cycles: 6, description: 'Heartbeat' },
-    edging: { type: 'waveform', pattern: 'edging', min: 15, max: 85, duration: 14000, cycles: 2, description: 'Edge play' },
-    teasing: { type: 'waveform', pattern: 'teasing', min: 30, max: 70, duration: 11000, cycles: 3, description: 'Irregular tease' },
-    crescendo: { type: 'waveform', pattern: 'crescendo', min: 15, max: 100, duration: 15000, cycles: 2, description: 'Slow build to peak' },
-    tidal_wave: { type: 'waveform', pattern: 'tidal_wave', min: 25, max: 100, duration: 12000, cycles: 3, description: 'Rising wave' },
-    milking_pump: { type: 'waveform', pattern: 'milking_pump', min: 20, max: 100, duration: 8000, cycles: 5, description: 'Pumping rhythm' },
-    forced_peak: { type: 'waveform', pattern: 'forced_peak', min: 15, max: 100, duration: 9000, cycles: 4, description: 'Forced peaks' },
-    tsunami: { type: 'waveform', pattern: 'tsunami', min: 15, max: 100, duration: 10000, cycles: 4, description: 'Massive waves' }
-  },
-  stroker: {
-    slow: { type: 'linear_waveform', pattern: 'sine', positions: [10, 90], duration: 3000, cycles: 5, description: 'Slow sine strokes' },
-    medium: { type: 'linear_waveform', pattern: 'sawtooth', positions: [20, 80], duration: 2000, cycles: 8, description: 'Medium strokes' },
-    fast: { type: 'linear_waveform', pattern: 'square', positions: [15, 85], duration: 1000, cycles: 15, description: 'Fast strokes' },
-    edge: { type: 'linear_gradient', positions: [10, 95], duration: 8000, hold: 3000, description: 'Edge strokes' },
-    tease: { type: 'linear_waveform', pattern: 'pulse', positions: [30, 70], duration: 1500, cycles: 12, description: 'Short stroke pulses' },
-    tease_edge: { type: 'linear_gradient', positions: [5, 98], duration: 12000, hold: 2000, release: 4000, description: 'Tease edge sequence' },
-    partial_strokes: { type: 'linear_waveform', pattern: 'sawtooth', positions: [30, 70], duration: 800, cycles: 20, description: 'Partial strokes only' },
-    stop_start: { type: 'linear_waveform', pattern: 'square', positions: [20, 80], duration: 1200, cycles: 10, description: 'Stop/start strokes' },
-    tickle: { type: 'linear_waveform', pattern: 'triangle', positions: [40, 60], duration: 400, cycles: 30, description: 'Short quick strokes' },
-    edging: { type: 'linear_gradient', positions: [10, 92], duration: 10000, hold: 3000, release: 5000, description: 'Long edge session' },
-    milking: { type: 'linear_waveform', pattern: 'sine', positions: [5, 95], duration: 2000, cycles: 20, description: 'Milking strokes' },
-    full_strokes: { type: 'linear_waveform', pattern: 'sawtooth', positions: [10, 90], duration: 1500, cycles: 25, description: 'Full deep strokes' },
-    crescendo_strokes: { type: 'linear_gradient', positions: [5, 98], duration: 15000, hold: 4000, release: 3000, description: 'Build to edge' },
-    tsunami_strokes: { type: 'linear_waveform', pattern: 'sine', positions: [2, 98], duration: 1200, cycles: 30, description: 'Massive waves' }
-  },
-  general: {
-    warmup: { type: 'gradient', start: 0, end: 50, duration: 10000, description: 'Gentle warmup' },
-    build: { type: 'waveform', pattern: 'ramp_up', min: 30, max: 80, duration: 12000, cycles: 1, description: 'Gradual build' },
-    peak: { type: 'waveform', pattern: 'square', min: 70, max: 100, duration: 3000, cycles: 3, description: 'Peak intensity' },
-    cooldown: { type: 'gradient', start: 60, end: 10, duration: 8000, description: 'Cool down' },
-    heartbeat: { type: 'waveform', pattern: 'heartbeat', min: 20, max: 60, duration: 7000, cycles: 5, description: 'Heartbeat rhythm' },
-    tickle: { type: 'waveform', pattern: 'tickle', min: 15, max: 50, duration: 6000, cycles: 8, description: 'Light teasing' },
-    edging: { type: 'waveform', pattern: 'edging', min: 10, max: 90, duration: 15000, cycles: 2, description: 'Edge pattern' },
-    teasing: { type: 'waveform', pattern: 'teasing', min: 25, max: 70, duration: 12000, cycles: 3, description: 'Irregular tease' },
-    random_tease: { type: 'waveform', pattern: 'random_tease', min: 10, max: 80, duration: 15000, cycles: 4, description: 'Random on/off' },
-    desperation: { type: 'waveform', pattern: 'desperation', min: 10, max: 80, duration: 15000, cycles: 2, description: 'Builds desperation' },
-    mercy: { type: 'waveform', pattern: 'mercy', min: 30, max: 60, duration: 8000, cycles: 4, description: 'Alternating rest/play' },
-    tease_escalate: { type: 'waveform', pattern: 'tease_escalate', min: 5, max: 85, duration: 12000, cycles: 2, description: 'Escalating tease' },
-    stop_start: { type: 'waveform', pattern: 'stop_start', min: 40, max: 80, duration: 6000, cycles: 3, description: 'Stop/start pattern' },
-    ruin: { type: 'waveform', pattern: 'ruin', min: 5, max: 95, duration: 8000, cycles: 1, description: 'Ruin at peak' },
-    micro_tease: { type: 'waveform', pattern: 'micro_tease', min: 5, max: 50, duration: 8000, cycles: 4, description: 'Micro twitching bursts' },
-    abrupt_edge: { type: 'waveform', pattern: 'abrupt_edge', min: 10, max: 95, duration: 5000, cycles: 3, description: 'Peak then abrupt stop' },
-    build_and_ruin: { type: 'waveform', pattern: 'build_and_ruin', min: 5, max: 92, duration: 10000, cycles: 2, description: 'Build then ruin' },
-    rapid_micro: { type: 'waveform', pattern: 'rapid_micro', min: 2, max: 30, duration: 6000, cycles: 10, description: 'Rapid micro movements' },
-    peak_and_drop: { type: 'waveform', pattern: 'peak_and_drop', min: 5, max: 95, duration: 6000, cycles: 3, description: 'Peak to 95% then drop' },
-    ghost_tease: { type: 'waveform', pattern: 'ghost_tease', min: 1, max: 60, duration: 7000, cycles: 5, description: 'Barely perceptible touches' },
-    erratic: { type: 'waveform', pattern: 'erratic', min: 1, max: 70, duration: 5000, cycles: 4, description: 'Completely unpredictable' },
-    held_edge: { type: 'waveform', pattern: 'held_edge', min: 15, max: 90, duration: 8000, cycles: 2, description: 'Hold at edge then drop' },
-    flutter: { type: 'waveform', pattern: 'flutter', min: 5, max: 50, duration: 4000, cycles: 8, description: 'Light fluttering' },
-    crescendo: { type: 'waveform', pattern: 'crescendo', min: 10, max: 100, duration: 15000, cycles: 2, description: 'Slow build to peak' },
-    tidal_wave: { type: 'waveform', pattern: 'tidal_wave', min: 20, max: 100, duration: 12000, cycles: 3, description: 'Rising wave pattern' },
-    milking_pump: { type: 'waveform', pattern: 'milking_pump', min: 10, max: 100, duration: 8000, cycles: 5, description: 'Pumping milking rhythm' },
-    relentless: { type: 'waveform', pattern: 'relentless', min: 15, max: 100, duration: 10000, cycles: 3, description: 'Relentless building' },
-    overload: { type: 'waveform', pattern: 'overload', min: 20, max: 100, duration: 12000, cycles: 4, description: 'Overload sensation' },
-    forced_peak: { type: 'waveform', pattern: 'forced_peak', min: 10, max: 100, duration: 9000, cycles: 4, description: 'Forced peak cycles' },
-    spiral_up: { type: 'waveform', pattern: 'spiral_up', min: 10, max: 100, duration: 11000, cycles: 3, description: 'Spiraling intensity' },
-    tsunami: { type: 'waveform', pattern: 'tsunami', min: 10, max: 100, duration: 10000, cycles: 4, description: 'Massive wave peaks' }
-  }
-}
+
 
 // Active pattern tracking
 let activePatterns = new Map(); // deviceIndex -> { pattern, interval, controls }
@@ -1507,9 +1473,19 @@ async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
   else if (devName.includes('plug')) deviceType = 'plug'
   else if (devName.includes('solace') || devName.includes('stroker') || devName.includes('launch')) deviceType = 'stroker'
 
-  // Get preset
-  const presets = DevicePresets[deviceType] || DevicePresets.general
-  const preset = presets[presetName] || presets.warmup || { type: 'waveform', pattern: 'sine', min: 20, max: 60, duration: 3000, cycles: 3 }
+  // Get preset from PatternLibrary
+  let preset = PatternLibrary.presets[presetName]
+  // Check compatibility - if not compatible with this device type, try device-specific version
+  if (preset && !PatternLibrary.isCompatible(presetName, deviceType)) {
+    const deviceSpecificName = `${deviceType}_${presetName}`
+    if (PatternLibrary.presets[deviceSpecificName]) {
+      preset = PatternLibrary.presets[deviceSpecificName]
+    }
+  }
+  // Fall back to warmup if preset not found or not compatible
+  if (!preset || !PatternLibrary.isCompatible(presetName, deviceType)) {
+    preset = PatternLibrary.presets.warmup || { type: 'waveform', pattern: 'sine', min: 20, max: 60, duration: 3000, cycles: 3 }
+  }
 
   // Merge with options
   const config = { ...preset, ...options }
@@ -2042,28 +2018,8 @@ intensity: intensity
 console.log(`${NAME}: Ignoring out-of-range media intensity: ${intensity}%`)
 }
       continue
-  }
-
-  // Parse FUNSCRIPT commands (view, modify, reset)
-  // Format: FUNSCRIPT: VIEW, FUNSCRIPT: MODIFY pauses 2000, FUNSCRIPT: RESET
-  const funscriptMatch = commandText.match(/FUNSCRIPT[:\s]+(\w+)(?:[\s,]+(.+))?/i)
-  if (funscriptMatch) {
-    const subCommand = funscriptMatch[1].toUpperCase()
-    const args = funscriptMatch[2] || ''
-
-    if (subCommand === 'VIEW') {
-      commands.push({ type: 'funscript_view' })
-    } else if (subCommand === 'MODIFY') {
-      commands.push({
-        type: 'funscript_modify',
-        args: args
-      })
-    } else if (subCommand === 'RESET') {
-      commands.push({ type: 'funscript_reset' })
     }
-    continue
   }
-}
 
 // Parse PRESET command
     // Format: PRESET: tease or PRESET tease
@@ -2453,27 +2409,7 @@ break
   return
 }
 
-// Funscript commands
-if (cmd.type === 'funscript_view' || cmd.type === 'funscript_modify' || cmd.type === 'funscript_reset') {
-  try {
-    switch (cmd.type) {
-    case 'funscript_view':
-      await handleFunscriptView()
-      break
-    case 'funscript_modify':
-      await handleFunscriptModify(cmd.args)
-      break
-    case 'funscript_reset':
-      await handleFunscriptReset()
-      break
-    }
-  } catch (e) {
-    console.error(`${NAME}: Funscript command execution failed:`, e)
-  }
-  return
-}
-
-// Device commands require connection
+  // Device commands require connection
   if (!client.connected || devices.length === 0) {
     console.log(`${NAME}: Cannot execute device command - not connected or no devices`)
     return
@@ -3993,17 +3929,17 @@ ${canStartIntiface ? `- <interface:START> - Start Intiface Central application (
       }
     }).join('\n')
     
-    // Build preset examples for connected device types
-    const presetList = []
-    connectedTypes.forEach(type => {
-      const typePresets = DevicePresets[type] || DevicePresets.general
-      const presetNames = Object.keys(typePresets).slice(0, 3) // Max 3 presets per type
-      const typeDevice = devices.find(d => getDeviceType(d) === type)
-      const shorthand = getDeviceShorthand(typeDevice)
-      presetNames.forEach(presetName => {
-        presetList.push(`- <${shorthand}:PRESET: ${presetName}> - ${typePresets[presetName].description || presetName} pattern`)
-      })
+  // Build preset examples for connected device types
+  const presetList = []
+  connectedTypes.forEach(type => {
+    const typePresets = PatternLibrary.getCompatiblePresets(type)
+    const presetNames = Object.keys(typePresets).slice(0, 3) // Max 3 presets per type
+    const typeDevice = devices.find(d => getDeviceType(d) === type)
+    const shorthand = getDeviceShorthand(typeDevice)
+    presetNames.forEach(presetName => {
+      presetList.push(`- <${shorthand}:PRESET: ${presetName}> - ${typePresets[presetName].description || presetName} pattern`)
     })
+  })
     presetExamples = presetList.join('\n')
     
     // Build device-specific examples
@@ -4213,7 +4149,7 @@ if (devices.length > 0) {
   const firstDevice = devices[0]
   const shorthand = getDeviceShorthand(firstDevice)
   const type = getDeviceType(firstDevice)
-  const typePresets = DevicePresets[type] || DevicePresets.general
+  const typePresets = PatternLibrary.getCompatiblePresets(type)
   const firstPreset = Object.keys(typePresets)[0] || 'tease'
   
     exampleResponses = `
@@ -4283,11 +4219,8 @@ Funscript Details:
 - Duration: ${(mediaPlayer.currentFunscript.duration / 1000).toFixed(1)}s
 - Average Position: ${mediaPlayer.currentFunscript.stats.avgPosition}%
 - Range: ${mediaPlayer.currentFunscript.stats.minPosition}-${mediaPlayer.currentFunscript.stats.maxPosition}%
-- Status: ${mediaPlayer.modifiedFunscript ? `MODIFIED - ${mediaPlayer.modifiedFunscript.modification}` : 'Original (unmodified)'}
 - Current Intensity: ${mediaPlayer.globalIntensity}%
-${Object.keys(mediaPlayer.channelFunscripts || {}).length > 1 ? `- Available Channels: ${Object.keys(mediaPlayer.channelFunscripts).filter(c => c !== '-').join(', ')}` : ''}
-
-⚠️ CRITICAL: You can modify the funscript in real-time using <funscript:MODIFY: type param> commands!` : '=== MEDIA STATUS ===\nNo media currently playing. Use <media:PLAY: filename.ext> to start.'}
+${Object.keys(mediaPlayer.channelFunscripts || {}).length > 1 ? `- Available Channels: ${Object.keys(mediaPlayer.channelFunscripts).filter(c => c !== '-').join(', ')}` : ''}` : '=== MEDIA STATUS ===\nNo media currently playing. Use <media:PLAY: filename.ext> to start.'}
 
 === VIDEO & FUNSCRIPT SUPPORT ===
 You can also play videos with synchronized haptic feedback! Videos are stored in the media library and can be played with matching Funscript files.
@@ -4324,31 +4257,6 @@ MEDIA EXAMPLES:
 ✓ Pause media: <media:PAUSE>
 ✓ Resume media: <media:RESUME>
 ✓ Adjust intensity: <media:INTENSITY: 150> (increases to 150%) or <media:INTENSITY: 50> (decreases to 50%)
-
-=== FUNSCRIPT MODIFICATION (AI Edging Control) ===
-When media is playing, you can MODIFY the funscript in real-time for edging and teasing:
-
-FUNSCRIPT COMMANDS:
-- <funscript:VIEW> - View current funscript stats (actions count, duration, intensity range)
-- <funscript:MODIFY: pauses 2000> - Insert 2000ms pauses between strokes (great for edging)
-- <funscript:MODIFY: pauses 3000> - Insert longer pauses (3000ms) for extended edging
-- <funscript:MODIFY: intensity 70> - Scale all intensities to 70% (reduce sensation)
-- <funscript:MODIFY: intensity 50> - Scale to 50% (heavy teasing)
-- <funscript:MODIFY: randomize 200> - Add ±200ms random timing variation
-- <funscript:MODIFY: slowdown 1.5> - Slow down playback by 1.5x (longer strokes)
-- <funscript:MODIFY: speedup 0.7> - Speed up by 0.7x (quicker patterns)
-- <funscript:MODIFY: hold 3000> - Add 3 second hold at peak intensity
-- <funscript:MODIFY: remove 30> - Remove all strokes below 30% intensity
-- <funscript:RESET> - Reset to original funscript (clear all modifications)
-
-FUNSCRIPT MODIFICATION EXAMPLES:
-✓ Edging setup: "Let me add some strategic pauses for you <funscript:MODIFY: pauses 2500>. Now you'll feel the build-up then wait..."
-✓ Reduce intensity: "Too intense? Let me dial it back <funscript:MODIFY: intensity 60>"
-✓ Extended tease: "This will be agonizing <funscript:MODIFY: pauses 4000> <funscript:MODIFY: slowdown 2.0>"
-✓ Quicken pace: "Let's speed things up <funscript:MODIFY: speedup 0.5>"
-✓ Randomize: "Unpredictable pleasure incoming <funscript:MODIFY: randomize 300>"
-✓ Add hold: "Hold it right there <funscript:MODIFY: hold 5000>"
-✓ Back to original: "Back to the original rhythm <funscript:RESET>"
 
 === RULES ===:
 1. ALWAYS include the command literally: <deviceName:COMMAND: value>
@@ -6974,18 +6882,16 @@ document.addEventListener('visibilitychange', async () => {
 
 // Media player state
 let mediaPlayer = {
-videoElement: null,
-currentFunscript: null,
-originalFunscript: null, // Store original funscript for comparison
-modifiedFunscript: null, // Store AI-modified version
-channelFunscripts: {}, // Map of channel letter -> funscript (A, B, C, D, - for all)
-isPlaying: false,
-syncOffset: 0,
-globalIntensity: 100,
-lastActionIndex: 0,
-animationFrameId: null,
-syncTimerId: null,
-currentMediaPath: null
+  videoElement: null,
+  currentFunscript: null,
+  channelFunscripts: {}, // Map of channel letter -> funscript (A, B, C, D, - for all)
+  isPlaying: false,
+  syncOffset: 0,
+  globalIntensity: 100,
+  lastActionIndex: 0,
+  animationFrameId: null,
+  syncTimerId: null,
+  currentMediaPath: null
 }
 
 // Funscript cache
@@ -7514,17 +7420,12 @@ const rawFunscript = await response.json()
 const funscript = processFunscript(rawFunscript)
 funscriptCache.set(funscriptUrl, funscript)
     
-    // Store as both current and original
     mediaPlayer.currentFunscript = funscript
-    mediaPlayer.originalFunscript = JSON.parse(JSON.stringify(funscript)) // Deep copy
-    mediaPlayer.modifiedFunscript = null // Clear any previous modifications
-    
     updateChatFunscriptUI(funscript)
 
   } catch (error) {
     console.error(`${NAME}: Failed to load Funscript:`, error)
     $("#intiface-chat-funscript-info").text(`Error: ${error.message}`).css("color", "#F44336")
-    clearChatFunscriptVisualizer()
   }
 }
 
@@ -7553,284 +7454,6 @@ function processFunscript(rawFunscript) {
       minPosition: minPos
     }
   }
-}
-
-// ==========================================
-// FUNSCRIPT MODIFICATION SYSTEM
-// ==========================================
-
-// Modified funscript cache to track AI modifications
-let modifiedFunscriptCache = new Map()
-
-// Funscript modification functions for AI control
-const FunscriptModifiers = {
-  // Insert pauses between strokes (great for edging)
-  insertPauses: (funscript, pauseDuration = 2000) => {
-    if (!funscript || !funscript.actions) return null
-    const actions = [...funscript.actions]
-    const modified = []
-    
-    for (let i = 0; i < actions.length; i++) {
-      modified.push(actions[i])
-      // Add pause after each stroke (except last)
-      if (i < actions.length - 1) {
-        const pauseTime = actions[i].at + pauseDuration
-        // Only add pause if it doesn't overlap with next action
-        if (pauseTime < actions[i + 1].at) {
-          modified.push({
-            at: pauseTime,
-            pos: 0, // Pause at 0 intensity
-            type: 'pause'
-          })
-        }
-      }
-    }
-    
-    return {
-      ...funscript,
-      actions: modified,
-      modified: true,
-      modification: `Inserted ${pauseDuration}ms pauses between strokes`
-    }
-  },
-
-  // Scale intensity values
-  scaleIntensity: (funscript, scale = 0.7) => {
-    if (!funscript || !funscript.actions) return null
-    const actions = funscript.actions.map(a => ({
-      ...a,
-      pos: Math.round(Math.min(100, Math.max(0, a.pos * scale)))
-    }))
-    
-    return {
-      ...funscript,
-      actions,
-      modified: true,
-      modification: `Scaled intensity to ${Math.round(scale * 100)}%`
-    }
-  },
-
-  // Add random variation to timing
-  randomizeTiming: (funscript, variance = 200) => {
-    if (!funscript || !funscript.actions) return null
-    const actions = funscript.actions.map((a, i) => ({
-      ...a,
-      at: i === 0 ? a.at : a.at + (Math.random() - 0.5) * variance * 2
-    }))
-    
-    return {
-      ...funscript,
-      actions,
-      modified: true,
-      modification: `Randomized timing by ±${variance}ms`
-    }
-  },
-
-  // Reverse the funscript (play backwards)
-  reverse: (funscript) => {
-    if (!funscript || !funscript.actions || funscript.actions.length === 0) return null
-    const duration = funscript.actions[funscript.actions.length - 1].at
-    const actions = funscript.actions.map(a => ({
-      ...a,
-      at: duration - a.at
-    })).reverse()
-    
-    return {
-      ...funscript,
-      actions,
-      modified: true,
-      modification: 'Reversed playback order'
-    }
-  },
-
-  // Slow down or speed up
-  changeSpeed: (funscript, multiplier = 1.5) => {
-    if (!funscript || !funscript.actions) return null
-    const actions = funscript.actions.map(a => ({
-      ...a,
-      at: Math.round(a.at * multiplier)
-    }))
-    
-    return {
-      ...funscript,
-      actions,
-      modified: true,
-      modification: `Speed changed to ${multiplier}x`
-    }
-  },
-
-  // Remove all actions below a threshold (for edging - remove low intensity strokes)
-  removeBelow: (funscript, threshold = 30) => {
-    if (!funscript || !funscript.actions) return null
-    const actions = funscript.actions.filter(a => a.pos >= threshold)
-    
-    return {
-      ...funscript,
-      actions,
-      modified: true,
-      modification: `Removed strokes below ${threshold}% intensity`
-    }
-  },
-
-  // Add a hold at peak intensity before release
-  addHoldAtPeak: (funscript, holdDuration = 3000) => {
-    if (!funscript || !funscript.actions) return null
-    const maxPos = Math.max(...funscript.actions.map(a => a.pos))
-    const peakActions = funscript.actions.filter(a => a.pos >= maxPos - 5)
-    
-    if (peakActions.length === 0) return funscript
-    
-    const peakTime = peakActions[0].at
-    const actions = [...funscript.actions]
-    
-    // Insert hold point
-    actions.push({
-      at: peakTime + holdDuration,
-      pos: maxPos,
-      type: 'hold'
-    })
-    
-    // Sort by time
-    actions.sort((a, b) => a.at - b.at)
-    
-    return {
-      ...funscript,
-      actions,
-      modified: true,
-      modification: `Added ${holdDuration}ms hold at peak`
-    }
-  }
-}
-
-// Apply funscript modification
-function applyFunscriptModification(funscript, modificationType, params = {}) {
-  if (!FunscriptModifiers[modificationType]) {
-    console.error(`${NAME}: Unknown funscript modification: ${modificationType}`)
-    return null
-  }
-  
-  try {
-    const modified = FunscriptModifiers[modificationType](funscript, ...Object.values(params))
-    if (modified) {
-      // Recalculate stats for modified version
-      const duration = modified.actions.length > 0 ? modified.actions[modified.actions.length - 1].at : 0
-      const avgPos = modified.actions.reduce((sum, a) => sum + a.pos, 0) / modified.actions.length || 0
-      const maxPos = Math.max(...modified.actions.map(a => a.pos), 0)
-      const minPos = Math.min(...modified.actions.map(a => a.pos), 100)
-      
-      modified.stats = {
-        actionCount: modified.actions.length,
-        avgPosition: Math.round(avgPos),
-        maxPosition: maxPos,
-        minPosition: minPos
-      }
-      modified.duration = duration
-    }
-    return modified
-  } catch (e) {
-    console.error(`${NAME}: Funscript modification failed:`, e)
-    return null
-  }
-}
-
-// Handle funscript modification command from AI
-async function handleFunscriptModify(commandText) {
-  if (!mediaPlayer.currentFunscript) {
-    console.log(`${NAME}: No funscript loaded to modify`)
-    return false
-  }
-  
-  // Store original if not already stored
-  if (!mediaPlayer.originalFunscript) {
-    mediaPlayer.originalFunscript = JSON.parse(JSON.stringify(mediaPlayer.currentFunscript))
-  }
-  
-  // Parse modification command
-  // Format: MODIFY: type=pauses, duration=2000 OR MODIFY pauses 2000
-  const modifyMatch = commandText.match(/MODIFY[:\s]+(\w+)(?:[,\s]+(\w+)=([\d.]+))?/i)
-  
-  if (!modifyMatch) {
-    console.log(`${NAME}: Invalid funscript modify command: ${commandText}`)
-    return false
-  }
-  
-  const modType = modifyMatch[1].toLowerCase()
-  const paramName = modifyMatch[2]
-  const paramValue = modifyMatch[3] ? parseFloat(modifyMatch[3]) : null
-  
-  const params = {}
-  if (paramName && paramValue !== null) {
-    params[paramName] = paramValue
-  }
-  
-  // Map command types to modifier functions
-  const modifierMap = {
-    'pauses': 'insertPauses',
-    'pause': 'insertPauses',
-    'scale': 'scaleIntensity',
-    'intensity': 'scaleIntensity',
-    'randomize': 'randomizeTiming',
-    'random': 'randomizeTiming',
-    'reverse': 'reverse',
-    'speed': 'changeSpeed',
-    'slowdown': 'changeSpeed',
-    'remove': 'removeBelow',
-    'hold': 'addHoldAtPeak'
-  }
-  
-  const modifierName = modifierMap[modType]
-  if (!modifierName) {
-    console.log(`${NAME}: Unknown modification type: ${modType}`)
-    return false
-  }
-  
-  // Get default params if not provided
-  if (modifierName === 'insertPauses' && !params.duration) params.duration = 2000
-  if (modifierName === 'scaleIntensity' && !params.scale) params.scale = 0.7
-  if (modifierName === 'randomizeTiming' && !params.variance) params.variance = 200
-  if (modifierName === 'changeSpeed' && !params.multiplier) params.multiplier = 1.5
-  if (modifierName === 'removeBelow' && !params.threshold) params.threshold = 30
-  if (modifierName === 'addHoldAtPeak' && !params.holdDuration) params.holdDuration = 3000
-  
-  // Apply to original funscript
-  const modified = applyFunscriptModification(
-    mediaPlayer.originalFunscript,
-    modifierName,
-    params
-  )
-  
-  if (modified) {
-    mediaPlayer.modifiedFunscript = modified
-    // Switch playback to modified version
-    mediaPlayer.currentFunscript = modified
-    updateStatus(`Funscript modified: ${modified.modification}`)
-    console.log(`${NAME}: Funscript modified - ${modified.modification}`)
-    
-    // Update both visualizations
-    updateFunscriptVisualizer(modified, 'modified')
-    updateFunscriptVisualizer(mediaPlayer.originalFunscript, 'original')
-    
-    return true
-  }
-  
-  return false
-}
-
-// Reset funscript to original
-async function handleFunscriptReset() {
-  if (mediaPlayer.originalFunscript) {
-    mediaPlayer.currentFunscript = mediaPlayer.originalFunscript
-    mediaPlayer.modifiedFunscript = null
-    updateStatus('Funscript reset to original')
-    console.log(`${NAME}: Funscript reset to original`)
-    
-    // Update visualizations
-    updateFunscriptVisualizer(mediaPlayer.originalFunscript, 'original')
-    clearFunscriptVisualizer('modified')
-    
-    return true
-  }
-  return false
 }
 
 // Start Funscript synchronization
@@ -8285,10 +7908,9 @@ const firstChannel = results.find(r => r.success)?.channel
 if (firstChannel) {
 mediaPlayer.currentFunscript = mediaPlayer.channelFunscripts[firstChannel]
 updateChatFunscriptUI(mediaPlayer.currentFunscript)
-} else {
-mediaPlayer.currentFunscript = null
-clearChatFunscriptVisualizer()
-}
+    } else {
+      mediaPlayer.currentFunscript = null
+    }
 }
     
     // Setup video event listeners
@@ -8394,7 +8016,6 @@ $("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
 }
 
 // Update Funscript UI in chat panel
-// Update both funscript visualizers (original and modified)
 function updateChatFunscriptUI(funscript) {
 if (!funscript) return
 
@@ -8414,186 +8035,9 @@ Range: ${funscript.stats.minPosition}-${funscript.stats.maxPosition}%
 ${channelInfo}
 `).css("color", "#888")
 
-// Update visualizers
-updateFunscriptVisualizer(funscript, 'original')
-if (mediaPlayer.modifiedFunscript) {
-updateFunscriptVisualizer(mediaPlayer.modifiedFunscript, 'modified')
-}
 }
 
-// Draw Funscript visualizer for menu panel
-function drawMenuFunscriptVisualizer(funscript) {
-  // Support legacy single canvas
-  const canvas = document.getElementById('intiface-menu-funscript-canvas')
-  if (canvas && funscript) {
-    const ctx = canvas.getContext('2d')
-    const width = canvas.width = 400
-    const height = canvas.height = 80
-    
-    const actions = funscript.actions
-    if (actions.length === 0) return
-    
-    const duration = funscript.duration || 1
-    
-    // Clear
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'
-    ctx.fillRect(0, 0, width, height)
-    
-    // Draw grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)'
-    ctx.lineWidth = 1
-    for (let i = 0; i <= 4; i++) {
-      const y = (height / 4) * i
-      ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(width, y)
-      ctx.stroke()
-    }
-    
-    // Draw waveform
-    ctx.strokeStyle = '#4CAF50'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    
-    actions.forEach((action, index) => {
-      const x = (action.at / duration) * width
-      const y = height - ((action.pos / 100) * height)
-      
-      if (index === 0) {
-        ctx.moveTo(x, y)
-      } else {
-        ctx.lineTo(x, y)
-      }
-    })
-    
-    ctx.stroke()
-    
-    // Draw position points
-    ctx.fillStyle = '#81C784'
-    actions.forEach(action => {
-      const x = (action.at / duration) * width
-      const y = height - ((action.pos / 100) * height)
-      
-      ctx.beginPath()
-      ctx.arc(x, y, 2, 0, Math.PI * 2)
-      ctx.fill()
-    })
-  }
-}
 
-// Update specific funscript visualizer (original or modified)
-function updateFunscriptVisualizer(funscript, type = 'original') {
-  if (!funscript) return
-
-  const canvasId = type === 'modified' 
-    ? 'intiface-menu-funscript-canvas-modified'
-    : 'intiface-menu-funscript-canvas-original'
-  const infoId = type === 'modified'
-    ? 'intiface-menu-funscript-info-modified'
-    : 'intiface-menu-funscript-info-original'
-  const durationId = type === 'modified'
-    ? 'intiface-menu-funscript-duration-modified'
-    : 'intiface-menu-funscript-duration-original'
-
-  const canvas = document.getElementById(canvasId)
-  if (!canvas) return
-
-  const ctx = canvas.getContext('2d')
-  const width = canvas.width = 400
-  const height = canvas.height = 60
-
-  const actions = funscript.actions
-  const duration = funscript.duration || 1
-
-  // Clear
-  ctx.fillStyle = 'rgba(0,0,0,0.2)'
-  ctx.fillRect(0, 0, width, height)
-
-  if (actions.length === 0) {
-    $(`#${infoId}`).text(type === 'modified' ? 'No modifications applied' : 'No Funscript loaded').css("color", "#666")
-    return
-  }
-
-  // Draw grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)'
-  ctx.lineWidth = 1
-  for (let i = 0; i <= 4; i++) {
-    const y = (height / 4) * i
-    ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(width, y)
-    ctx.stroke()
-  }
-
-  // Draw waveform
-  ctx.strokeStyle = type === 'modified' ? '#64B5F6' : '#4CAF50'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-
-  actions.forEach((action, index) => {
-    const x = (action.at / duration) * width
-    const y = height - ((action.pos / 100) * height)
-
-    if (index === 0) {
-      ctx.moveTo(x, y)
-    } else {
-      ctx.lineTo(x, y)
-    }
-  })
-
-  ctx.stroke()
-
-  // Draw position points
-  ctx.fillStyle = type === 'modified' ? '#90CAF9' : '#81C784'
-  actions.forEach(action => {
-    const x = (action.at / duration) * width
-    const y = height - ((action.pos / 100) * height)
-
-    ctx.beginPath()
-    ctx.arc(x, y, 2, 0, Math.PI * 2)
-    ctx.fill()
-  })
-
-  // Update info text
-  $(`#${durationId}`).text(`${(duration / 1000).toFixed(1)}s`)
-  
-  let infoText = `${funscript.stats.actionCount} actions | Range: ${funscript.stats.minPosition}-${funscript.stats.maxPosition}%`
-  if (funscript.modification) {
-    infoText += ` | ${funscript.modification}`
-  }
-  $(`#${infoId}`).html(infoText).css("color", type === 'modified' ? '#64B5F6' : '#888')
-}
-
-// Clear specific funscript visualizer
-function clearFunscriptVisualizer(type = 'original') {
-  const canvasId = type === 'modified'
-    ? 'intiface-menu-funscript-canvas-modified'
-    : 'intiface-menu-funscript-canvas-original'
-  const infoId = type === 'modified'
-    ? 'intiface-menu-funscript-info-modified'
-    : 'intiface-menu-funscript-info-original'
-  const durationId = type === 'modified'
-    ? 'intiface-menu-funscript-duration-modified'
-    : 'intiface-menu-funscript-duration-original'
-
-  const canvas = document.getElementById(canvasId)
-  if (canvas) {
-    const ctx = canvas.getContext('2d')
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-  }
-
-  $(`#${durationId}`).text('--')
-  $(`#${infoId}`).text(type === 'modified' ? 'No modifications' : 'No Funscript loaded').css("color", "#666")
-}
-
-// Legacy clear function for backwards compatibility
-function clearChatFunscriptVisualizer() {
-  clearFunscriptVisualizer('original')
-  clearFunscriptVisualizer('modified')
-  $("#intiface-menu-funscript-duration").text('--')
-  $("#intiface-menu-funscript-info").text('No Funscript loaded').css("color", "#666")
-}
 
 // View funscript details (for AI to see the data)
 async function handleFunscriptView() {
@@ -8601,21 +8045,19 @@ async function handleFunscriptView() {
     console.log(`${NAME}: No funscript loaded to view`)
     return false
   }
-  
+
   const funscript = mediaPlayer.currentFunscript
   const summary = {
     actionCount: funscript.stats.actionCount,
     duration: `${(funscript.duration / 1000).toFixed(1)}s`,
     avgPosition: funscript.stats.avgPosition,
     minPosition: funscript.stats.minPosition,
-    maxPosition: funscript.stats.maxPosition,
-    isModified: !!funscript.modified,
-    modification: funscript.modification || 'None'
+    maxPosition: funscript.stats.maxPosition
   }
-  
+
   console.log(`${NAME}: Funscript view requested:`, summary)
   updateStatus(`Funscript: ${summary.actionCount} actions, ${summary.duration}`)
-  
+
   return true
 }
 
