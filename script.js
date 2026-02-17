@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-
 import { renderExtensionTemplateAsync } from "../../../extensions.js"
 import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles, getRequestHeaders, messageFormatting, appendMediaToMessage, addCopyToCodeBlocks } from "../../../../script.js"
 import { PlayModeLoader } from "./play_modes/_loader.js"
@@ -281,934 +279,58 @@ function clearWorkerTimeout(id) {
   }
 }
 
-// Waveform pattern generator
-const WaveformPatterns = {
-  sine: (phase, intensity) => Math.sin(phase * Math.PI * 2) * intensity,
-  sawtooth: (phase, intensity) => (phase < 0.5 ? phase * 2 : (1 - phase) * 2) * intensity,
-  square: (phase, intensity) => (phase < 0.5 ? intensity : 0),
-  triangle: (phase, intensity) => (phase < 0.5 ? phase * 2 : (1 - phase) * 2) * intensity,
-  pulse: (phase, intensity) => (phase < 0.1 ? intensity : phase < 0.2 ? intensity * 0.3 : 0),
-  random: (_, intensity) => Math.random() * intensity,
-  ramp_up: (phase, intensity) => phase * intensity,
-  ramp_down: (phase, intensity) => (1 - phase) * intensity,
-  heartbeat: (phase, intensity) => {
-    const cycle = phase * 2;
-    const part1 = cycle % 1;
-    const part2 = (cycle + 0.3) % 1;
-    return (part1 < 0.15 ? intensity * 1.0 : part1 < 0.25 ? intensity * 0.4 : 0) + (part2 < 0.15 ? intensity * 0.6 : part2 < 0.25 ? intensity * 0.2 : 0);
-  },
-  tickle: (phase, intensity) => Math.random() > 0.5 ? intensity * (0.3 + Math.random() * 0.4) : intensity * (0.1 + Math.random() * 0.15),
-  edging: (phase, intensity) => {
-    const edgePhase = (phase * 4) % 1;
-    const ramp = Math.sin(phase * Math.PI * 1.5);
-    return edgePhase < 0.9 ? ramp * intensity * 0.8 : 0;
-  },
-  ruin: (phase, intensity) => phase < 0.85 ? Math.sin(phase * Math.PI * 0.85) * intensity : intensity * 0.2,
-  teasing: (phase, intensity) => {
-    const sub = phase * 3;
-    const wave = Math.sin(sub * Math.PI * 2);
-    const tease = wave < 0 ? wave * 0.1 : wave * (0.3 + Math.random() * 0.3);
-    return Math.abs(tease) * intensity;
-  },
-  desperation: (phase, intensity) => {
-    const desperation = phase * phase;
-    const bursts = Math.floor(phase * 8) % 3 === 0 ? 1 : 0.1;
-    return desperation * bursts * intensity;
-  },
-  mercy: (phase, intensity) => {
-    const cycle = phase * 5;
-    const rest = cycle % 2 > 1 ? 0 : 1;
-    return rest * Math.sin(cycle * Math.PI) * intensity * 0.6;
-  },
-  tease_escalate: (phase, intensity) => {
-    const base = phase;
-    const tease = (phase % 0.3) < 0.15 ? 1 : 0.2;
-    return base * tease * intensity;
-  },
-  stop_start: (phase, intensity) => Math.floor(phase * 10) % 2 === 0 ? intensity * 0.7 : 0,
-  random_tease: (_, intensity) => Math.random() > 0.6 ? intensity * (0.2 + Math.random() * 0.7) : 0,
-  micro_tease: (phase, intensity) => {
-    const tickCount = Math.floor(phase * 20);
-    const baseMicro = (tickCount % 3 === 0) ? 0.05 + Math.random() * 0.15 : (tickCount % 3 === 1) ? 0.5 + Math.random() * 0.2 : 0.1 + Math.random() * 0.1;
-    const burst = Math.random() > 0.7 ? intensity * 0.7 : intensity * baseMicro;
-    return burst;
-  },
-  abrupt_edge: (phase, intensity) => {
-    const buildPhase = phase % 0.4;
-    if (buildPhase < 0.35) {
-      return Math.sin(buildPhase * Math.PI * 2.85) * intensity;
-    } else {
-      return 0;
-    }
-  },
-  build_and_ruin: (phase, intensity) => {
-    const cycle = phase * 2;
-    const build = Math.sin(cycle * Math.PI * 0.9) * intensity;
-    const drop = (cycle % 1) > 0.9 ? intensity * 0.1 : build;
-    return drop;
-  },
-  rapid_micro: (phase, intensity) => {
-    const microTwitch = Math.random() > 0.3 ? intensity * (0.02 + Math.random() * 0.08) : intensity * (0.2 + Math.random() * 0.3);
-    return microTwitch;
-  },
-  peak_and_drop: (phase, intensity) => {
-    const phaseCycle = (phase * 3) % 1;
-    return phaseCycle < 0.8 ? Math.sin(phaseCycle * Math.PI * 1.25) * intensity * 0.95 : 0;
-  },
-  ghost_tease: (phase, intensity) => {
-    const ghostPhase = Math.floor(phase * 15);
-    if (ghostPhase % 4 === 0) {
-      return intensity * (0.5 + Math.random() * 0.3);
-    } else if (ghostPhase % 4 === 2) {
-      return intensity * (0.02 + Math.random() * 0.05);
-    }
-    return 0;
-  },
-  erratic: (phase, intensity) => {
-    const erraticValue = Math.random();
-    if (erraticValue > 0.75) return intensity * 0.7;
-    if (erraticValue > 0.5) return intensity * 0.2;
-    if (erraticValue > 0.3) return intensity * 0.05;
-    return intensity * 0.01;
-  },
-  held_edge: (phase, intensity) => {
-    const holdPhase = (phase * 1.5) % 1;
-    if (holdPhase < 0.6) {
-      return Math.sin(holdPhase * Math.PI * 1.66) * intensity;
-    } else if (holdPhase < 0.8) {
-      return intensity * 0.9;
-    } else {
-      return intensity * 0.05;
-    }
-  },
-  flutter: (phase, intensity) => {
-    const flutterCount = Math.floor(phase * 30);
-    const flutter = flutterCount % 2 === 0 ? intensity * 0.4 : intensity * 0.1;
-    const ramp = Math.sqrt(phase) * flutter;
-    return Math.min(ramp, intensity * 0.5);
-  },
-  crescendo: (phase, intensity) => {
-    const build = Math.pow(phase, 1.5);
-    return Math.min(build, 1) * intensity;
-  },
-  tidal_wave: (phase, intensity) => {
-    const wave = Math.sin(phase * Math.PI * 2);
-    const tide = Math.sin(phase * Math.PI * 0.5) * 0.7 + 0.3;
-    return Math.abs(wave) * tide * intensity;
-  },
-  milking_pump: (phase, intensity) => {
-    const pumpCycle = Math.floor(phase * 4);
-    const pumpPhase = (phase * 4) % 1;
-    if (pumpPhase < 0.7) {
-      return Math.pow(pumpPhase / 0.7, 1.5) * intensity;
-    } else if (pumpPhase < 0.85) {
-      return intensity;
-    } else {
-      return intensity * ((0.85 - pumpPhase) / 0.15);
-    }
-  },
- relentless: (phase, intensity) => {
-    const relentlessPhase = phase * 2;
-    const wave1 = Math.sin(relentlessPhase * Math.PI * 2.5);
-    const wave2 = Math.sin(relentlessPhase * Math.PI * 7);
-    const build = Math.min(phase * 3, 1);
-    return (Math.abs(wave1) * 0.6 + Math.abs(wave2) * 0.4) * build * intensity;
-  },
-  overload: (phase, intensity) => {
-    const phaseQuadrant = Math.floor(phase * 8);
-    const subPhase = (phase * 8) % 1;
-    const baseIntensity = Math.min((phaseQuadrant + 1) / 8, 1);
-    const wave = Math.sin(subPhase * Math.PI * 4);
-    return Math.abs(wave) * baseIntensity * intensity;
-  },
-  forced_peak: (phase, intensity) => {
-    const cycle = (phase * 3) % 1;
-    const buildPhase = cycle * 0.6;
-    const peakPhase = cycle < 0.7 ? buildPhase / 0.6 : (cycle - 0.7) / 0.25;
-    if (cycle < 0.7) {
-      return Math.pow(buildPhase / 0.6, 2) * intensity;
-    } else if (cycle < 0.95) {
-      return intensity;
-    } else {
-      return intensity * (1 - (cycle - 0.95) / 0.05);
-    }
-  },
-  spiral_up: (phase, intensity) => {
-    const spiral = Math.sin(phase * Math.PI * (4 + phase * 6));
-    const spiralIntensity = Math.min(phase * 2, 1);
-    return Math.abs(spiral) * spiralIntensity * intensity;
-  },
-  tsunami: (phase, intensity) => {
-    const tsunamis = Math.floor(phase * 3);
-    const tsunamiPhase = (phase * 3) % 1;
-    const buildUp = Math.pow(tsunamiPhase, 0.5) * 0.8;
-    const peak = tsunamiPhase < 0.7 ? buildUp : (tsunamiPhase < 0.85 ? 1 : (1 - (tsunamiPhase - 0.85) / 0.15));
-    const waves = Math.sin(tsunamiPhase * Math.PI * 10) * 0.3 + 0.7;
-    return peak * waves * intensity;
-  },
-  ripple_thruster: (phase, intensity) => {
-    const phaseCycle = (phase * 4) % 1;
-    const ripple = Math.sin((phase * 8) % 1 * Math.PI * 4) * 0.5 + 0.5;
-    const thrust = phaseCycle < 0.8 ? ripple : ripple * 0.3;
-    return thrust * intensity;
-  },
-  forbidden_peaks: (phase, intensity) => {
-    const peakCycle = (phase * 2) % 1;
-    const baseBuild = Math.min(phase * 3, 1);
-    const quickRise = peakCycle < 0.6 ? baseBuild * Math.pow(peakCycle / 0.6, 1.5) : baseBuild * (1 - (peakCycle - 0.6) / 0.4);
-    const modulation = Math.sin(phase * Math.PI * 8) * 0.3 + 0.7;
-    return quickRise * modulation * intensity;
-  },
-  multiple_peaks: (phase, intensity) => {
-    const peakCount = Math.floor(phase * 6);
-    const subPhase = (phase * 6) % 1;
-    const base = Math.min((peakCount + 1) / 6, 1);
-    const peak = subPhase < 0.7 ? subPhase / 0.7 : 1 - ((subPhase - 0.7) / 0.3);
-    const variation = Math.sin(phase * Math.PI * 12) * 0.2 + 0.8;
-    return base * peak * variation * intensity;
-  },
-  intense_waves: (phase, intensity) => {
-    const wave1 = Math.sin(phase * Math.PI * 3);
-    const wave2 = Math.sin(phase * Math.PI * 7);
-    const wave3 = Math.sin(phase * Math.PI * 12);
-    const combined = (Math.abs(wave1) * 0.5 + Math.abs(wave2) * 0.3 + Math.abs(wave3) * 0.2);
-    const build = Math.min(phase * 2, 1) * 0.7 + 0.3;
-    return combined * build * intensity;
-  },
-  rapid_fire: (phase, intensity) => {
-    const burstCycle = (phase * 10) % 1;
-    const burst = burstCycle < 0.15 ? 1 : burstCycle < 0.3 ? 0.2 : 0.05;
-    const ramp = Math.min(phase * 1.5, 1);
-    return burst * ramp * intensity;
-  },
-  mechanical: (phase, intensity) => {
-    const stepPhase = Math.floor(phase * 16) / 16;
-    const mechanical = Math.sin(stepPhase * Math.PI * 2);
-    return (mechanical > 0 ? mechanical : mechanical * 0.3) * intensity;
-  },
-  algorithm: (phase, intensity) => {
-    const algoPhase = (phase * 4) % 1;
-    if (algoPhase < 0.9) {
-      return Math.pow(algoPhase / 0.9, 1.5) * intensity;
-    } else {
-      return intensity * ((1 - algoPhase) / 0.1);
-    }
-  },
-  systematic_ruin: (phase, intensity) => {
-    const cycle = (phase * 2.5) % 1;
-    const buildPhase = Math.min(cycle / 0.92, 1);
-    const ruinPhase = cycle >= 0.92 ? 0.08 : buildPhase;
-    return Math.pow(ruinPhase, 1.2) * intensity;
-  },
-  cold_calculation: (phase, intensity) => {
-    const tickPhase = Math.floor(phase * 20);
-    const tickLevel = Math.min(tickPhase / 18, 1);
-    const suddenDrop = tickPhase >= 19 ? 0.05 : tickLevel;
-    const precisionStep = Math.sin(tickPhase * 0.5 * Math.PI) * suddenDrop;
-    return precisionStep * intensity;
-  },
-  evil_ripple: (phase, intensity) => {
-    const ripplePhase = (phase * 12) % 1;
-    const rippleSize = Math.sin(ripplePhase * Math.PI * 2) * 0.5 + 0.5;
-    const evilCurve = Math.pow(rippleSize, 1.5);
-    return evilCurve * intensity * 0.9;
-  },
-  cruel_sine: (phase, intensity) => {
-    const sineValue = Math.sin(phase * Math.PI * 2);
-    const cruelMod = Math.abs(sineValue) * Math.pow(Math.abs(sineValue), 0.5);
-    return cruelMod * intensity;
-  },
-  torture_pulse: (phase, intensity) => {
-    const pulseCycle = Math.floor(phase * 15);
-    const pulsePhase = (phase * 15) % 1;
-    const isPulse = pulsePhase < 0.3;
-    const pulseIntensity = isPulse ? Math.random() * 0.3 + 0.7 : 0.05;
-    const escalation = 0.5 + (pulseCycle / 15) * 0.5;
-    return pulseIntensity * escalation * intensity;
-  },
-  wicked_build: (phase, intensity) => {
-    const buildPhase = Math.pow(phase, 0.8);
-    const wickedness = Math.sin(buildPhase * Math.PI * 4) * 0.3 + 0.7;
-    const spike = Math.random() > 0.9 ? intensity * 0.3 : 0;
-    return wickedness * intensity * buildPhase + spike;
-  },
-  malicious_flicker: (phase, intensity) => {
-    const flickerPhase = Math.floor(phase * 40);
-    const flicker = flickerPhase % 3 === 0 ? 1 : (flickerPhase % 3 === 1 ? 0.3 : 0.05);
-    const ramp = Math.min(phase * 2, 1);
-    return flicker * ramp * intensity;
-  },
-  sadistic_hold: (phase, intensity) => {
-    const holdCycle = (phase * 2.5) % 1;
-    if (holdCycle < 0.5) {
-      return Math.pow(holdCycle * 2, 0.8) * intensity;
-    } else if (holdCycle < 0.7) {
-      return intensity * 0.95;
-    } else if (holdCycle < 0.75) {
-      return intensity * 0.02;
-    } else {
-      return intensity * (holdCycle - 0.75) * 4 * 0.1;
-    }
-  },
-  torment_wave: (phase, intensity) => {
-    const wave1 = Math.sin(phase * Math.PI * 6);
-    const wave2 = Math.sin(phase * Math.PI * 13);
-    const wave3 = Math.sin(phase * Math.PI * 19);
-    const combined = (Math.abs(wave1) * 0.5 + Math.abs(wave2) * 0.3 + Math.abs(wave3) * 0.2);
-    const tormentCurve = Math.pow(combined, 1.5);
-    return tormentCurve * intensity;
-  },
-  vindictive_spikes: (phase, intensity) => {
-    const spikePhase = (phase * 8) % 1;
-    if (spikePhase < 0.1) {
-      return intensity * (0.8 + Math.random() * 0.2);
-    } else if (spikePhase < 0.3) {
-      return intensity * 0.5;
-    } else if (spikePhase < 0.5) {
-      return intensity * 0.2;
-    } else {
-      return intensity * 0.02;
-    }
-  },
-  fairy_dust: (phase, intensity) => {
-    const dustPhase = Math.floor(phase * 50);
-    const randomDust = dustPhase % 7 === 0 ? 1 : (dustPhase % 3 === 0 ? 0.3 : 0.05);
-    return randomDust * intensity * 0.2;
-  },
-  impish_flutter: (phase, intensity) => {
-    const flutterPhase = (phase * 30) % 1;
-    const flutter = Math.sin(flutterPhase * Math.PI * 4);
-    const whisper = flutter > 0.7 ? flutter * 0.15 : flutter * 0.02;
-    return Math.abs(whisper) * intensity * 0.25;
-  },
-  maddening_tickle: (phase, intensity) => {
-    const ticklePhase = Math.floor(phase * 40);
-    if (ticklePhase % 5 === 0) {
-      return intensity * (0.1 + Math.random() * 0.15);
-    } else if (ticklePhase % 2 === 0) {
-      return intensity * 0.03;
-    } else {
-      return intensity * 0.01;
-    }
-  },
-  phantom_touch: (phase, intensity) => {
-    const ghostCycle = Math.floor(phase * 25);
-    if (ghostCycle % 8 === 0) {
-      return intensity * 0.25;
-    } else if (ghostCycle % 3 === 0) {
-      return intensity * (0.02 + Math.random() * 0.03);
-    } else {
-      return intensity * 0.005;
-    }
-  },
-  frustrating_flutter: (phase, intensity) => {
-    const flutterPhase = (phase * 40) % 1;
-    const flutter = flutterPhase < 0.15 ? 0.3 : flutterPhase < 0.3 ? 0.1 : 0.02;
-    const tease = Math.sin(phase * Math.PI * 8) * 0.3 + 0.7;
-    return flutter * tease * intensity * 0.2;
-  },
-  unbearable_lightness: (phase, intensity) => {
-    const lightPhase = (phase * 60) % 1;
-    const lightness = lightPhase < 0.1 ? 0.2 : (lightPhase < 0.15 ? 0.05 : 0.01);
-    const buildup = Math.min(phase * 1.5, 1);
-    return lightness * buildup * intensity * 0.3;
-  },
-  teasing_whisper: (phase, intensity) => {
-    const whisperPhase = Math.sin(phase * Math.PI * 12);
-    const whisper = whisperPhase > 0.8 ? (whisperPhase - 0.8) * 5 : 0;
-    return whisper * intensity * 0.15;
-  },
-  maddening_ripples: (phase, intensity) => {
-    const ripplePhase = (phase * 20) % 1;
-    const ripple = Math.sin(ripplePhase * Math.PI * 6) * 0.5 + 0.5;
-    const tease = ripple < 0.5 ? ripple * 0.2 : ripple * 0.05;
-    return tease * intensity * 0.25;
-  },
-  infuriating_flicker: (phase, intensity) => {
-    const flickerPhase = Math.floor(phase * 80);
-    const flicker = flickerPhase % 4 === 0 ? 0.3 : (flickerPhase % 2 === 0 ? 0.08 : 0.01);
-    const sensitivityBuild = Math.min(phase * 2, 1);
-    return flicker * sensitivityBuild * intensity * 0.3;
-  },
-  
-  // Hypno Helper patterns
-  hypno_wave: (phase, intensity) => {
-    const wave1 = Math.sin(phase * Math.PI * 0.8);
-    const wave2 = Math.sin(phase * Math.PI * 1.6);
-    const wave3 = Math.sin(phase * Math.PI * 2.4);
-    const entrainment = (wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2) * 0.5 + 0.5;
-    return entrainment * intensity * 0.85;
-  },
-  trance_rhythm: (phase, intensity) => {
-    const tranceCycle = Math.sin(phase * Math.PI);
-    const hypnotic = Math.pow((tranceCycle + 1) / 2, 0.7);
-    return hypnotic * intensity * 0.8;
-  },
-  sleepy_spiral: (phase, intensity) => {
-    const spiralPhase = phase * 3;
-    const spiral = Math.sin(spiralPhase * Math.PI * 2);
-    const hypnotic = Math.abs(spiral) * 0.7 + 0.15;
-    return hypnotic * intensity * 0.75;
-  },
-  hypnotic_pulse: (phase, intensity) => {
-    const pulsePhase = (phase * 4) % 1;
-    if (pulsePhase < 0.6) {
-      const build = Math.sin(pulsePhase / 0.6 * Math.PI * 0.5);
-      return build * intensity * 0.75;
-    } else {
-      return Math.sin((pulsePhase - 0.6) / 0.4 * Math.PI) * intensity * 0.4 + intensity * 0.3;
-    }
-  },
-  dreamy_flow: (phase, intensity) => {
-    const flowPhase = Math.sin(phase * Math.PI * 1.5);
-    const dreamy = Math.pow((flowPhase + 1) / 2, 0.6);
-    return dreamy * intensity * 0.8;
-  },
-  entrancement_zone: (phase, intensity) => {
-    const zone = Math.sin(phase * Math.PI * 2) * 0.4 + 0.5;
-    const hypnotic = Math.min(zone, 0.85);
-    return hypnotic * intensity * 0.75;
-  },
-  sleepy_build: (phase, intensity) => {
-    const buildUp = Math.pow(phase, 0.5);
-    const hypnotic = Math.sin(buildUp * Math.PI * 1.5) * 0.4 + 0.4;
-    return hypnotic * intensity * 0.7;
-  },
-  trance_oscillation: (phase, intensity) => {
-    const tranceWave = Math.sin(phase * Math.PI * 1.2);
-    const oscillating = (tranceWave + 1) / 2;
-    const peakCap = Math.min(oscillating, 0.85);
-    return peakCap * intensity * 0.8;
-  },
-  hypnotic_drift: (phase, intensity) => {
-    const drift = Math.sin(phase * Math.PI * 0.6) * 0.5 + 0.5;
-    const entrainment = Math.pow(drift, 0.8) * 0.9;
-    return entrainment * intensity * 0.75;
-  },
-  edge_trance: (phase, intensity) => {
-    const trancePhase = Math.floor(phase * 3);
-    const phaseProgress = (phase * 3) % 1;
-    const tranceBase = Math.sin(phaseProgress * Math.PI * 2) * 0.4 + 0.45;
-    const stageMod = 0.6 + (trancePhase / 10) * 0.25;
-    return Math.min(tranceBase * stageMod, 0.85) * intensity * 0.75;
-  },
-  // Chastity Caretaker patterns
-  gentle_checkup: (phase, intensity) => {
-    const checkPhase = (phase * 8) % 1;
-    if (checkPhase < 0.2) {
-      return intensity * 0.15;
-    } else if (checkPhase < 0.4) {
-      return intensity * 0.08;
-    } else {
-      return intensity * 0.02;
-    }
-  },
-  caring_tap: (phase, intensity) => {
-    const tapPhase = Math.floor(phase * 20);
-    if (tapPhase % 5 === 0) {
-      return intensity * 0.25;
-    } else if (tapPhase % 3 === 0) {
-      return intensity * 0.1;
-    } else {
-      return intensity * 0.03;
-    }
-  },
-  tender_flutter: (phase, intensity) => {
-    const flutter = Math.sin(phase * Math.PI * 6) * 0.5 + 0.5;
-    const caring = flutter < 0.6 ? flutter * 0.2 : flutter * 0.05;
-    return caring * intensity * 0.3;
-  },
-  nurturing_pulse: (phase, intensity) => {
-    const pulseCycle = (phase * 5) % 1;
-    if (pulseCycle < 0.5) {
-      const build = Math.sin(pulseCycle * Math.PI * 2);
-      return build * intensity * 0.25;
-    } else {
-      return intensity * 0.05;
-    }
-  },
-  cage_nurse: (phase, intensity) => {
-    const nursePhase = Math.floor(phase * 12);
-    const checkIn = nursePhase % 4 === 0 ? 0.2 : 0.05;
-    const care = nursePhase % 3 === 0 ? 0.15 : 0.03;
-    return Math.max(checkIn, care) * intensity * 0.3;
-  },
-  gentle_denial: (phase, intensity) => {
-    const denialPhase = Math.sin(phase * Math.PI * 1.5);
-    const sweet = denialPhase > 0 ? denialPhase * 0.2 : 0;
-    return Math.abs(sweet) * intensity * 0.25;
-  },
-  tender_torment: (phase, intensity) => {
-    const torment = Math.random() > 0.85 ? intensity * 0.3 : (Math.random() > 0.6 ? intensity * 0.1 : intensity * 0.02);
-    const growth = Math.min(phase * 1.2, 1);
-    return torment * growth * 0.4;
-  },
-  loving_check: (phase, intensity) => {
-    const lovePhase = (phase * 10) % 1;
-    if (lovePhase < 0.25) {
-      return intensity * 0.18;
-    } else if (lovePhase < 0.4) {
-      return intensity * 0.06;
-    } else {
-      return intensity * 0.01;
-    }
-  },
-  caretaker_hums: (phase, intensity) => {
-    const hum = Math.sin(phase * Math.PI * 3) * 0.4 + 0.5;
-    const gentle = Math.pow(hum, 0.7) * 0.5;
-    return gentle * intensity * 0.3;
-  },
-  sweet_frustration: (phase, intensity) => {
-    const sweetPhase = (phase * 6) % 1;
-    if (sweetPhase < 0.3) {
-      return intensity * 0.2;
-    } else if (sweetPhase < 0.6) {
-      return intensity * 0.05;
-    } else if (sweetPhase < 0.75) {
-      return intensity * 0.15;
-    } else {
-      return intensity * 0.02;
-    }
-  },
-  daily_routine: (phase, intensity) => {
-    const routine = Math.floor(phase * 8);
-    const stage = routine % 4;
-    switch (stage) {
-      case 0: return intensity * 0.25;
-      case 1: return intensity * 0.05;
-      case 2: return intensity * 0.15;
-      case 3: return intensity * 0.03;
-      default: return intensity * 0.02;
-    }
-  }
-}
 
 // UNIFIED PLAY MODE SYSTEM
 // =======================
 // All patterns consolidated into one library with device compatibility
 
 const PatternLibrary = {
-  // Waveform functions - the building blocks
-  waveforms: {
-    // Basic patterns
-    sine: (phase, intensity) => Math.sin(phase * Math.PI * 2) * intensity,
-    sawtooth: (phase, intensity) => (phase < 0.5 ? phase * 2 : (1 - phase) * 2) * intensity,
-    square: (phase, intensity) => (phase < 0.5 ? intensity : 0),
-    triangle: (phase, intensity) => (phase < 0.5 ? phase * 2 : (1 - phase) * 2) * intensity,
-    pulse: (phase, intensity) => (phase < 0.1 ? intensity : phase < 0.2 ? intensity * 0.3 : 0),
-    random: (_, intensity) => Math.random() * intensity,
-    ramp_up: (phase, intensity) => phase * intensity,
-    ramp_down: (phase, intensity) => (1 - phase) * intensity,
-    
-    // Advanced patterns
-    heartbeat: (phase, intensity) => {
-      const cycle = phase * 2;
-      const part1 = cycle % 1;
-      const part2 = (cycle + 0.3) % 1;
-      return (part1 < 0.15 ? intensity * 1.0 : part1 < 0.25 ? intensity * 0.4 : 0) + 
-             (part2 < 0.15 ? intensity * 0.6 : part2 < 0.25 ? intensity * 0.2 : 0);
-    },
-    tickle: (phase, intensity) => Math.random() > 0.5 ? 
-      intensity * (0.3 + Math.random() * 0.4) : intensity * (0.1 + Math.random() * 0.15),
-    edging: (phase, intensity) => {
-      const edgePhase = (phase * 4) % 1;
-      const ramp = Math.sin(phase * Math.PI * 1.5);
-      return edgePhase < 0.9 ? ramp * intensity * 0.8 : 0;
-    },
-    ruin: (phase, intensity) => phase < 0.85 ? 
-      Math.sin(phase * Math.PI * 0.85) * intensity : intensity * 0.2,
-    teasing: (phase, intensity) => {
-      const sub = phase * 3;
-      const wave = Math.sin(sub * Math.PI * 2);
-      const tease = wave < 0 ? wave * 0.1 : wave * (0.3 + Math.random() * 0.3);
-      return Math.abs(tease) * intensity;
-    },
-    desperation: (phase, intensity) => {
-      const desperation = phase * phase;
-      const bursts = Math.floor(phase * 8) % 3 === 0 ? 1 : 0.1;
-      return desperation * bursts * intensity;
-    },
-    mercy: (phase, intensity) => {
-      const cycle = phase * 5;
-      const rest = cycle % 2 > 1 ? 0 : 1;
-      return rest * Math.sin(cycle * Math.PI) * intensity * 0.6;
-    },
-    tease_escalate: (phase, intensity) => {
-      const base = phase;
-      const tease = (phase % 0.3) < 0.15 ? 1 : 0.2;
-      return base * tease * intensity;
-    },
-    stop_start: (phase, intensity) => Math.floor(phase * 10) % 2 === 0 ? intensity * 0.7 : 0,
-    random_tease: (_, intensity) => Math.random() > 0.6 ? intensity * (0.2 + Math.random() * 0.7) : 0,
-    micro_tease: (phase, intensity) => {
-      const tickCount = Math.floor(phase * 20);
-      const baseMicro = (tickCount % 3 === 0) ? 0.05 + Math.random() * 0.15 : 
-                       (tickCount % 3 === 1) ? 0.5 + Math.random() * 0.2 : 0.1 + Math.random() * 0.1;
-      return Math.random() > 0.7 ? intensity * 0.7 : intensity * baseMicro;
-    },
-    abrupt_edge: (phase, intensity) => {
-      const buildPhase = phase % 0.4;
-      return buildPhase < 0.35 ? Math.sin(buildPhase * Math.PI * 2.85) * intensity : 0;
-    },
-    build_and_ruin: (phase, intensity) => {
-      const cycle = phase * 2;
-      const build = Math.sin(cycle * Math.PI * 0.9) * intensity;
-      return (cycle % 1) > 0.9 ? intensity * 0.1 : build;
-    },
-    rapid_micro: (phase, intensity) => Math.random() > 0.3 ? 
-      intensity * (0.02 + Math.random() * 0.08) : intensity * (0.2 + Math.random() * 0.3),
-    peak_and_drop: (phase, intensity) => {
-      const phaseCycle = (phase * 3) % 1;
-      return phaseCycle < 0.8 ? Math.sin(phaseCycle * Math.PI * 1.25) * intensity * 0.95 : 0;
-    },
-    ghost_tease: (phase, intensity) => {
-      const ghostPhase = Math.floor(phase * 15);
-      if (ghostPhase % 4 === 0) return intensity * (0.5 + Math.random() * 0.3);
-      if (ghostPhase % 4 === 2) return intensity * (0.02 + Math.random() * 0.05);
-      return 0;
-    },
-    erratic: (phase, intensity) => {
-      const erraticValue = Math.random();
-      if (erraticValue > 0.75) return intensity * 0.7;
-      if (erraticValue > 0.5) return intensity * 0.2;
-      if (erraticValue > 0.3) return intensity * 0.05;
-      return intensity * 0.01;
-    },
-    held_edge: (phase, intensity) => {
-      const holdPhase = (phase * 1.5) % 1;
-      if (holdPhase < 0.6) return Math.sin(holdPhase * Math.PI * 1.66) * intensity;
-      if (holdPhase < 0.8) return intensity * 0.9;
-      return intensity * 0.05;
-    },
-    flutter: (phase, intensity) => {
-      const flutterCount = Math.floor(phase * 30);
-      const flutter = flutterCount % 2 === 0 ? intensity * 0.4 : intensity * 0.1;
-      return Math.min(Math.sqrt(phase) * flutter, intensity * 0.5);
-    },
-    crescendo: (phase, intensity) => Math.min(Math.pow(phase, 1.5), 1) * intensity,
-    tidal_wave: (phase, intensity) => {
-      const wave = Math.sin(phase * Math.PI * 2);
-      const tide = Math.sin(phase * Math.PI * 0.5) * 0.7 + 0.3;
-      return Math.abs(wave) * tide * intensity;
-    },
-    milking_pump: (phase, intensity) => {
-      const pumpPhase = (phase * 4) % 1;
-      if (pumpPhase < 0.7) return Math.pow(pumpPhase / 0.7, 1.5) * intensity;
-      if (pumpPhase < 0.85) return intensity;
-      return intensity * ((0.85 - pumpPhase) / 0.15);
-    },
-    relentless: (phase, intensity) => {
-      const relentlessPhase = phase * 2;
-      const wave1 = Math.sin(relentlessPhase * Math.PI * 2.5);
-      const wave2 = Math.sin(relentlessPhase * Math.PI * 7);
-      const build = Math.min(phase * 3, 1);
-      return (Math.abs(wave1) * 0.6 + Math.abs(wave2) * 0.4) * build * intensity;
-    },
-    overload: (phase, intensity) => {
-      const phaseQuadrant = Math.floor(phase * 8);
-      const subPhase = (phase * 8) % 1;
-      const baseIntensity = Math.min((phaseQuadrant + 1) / 8, 1);
-      return Math.abs(Math.sin(subPhase * Math.PI * 4)) * baseIntensity * intensity;
-    },
-    forced_peak: (phase, intensity) => {
-      const cycle = (phase * 3) % 1;
-      const buildPhase = cycle * 0.6;
-      if (cycle < 0.7) return Math.pow(buildPhase / 0.6, 2) * intensity;
-      if (cycle < 0.95) return intensity;
-      return intensity * (1 - (cycle - 0.95) / 0.05);
-    },
-    spiral_up: (phase, intensity) => {
-      const spiral = Math.sin(phase * Math.PI * (4 + phase * 6));
-      return Math.abs(spiral) * Math.min(phase * 2, 1) * intensity;
-    },
-    tsunami: (phase, intensity) => {
-      const tsunamiPhase = (phase * 3) % 1;
-      const buildUp = Math.pow(tsunamiPhase, 0.5) * 0.8;
-      const peak = tsunamiPhase < 0.7 ? buildUp : 
-                  (tsunamiPhase < 0.85 ? 1 : (1 - (tsunamiPhase - 0.85) / 0.15));
-      const waves = Math.sin(tsunamiPhase * Math.PI * 10) * 0.3 + 0.7;
-      return peak * waves * intensity;
-    },
-    ripple_thruster: (phase, intensity) => {
-      const phaseCycle = (phase * 4) % 1;
-      const ripple = Math.sin((phase * 8) % 1 * Math.PI * 4) * 0.5 + 0.5;
-      return (phaseCycle < 0.8 ? ripple : ripple * 0.3) * intensity;
-    },
-    forbidden_peaks: (phase, intensity) => {
-      const peakCycle = (phase * 2) % 1;
-      const baseBuild = Math.min(phase * 3, 1);
-      const quickRise = peakCycle < 0.6 ? 
-        baseBuild * Math.pow(peakCycle / 0.6, 1.5) : 
-        baseBuild * (1 - (peakCycle - 0.6) / 0.4);
-      return quickRise * (Math.sin(phase * Math.PI * 8) * 0.3 + 0.7) * intensity;
-    },
-    multiple_peaks: (phase, intensity) => {
-      const peakCount = Math.floor(phase * 6);
-      const subPhase = (phase * 6) % 1;
-      const base = Math.min((peakCount + 1) / 6, 1);
-      const peak = subPhase < 0.7 ? subPhase / 0.7 : 1 - ((subPhase - 0.7) / 0.3);
-      return base * peak * (Math.sin(phase * Math.PI * 12) * 0.2 + 0.8) * intensity;
-    },
-    intense_waves: (phase, intensity) => {
-      const wave1 = Math.sin(phase * Math.PI * 3);
-      const wave2 = Math.sin(phase * Math.PI * 7);
-      const wave3 = Math.sin(phase * Math.PI * 12);
-      const combined = (Math.abs(wave1) * 0.5 + Math.abs(wave2) * 0.3 + Math.abs(wave3) * 0.2);
-      return combined * (Math.min(phase * 2, 1) * 0.7 + 0.3) * intensity;
-    },
-    rapid_fire: (phase, intensity) => {
-      const burstCycle = (phase * 10) % 1;
-      const burst = burstCycle < 0.15 ? 1 : burstCycle < 0.3 ? 0.2 : 0.05;
-      return burst * Math.min(phase * 1.5, 1) * intensity;
-    },
-    mechanical: (phase, intensity) => {
-      const stepPhase = Math.floor(phase * 16) / 16;
-      const mechanical = Math.sin(stepPhase * Math.PI * 2);
-      return (mechanical > 0 ? mechanical : mechanical * 0.3) * intensity;
-    },
-    algorithm: (phase, intensity) => {
-      const algoPhase = (phase * 4) % 1;
-      return algoPhase < 0.9 ? 
-        Math.pow(algoPhase / 0.9, 1.5) * intensity : 
-        intensity * ((1 - algoPhase) / 0.1);
-    },
-    systematic_ruin: (phase, intensity) => {
-      const cycle = (phase * 2.5) % 1;
-      const buildPhase = Math.min(cycle / 0.92, 1);
-      return Math.pow(cycle >= 0.92 ? 0.08 : buildPhase, 1.2) * intensity;
-    },
-    cold_calculation: (phase, intensity) => {
-      const tickPhase = Math.floor(phase * 20);
-      const tickLevel = Math.min(tickPhase / 18, 1);
-      const suddenDrop = tickPhase >= 19 ? 0.05 : tickLevel;
-      return Math.sin(tickPhase * 0.5 * Math.PI) * suddenDrop * intensity;
-    },
-    evil_ripple: (phase, intensity) => {
-      const ripplePhase = (phase * 12) % 1;
-      const rippleSize = Math.sin(ripplePhase * Math.PI * 2) * 0.5 + 0.5;
-      return Math.pow(rippleSize, 1.5) * intensity * 0.9;
-    },
-    cruel_sine: (phase, intensity) => {
-      const sineValue = Math.sin(phase * Math.PI * 2);
-      return Math.abs(sineValue) * Math.pow(Math.abs(sineValue), 0.5) * intensity;
-    },
-    torture_pulse: (phase, intensity) => {
-      const pulseCycle = Math.floor(phase * 15);
-      const pulsePhase = (phase * 15) % 1;
-      const isPulse = pulsePhase < 0.3;
-      const pulseIntensity = isPulse ? Math.random() * 0.3 + 0.7 : 0.05;
-      return pulseIntensity * (0.5 + (pulseCycle / 15) * 0.5) * intensity;
-    },
-    wicked_build: (phase, intensity) => {
-      const buildPhase = Math.pow(phase, 0.8);
-      const wickedness = Math.sin(buildPhase * Math.PI * 4) * 0.3 + 0.7;
-      const spike = Math.random() > 0.9 ? intensity * 0.3 : 0;
-      return wickedness * intensity * buildPhase + spike;
-    },
-    malicious_flicker: (phase, intensity) => {
-      const flickerPhase = Math.floor(phase * 40);
-      const flicker = flickerPhase % 3 === 0 ? 1 : (flickerPhase % 3 === 1 ? 0.3 : 0.05);
-      return flicker * Math.min(phase * 2, 1) * intensity;
-    },
-    sadistic_hold: (phase, intensity) => {
-      const holdCycle = (phase * 2.5) % 1;
-      if (holdCycle < 0.5) return Math.pow(holdCycle * 2, 0.8) * intensity;
-      if (holdCycle < 0.7) return intensity * 0.95;
-      if (holdCycle < 0.75) return intensity * 0.02;
-      return intensity * (holdCycle - 0.75) * 4 * 0.1;
-    },
-    torment_wave: (phase, intensity) => {
-      const wave1 = Math.sin(phase * Math.PI * 6);
-      const wave2 = Math.sin(phase * Math.PI * 13);
-      const wave3 = Math.sin(phase * Math.PI * 19);
-      const combined = (Math.abs(wave1) * 0.5 + Math.abs(wave2) * 0.3 + Math.abs(wave3) * 0.2);
-      return Math.pow(combined, 1.5) * intensity;
-    },
-    vindictive_spikes: (phase, intensity) => {
-      const spikePhase = (phase * 8) % 1;
-      if (spikePhase < 0.1) return intensity * (0.8 + Math.random() * 0.2);
-      if (spikePhase < 0.3) return intensity * 0.5;
-      if (spikePhase < 0.5) return intensity * 0.2;
-      return intensity * 0.02;
-    },
-    fairy_dust: (phase, intensity) => {
-      const dustPhase = Math.floor(phase * 50);
-      const randomDust = dustPhase % 7 === 0 ? 1 : (dustPhase % 3 === 0 ? 0.3 : 0.05);
-      return randomDust * intensity * 0.2;
-    },
-    impish_flutter: (phase, intensity) => {
-      const flutterPhase = (phase * 30) % 1;
-      const flutter = Math.sin(flutterPhase * Math.PI * 4);
-      const whisper = flutter > 0.7 ? flutter * 0.15 : flutter * 0.02;
-      return Math.abs(whisper) * intensity * 0.25;
-    },
-    maddening_tickle: (phase, intensity) => {
-      const ticklePhase = Math.floor(phase * 40);
-      if (ticklePhase % 5 === 0) return intensity * (0.1 + Math.random() * 0.15);
-      if (ticklePhase % 2 === 0) return intensity * 0.03;
-      return intensity * 0.01;
-    },
-    phantom_touch: (phase, intensity) => {
-      const ghostCycle = Math.floor(phase * 25);
-      if (ghostCycle % 8 === 0) return intensity * 0.25;
-      if (ghostCycle % 3 === 0) return intensity * (0.02 + Math.random() * 0.03);
-      return intensity * 0.005;
-    },
-    frustrating_flutter: (phase, intensity) => {
-      const flutterPhase = (phase * 40) % 1;
-      const flutter = flutterPhase < 0.15 ? 0.3 : flutterPhase < 0.3 ? 0.1 : 0.02;
-      return flutter * (Math.sin(phase * Math.PI * 8) * 0.3 + 0.7) * intensity * 0.2;
-    },
-    unbearable_lightness: (phase, intensity) => {
-      const lightPhase = (phase * 60) % 1;
-      const lightness = lightPhase < 0.1 ? 0.2 : (lightPhase < 0.15 ? 0.05 : 0.01);
-      return lightness * Math.min(phase * 1.5, 1) * intensity * 0.3;
-    },
-    teasing_whisper: (phase, intensity) => {
-      const whisperPhase = Math.sin(phase * Math.PI * 12);
-      const whisper = whisperPhase > 0.8 ? (whisperPhase - 0.8) * 5 : 0;
-      return whisper * intensity * 0.15;
-    },
-    maddening_ripples: (phase, intensity) => {
-      const ripplePhase = (phase * 20) % 1;
-      const ripple = Math.sin(ripplePhase * Math.PI * 6) * 0.5 + 0.5;
-      const tease = ripple < 0.5 ? ripple * 0.2 : ripple * 0.05;
-      return tease * intensity * 0.25;
-    },
-    infuriating_flicker: (phase, intensity) => {
-      const flickerPhase = Math.floor(phase * 80);
-      const flicker = flickerPhase % 4 === 0 ? 0.3 : (flickerPhase % 2 === 0 ? 0.08 : 0.01);
-      return flicker * Math.min(phase * 2, 1) * intensity * 0.3;
-    },
-    // Hypno Helper patterns
-    hypno_wave: (phase, intensity) => {
-      const wave1 = Math.sin(phase * Math.PI * 0.8);
-      const wave2 = Math.sin(phase * Math.PI * 1.6);
-      const wave3 = Math.sin(phase * Math.PI * 2.4);
-      return ((wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2) * 0.5 + 0.5) * intensity * 0.85;
-    },
-    trance_rhythm: (phase, intensity) => {
-      const tranceCycle = Math.sin(phase * Math.PI);
-      return Math.pow((tranceCycle + 1) / 2, 0.7) * intensity * 0.8;
-    },
-    sleepy_spiral: (phase, intensity) => {
-      const spiral = Math.sin(phase * 3 * Math.PI * 2);
-      return (Math.abs(spiral) * 0.7 + 0.15) * intensity * 0.75;
-    },
-    hypnotic_pulse: (phase, intensity) => {
-      const pulsePhase = (phase * 4) % 1;
-      if (pulsePhase < 0.6) {
-        return Math.sin(pulsePhase / 0.6 * Math.PI * 0.5) * intensity * 0.75;
-      }
-      return Math.sin((pulsePhase - 0.6) / 0.4 * Math.PI) * intensity * 0.4 + intensity * 0.3;
-    },
-    dreamy_flow: (phase, intensity) => {
-      const flowPhase = Math.sin(phase * Math.PI * 1.5);
-      return Math.pow((flowPhase + 1) / 2, 0.6) * intensity * 0.8;
-    },
-    entrancement_zone: (phase, intensity) => {
-      const zone = Math.sin(phase * Math.PI * 2) * 0.4 + 0.5;
-      return Math.min(zone, 0.85) * intensity * 0.75;
-    },
-    sleepy_build: (phase, intensity) => {
-      const buildUp = Math.pow(phase, 0.5);
-      return (Math.sin(buildUp * Math.PI * 1.5) * 0.4 + 0.4) * intensity * 0.7;
-    },
-    trance_oscillation: (phase, intensity) => {
-      const tranceWave = Math.sin(phase * Math.PI * 1.2);
-      const oscillating = (tranceWave + 1) / 2;
-      return Math.min(oscillating, 0.85) * intensity * 0.8;
-    },
-    hypnotic_drift: (phase, intensity) => {
-      const drift = Math.sin(phase * Math.PI * 0.6) * 0.5 + 0.5;
-      return Math.pow(drift, 0.8) * 0.9 * intensity * 0.75;
-    },
-    edge_trance: (phase, intensity) => {
-      const trancePhase = Math.floor(phase * 3);
-      const phaseProgress = (phase * 3) % 1;
-      const tranceBase = Math.sin(phaseProgress * Math.PI * 2) * 0.4 + 0.45;
-      const stageMod = 0.6 + (trancePhase / 10) * 0.25;
-      return Math.min(tranceBase * stageMod, 0.85) * intensity * 0.75;
-    },
-    // Chastity Caretaker patterns
-    gentle_checkup: (phase, intensity) => {
-      const checkPhase = (phase * 8) % 1;
-      if (checkPhase < 0.2) return intensity * 0.15;
-      if (checkPhase < 0.4) return intensity * 0.08;
-      return intensity * 0.02;
-    },
-    caring_tap: (phase, intensity) => {
-      const tapPhase = Math.floor(phase * 20);
-      if (tapPhase % 5 === 0) return intensity * 0.25;
-      if (tapPhase % 3 === 0) return intensity * 0.1;
-      return intensity * 0.03;
-    },
-    tender_flutter: (phase, intensity) => {
-      const flutter = Math.sin(phase * Math.PI * 6) * 0.5 + 0.5;
-      const caring = flutter < 0.6 ? flutter * 0.2 : flutter * 0.05;
-      return caring * intensity * 0.3;
-    },
-    nurturing_pulse: (phase, intensity) => {
-      const pulseCycle = (phase * 5) % 1;
-      if (pulseCycle < 0.5) return Math.sin(pulseCycle * Math.PI * 2) * intensity * 0.25;
-      return intensity * 0.05;
-    },
-    cage_nurse: (phase, intensity) => {
-      const nursePhase = Math.floor(phase * 12);
-      const checkIn = nursePhase % 4 === 0 ? 0.2 : 0.05;
-      const care = nursePhase % 3 === 0 ? 0.15 : 0.03;
-      return Math.max(checkIn, care) * intensity * 0.3;
-    },
-    gentle_denial: (phase, intensity) => {
-      const denialPhase = Math.sin(phase * Math.PI * 1.5);
-      return Math.abs(denialPhase > 0 ? denialPhase * 0.2 : 0) * intensity * 0.25;
-    },
-    tender_torment: (phase, intensity) => {
-      const torment = Math.random() > 0.85 ? intensity * 0.3 : 
-                     (Math.random() > 0.6 ? intensity * 0.1 : intensity * 0.02);
-      return torment * Math.min(phase * 1.2, 1) * 0.4;
-    },
-    loving_check: (phase, intensity) => {
-      const lovePhase = (phase * 10) % 1;
-      if (lovePhase < 0.25) return intensity * 0.18;
-      if (lovePhase < 0.4) return intensity * 0.06;
-      return intensity * 0.01;
-    },
-    caretaker_hums: (phase, intensity) => {
-      const hum = Math.sin(phase * Math.PI * 3) * 0.4 + 0.5;
-      return Math.pow(hum, 0.7) * 0.5 * intensity * 0.3;
-    },
-    sweet_frustration: (phase, intensity) => {
-      const sweetPhase = (phase * 6) % 1;
-      if (sweetPhase < 0.3) return intensity * 0.2;
-      if (sweetPhase < 0.6) return intensity * 0.05;
-      if (sweetPhase < 0.75) return intensity * 0.15;
-      return intensity * 0.02;
-    },
-    daily_routine: (phase, intensity) => {
-      const routine = Math.floor(phase * 8) % 4;
-      switch (routine) {
-        case 0: return intensity * 0.25;
-        case 1: return intensity * 0.05;
-        case 2: return intensity * 0.15;
-        case 3: return intensity * 0.03;
-        default: return intensity * 0.02;
-      }
-    }
-  },
-
   // Device compatibility metadata for patterns
   // All patterns work with all devices by default, but some are optimized
   compatibility: {
-    // Vibration devices (cage, plug)
-    vibration: ['sine', 'pulse', 'heartbeat', 'tickle', 'edging', 'ruin', 'teasing', 'desperation', 
-               'mercy', 'stop_start', 'random_tease', 'micro_tease', 'abrupt_edge', 'crescendo',
-               'tidal_wave', 'milking_pump', 'relentless', 'overload', 'tsunami', 'forbidden_peaks'],
-    // Linear devices (stroker)
-    linear: ['sine', 'sawtooth', 'triangle', 'pulse', 'ramp_up', 'ramp_down', 'ripple_thruster',
-             'crescendo', 'tsunami', 'milking_pump'],
-// All devices support all patterns - will be populated after initialization
-all: []
+    // Device type to waveform pattern mappings - which patterns work best with which device types
+    // All device types default to 'general' patterns if not specified here
+    byDeviceType: {
+      vibration: ['sine', 'pulse', 'heartbeat', 'tickle', 'edging', 'ruin', 'teasing', 'desperation',
+        'mercy', 'stop_start', 'random_tease', 'micro_tease', 'abrupt_edge', 'crescendo',
+        'tidal_wave', 'milking_pump', 'relentless', 'overload', 'tsunami', 'forbidden_peaks'],
+      linear: ['sine', 'sawtooth', 'triangle', 'pulse', 'ramp_up', 'ramp_down', 'ripple_thruster',
+        'crescendo', 'tsunami', 'milking_pump']
+    },
+    // All devices support all patterns - will be populated after initialization
+    all: []
+  },
+
+  // Device type detection configuration
+  // Maps device name patterns to device types and properties
+  devices: {
+    // Device type patterns - used to detect device type from device name
+    typePatterns: {
+      cage: ['cage'],
+      plug: ['plug'],
+      stroker: ['solace', 'stroker', 'launch'],
+      vibrator: ['lush', 'hush', 'nora', 'max', 'domi'],
+      gush: ['gush'],
+      general: [] // Fallback for unmatched devices
+    },
+    // Device-specific default intensities
+    defaultIntensities: {
+      gush: 117, // Gush 2 works better at 117%
+      default: 100
+    },
+    // Device shorthand mappings (for display)
+    shorthandPatterns: {
+      cage: ['cage'],
+      plug: ['plug'],
+      solace: ['solace'],
+      lush: ['lush'],
+      hush: ['hush'],
+      nora: ['nora'],
+      max: ['max'],
+      domi: ['domi'],
+      edge: ['edge'],
+      gush: ['gush']
+    }
   },
 
   // Preset patterns - ready-to-use configurations
@@ -1254,115 +376,6 @@ all: []
       description: 'Build to edge then stop',
       compatibleDevices: ['cage', 'plug', 'general']
     },
-    // Device-specific optimized presets
-    cage_tease: {
-      type: 'waveform',
-      pattern: 'pulse',
-      min: 10,
-      max: 40,
-      duration: 5000,
-      cycles: 3,
-      description: 'Gentle pulses for chastity device',
-      compatibleDevices: ['cage']
-    },
-    cage_denial: {
-      type: 'waveform',
-      pattern: 'ramp_up',
-      min: 5,
-      max: 80,
-      duration: 10000,
-      cycles: 1,
-      description: 'Build then stop - denial',
-      compatibleDevices: ['cage']
-    },
-    stroker_slow: {
-      type: 'linear_waveform',
-      pattern: 'sine',
-      positions: [10, 90],
-      duration: 3000,
-      cycles: 5,
-      description: 'Slow full strokes',
-      compatibleDevices: ['stroker']
-    },
-    stroker_fast: {
-      type: 'linear_waveform',
-      pattern: 'square',
-      positions: [15, 85],
-      duration: 1000,
-      cycles: 15,
-      description: 'Fast strokes',
-      compatibleDevices: ['stroker']
-    },
-    stroker_edge: {
-      type: 'linear_gradient',
-      positions: [10, 95],
-      duration: 8000,
-      hold: 3000,
-      description: 'Edge and hold',
-      compatibleDevices: ['stroker']
-    },
-
-    // Cage-specific presets
-    cage_pulse: { type: 'waveform', pattern: 'square', min: 20, max: 60, duration: 2000, cycles: 10, description: 'Rhythmic pulses', compatibleDevices: ['cage'] },
-    cage_edge: { type: 'gradient', start: 0, end: 90, duration: 15000, hold: 5000, release: 3000, description: 'Edge pattern', compatibleDevices: ['cage'] },
-    cage_random: { type: 'waveform', pattern: 'random', min: 15, max: 50, duration: 8000, cycles: 2, description: 'Random sensations', compatibleDevices: ['cage'] },
-    cage_heartbeat: { type: 'waveform', pattern: 'heartbeat', min: 15, max: 50, duration: 6000, cycles: 8, description: 'Heartbeat rhythm', compatibleDevices: ['cage'] },
-    cage_tickle: { type: 'waveform', pattern: 'tickle', min: 20, max: 60, duration: 4000, cycles: 10, description: 'Random light touches', compatibleDevices: ['cage'] },
-    cage_edging: { type: 'waveform', pattern: 'edging', min: 10, max: 90, duration: 12000, cycles: 2, description: 'Edge to 90% then stop', compatibleDevices: ['cage'] },
-    cage_ruin: { type: 'waveform', pattern: 'ruin', min: 5, max: 95, duration: 8000, cycles: 1, description: 'Ruin at peak (drops to 20%)', compatibleDevices: ['cage'] },
-    cage_desperation: { type: 'waveform', pattern: 'desperation', min: 10, max: 80, duration: 15000, cycles: 2, description: 'Builds desperation', compatibleDevices: ['cage'] },
-    cage_mercy: { type: 'waveform', pattern: 'mercy', min: 30, max: 60, duration: 8000, cycles: 4, description: 'Alternates rest and play', compatibleDevices: ['cage'] },
-    cage_tease_escalate: { type: 'waveform', pattern: 'tease_escalate', min: 5, max: 85, duration: 12000, cycles: 2, description: 'Escalating tease', compatibleDevices: ['cage'] },
-    cage_stop_start: { type: 'waveform', pattern: 'stop_start', min: 40, max: 80, duration: 6000, cycles: 3, description: 'Stop/start pattern', compatibleDevices: ['cage'] },
-    cage_random_tease: { type: 'waveform', pattern: 'random_tease', min: 10, max: 75, duration: 10000, cycles: 4, description: 'Random on/off', compatibleDevices: ['cage'] },
-    cage_micro_tease: { type: 'waveform', pattern: 'micro_tease', min: 5, max: 50, duration: 8000, cycles: 4, description: 'Micro twitching', compatibleDevices: ['cage'] },
-    cage_abrupt_edge: { type: 'waveform', pattern: 'abrupt_edge', min: 10, max: 95, duration: 5000, cycles: 3, description: 'Peak then stop', compatibleDevices: ['cage'] },
-    cage_build_and_ruin: { type: 'waveform', pattern: 'build_and_ruin', min: 5, max: 92, duration: 10000, cycles: 2, description: 'Build then ruin', compatibleDevices: ['cage'] },
-    cage_rapid_micro: { type: 'waveform', pattern: 'rapid_micro', min: 2, max: 30, duration: 6000, cycles: 10, description: 'Rapid micros', compatibleDevices: ['cage'] },
-    cage_ghost_tease: { type: 'waveform', pattern: 'ghost_tease', min: 1, max: 60, duration: 7000, cycles: 5, description: 'Ghost touches', compatibleDevices: ['cage'] },
-    cage_erratic: { type: 'waveform', pattern: 'erratic', min: 1, max: 70, duration: 5000, cycles: 4, description: 'Unpredictable', compatibleDevices: ['cage'] },
-    cage_held_edge: { type: 'waveform', pattern: 'held_edge', min: 15, max: 90, duration: 8000, cycles: 2, description: 'Hold at edge', compatibleDevices: ['cage'] },
-    cage_crescendo: { type: 'waveform', pattern: 'crescendo', min: 10, max: 100, duration: 15000, cycles: 2, description: 'Slow build to peak', compatibleDevices: ['cage'] },
-    cage_tidal_wave: { type: 'waveform', pattern: 'tidal_wave', min: 20, max: 100, duration: 12000, cycles: 3, description: 'Rising wave', compatibleDevices: ['cage'] },
-    cage_milking_pump: { type: 'waveform', pattern: 'milking_pump', min: 10, max: 100, duration: 8000, cycles: 5, description: 'Pumping rhythm', compatibleDevices: ['cage'] },
-    cage_relentless: { type: 'waveform', pattern: 'relentless', min: 15, max: 100, duration: 10000, cycles: 3, description: 'Relentless building', compatibleDevices: ['cage'] },
-    cage_overload: { type: 'waveform', pattern: 'overload', min: 20, max: 100, duration: 12000, cycles: 4, description: 'Overload', compatibleDevices: ['cage'] },
-    cage_forced_peak: { type: 'waveform', pattern: 'forced_peak', min: 10, max: 100, duration: 9000, cycles: 4, description: 'Forced peak cycles', compatibleDevices: ['cage'] },
-    cage_spiral_up: { type: 'waveform', pattern: 'spiral_up', min: 10, max: 100, duration: 11000, cycles: 3, description: 'Spiraling intensity', compatibleDevices: ['cage'] },
-    cage_tsunami: { type: 'waveform', pattern: 'tsunami', min: 10, max: 100, duration: 10000, cycles: 4, description: 'Massive waves', compatibleDevices: ['cage'] },
-    cage_ripple_thruster: { type: 'waveform', pattern: 'ripple_thruster', min: 15, max: 85, duration: 4000, cycles: 4, description: 'Thrusts with ripples', compatibleDevices: ['cage'] },
-    cage_forbidden_peaks: { type: 'waveform', pattern: 'forbidden_peaks', min: 30, max: 100, duration: 3500, cycles: 4, description: 'Forbidden peaks', compatibleDevices: ['cage'] },
-    cage_multiple_peaks: { type: 'waveform', pattern: 'multiple_peaks', min: 25, max: 100, duration: 6000, cycles: 4, description: 'Multiple peaks', compatibleDevices: ['cage'] },
-    cage_intense_waves: { type: 'waveform', pattern: 'intense_waves', min: 30, max: 100, duration: 4000, cycles: 4, description: 'Intense combined waves', compatibleDevices: ['cage'] },
-    cage_rapid_fire: { type: 'waveform', pattern: 'rapid_fire', min: 40, max: 100, duration: 1500, cycles: 6, description: 'Rapid fire', compatibleDevices: ['cage'] },
-
-    // Plug-specific presets
-    plug_gentle: { type: 'waveform', pattern: 'sine', min: 10, max: 30, duration: 3000, cycles: 5, description: 'Gentle sway', compatibleDevices: ['plug'] },
-    plug_pulse: { type: 'waveform', pattern: 'pulse', min: 20, max: 70, duration: 1500, cycles: 8, description: 'Pulse rhythm', compatibleDevices: ['plug'] },
-    plug_wave: { type: 'waveform', pattern: 'sawtooth', min: 15, max: 55, duration: 4000, cycles: 4, description: 'Wave pattern', compatibleDevices: ['plug'] },
-    plug_intense: { type: 'waveform', pattern: 'square', min: 40, max: 90, duration: 2500, cycles: 6, description: 'Intense bursts', compatibleDevices: ['plug'] },
-    plug_tickle: { type: 'waveform', pattern: 'tickle', min: 25, max: 65, duration: 5000, cycles: 8, description: 'Light tickling', compatibleDevices: ['plug'] },
-    plug_heartbeat: { type: 'waveform', pattern: 'heartbeat', min: 20, max: 55, duration: 8000, cycles: 6, description: 'Heartbeat', compatibleDevices: ['plug'] },
-    plug_edging: { type: 'waveform', pattern: 'edging', min: 15, max: 85, duration: 14000, cycles: 2, description: 'Edge play', compatibleDevices: ['plug'] },
-    plug_teasing: { type: 'waveform', pattern: 'teasing', min: 30, max: 70, duration: 11000, cycles: 3, description: 'Irregular tease', compatibleDevices: ['plug'] },
-    plug_crescendo: { type: 'waveform', pattern: 'crescendo', min: 15, max: 100, duration: 15000, cycles: 2, description: 'Slow build to peak', compatibleDevices: ['plug'] },
-    plug_tidal_wave: { type: 'waveform', pattern: 'tidal_wave', min: 25, max: 100, duration: 12000, cycles: 3, description: 'Rising wave', compatibleDevices: ['plug'] },
-    plug_milking_pump: { type: 'waveform', pattern: 'milking_pump', min: 20, max: 100, duration: 8000, cycles: 5, description: 'Pumping rhythm', compatibleDevices: ['plug'] },
-    plug_forced_peak: { type: 'waveform', pattern: 'forced_peak', min: 15, max: 100, duration: 9000, cycles: 4, description: 'Forced peaks', compatibleDevices: ['plug'] },
-    plug_tsunami: { type: 'waveform', pattern: 'tsunami', min: 15, max: 100, duration: 10000, cycles: 4, description: 'Massive waves', compatibleDevices: ['plug'] },
-
-    // Stroker-specific presets
-    stroker_medium: { type: 'linear_waveform', pattern: 'sawtooth', positions: [20, 80], duration: 2000, cycles: 8, description: 'Medium strokes', compatibleDevices: ['stroker'] },
-    stroker_tease: { type: 'linear_waveform', pattern: 'pulse', positions: [30, 70], duration: 1500, cycles: 12, description: 'Short stroke pulses', compatibleDevices: ['stroker'] },
-    stroker_tease_edge: { type: 'linear_gradient', positions: [5, 98], duration: 12000, hold: 2000, release: 4000, description: 'Tease edge sequence', compatibleDevices: ['stroker'] },
-    stroker_partial: { type: 'linear_waveform', pattern: 'sawtooth', positions: [30, 70], duration: 800, cycles: 20, description: 'Partial strokes only', compatibleDevices: ['stroker'] },
-    stroker_stop_start: { type: 'linear_waveform', pattern: 'square', positions: [20, 80], duration: 1200, cycles: 10, description: 'Stop/start strokes', compatibleDevices: ['stroker'] },
-    stroker_tickle: { type: 'linear_waveform', pattern: 'triangle', positions: [40, 60], duration: 400, cycles: 30, description: 'Short quick strokes', compatibleDevices: ['stroker'] },
-    stroker_edging: { type: 'linear_gradient', positions: [10, 92], duration: 10000, hold: 3000, release: 5000, description: 'Long edge session', compatibleDevices: ['stroker'] },
-    stroker_milking: { type: 'linear_waveform', pattern: 'sine', positions: [5, 95], duration: 2000, cycles: 20, description: 'Milking strokes', compatibleDevices: ['stroker'] },
-    stroker_full: { type: 'linear_waveform', pattern: 'sawtooth', positions: [10, 90], duration: 1500, cycles: 25, description: 'Full deep strokes', compatibleDevices: ['stroker'] },
-    stroker_crescendo: { type: 'linear_gradient', positions: [5, 98], duration: 15000, hold: 4000, release: 3000, description: 'Build to edge', compatibleDevices: ['stroker'] },
-    stroker_tsunami: { type: 'linear_waveform', pattern: 'sine', positions: [2, 98], duration: 1200, cycles: 30, description: 'Massive waves', compatibleDevices: ['stroker'] },
 
     // General patterns for all devices
     build: { type: 'waveform', pattern: 'ramp_up', min: 30, max: 80, duration: 12000, cycles: 1, description: 'Gradual build', compatibleDevices: ['cage', 'plug', 'stroker', 'general'] },
@@ -1393,11 +406,6 @@ all: []
   }
 };
 
-// Populate compatibility array after PatternLibrary is fully initialized
-PatternLibrary.compatibility.all = Object.keys(PatternLibrary.waveforms);
-
-
-
 // Active pattern tracking
 let activePatterns = new Map(); // deviceIndex -> { pattern, interval, controls }
 
@@ -1418,7 +426,7 @@ function applyMaxOscillate(value) {
 // Generate waveform pattern values
 function generateWaveformValues(pattern, steps, min, max) {
   const values = []
-  const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
+  const generator = PlayModeLoader.getPattern(pattern) || PlayModeLoader.getPattern('sine')
   const range = max - min
   
   for (let i = 0; i < steps; i++) {
@@ -1434,7 +442,7 @@ function generateWaveformValues(pattern, steps, min, max) {
 function generateDualMotorWaveform(pattern, steps, min, max) {
   const motor1Values = []
   const motor2Values = []
-  const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
+  const generator = PlayModeLoader.getPattern(pattern) || PlayModeLoader.getPattern('sine')
   const range = max - min
 
   for (let i = 0; i < steps; i++) {
@@ -1466,12 +474,8 @@ async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
     return
   }
 
-  // Determine device type
-  const devName = (targetDevice.displayName || targetDevice.name || '').toLowerCase()
-  let deviceType = 'general'
-  if (devName.includes('cage')) deviceType = 'cage'
-  else if (devName.includes('plug')) deviceType = 'plug'
-  else if (devName.includes('solace') || devName.includes('stroker') || devName.includes('launch')) deviceType = 'stroker'
+  // Determine device type using PatternLibrary configuration
+  const deviceType = getDeviceType(targetDevice)
 
   // Get preset from PatternLibrary
   let preset = PatternLibrary.presets[presetName]
@@ -1637,7 +641,7 @@ async function executeLinearWaveform(deviceIndex, config) {
   const { pattern, positions, duration, cycles } = config
   const [startPos, endPos] = positions
   const steps = Math.floor(duration / 100)
-  const generator = WaveformPatterns[pattern] || WaveformPatterns.sine
+  const generator = PlayModeLoader.getPattern(pattern) || PlayModeLoader.getPattern('sine')
 
   const targetDevice = devices[deviceIndex] || devices[0]
   if (!targetDevice) return
@@ -3346,39 +2350,60 @@ function getDeviceDisplayName(dev) {
   return dev.displayName || dev.name || 'Unknown Device'
 }
 
-// Get device type classification
+// Get device type classification using PatternLibrary configuration
 function getDeviceType(dev) {
-const devName = (dev.displayName || dev.name || '').toLowerCase()
-if (devName.includes('cage')) return 'cage'
-if (devName.includes('plug')) return 'plug'
-if (devName.includes('solace') || devName.includes('stroker') || devName.includes('launch')) return 'stroker'
-if (devName.includes('lush') || devName.includes('hush')) return 'vibrator'
-if (devName.includes('nora') || devName.includes('max') || devName.includes('domi')) return 'vibrator'
-if (devName.includes('gush')) return 'gush'
-return 'general'
+  const devName = (dev.displayName || dev.name || '').toLowerCase()
+  const patterns = PatternLibrary.devices.typePatterns
+
+  // Check each device type in order
+  for (const [deviceType, keywords] of Object.entries(patterns)) {
+    if (deviceType === 'general') continue // Skip fallback, check last
+    if (keywords.some(keyword => devName.includes(keyword))) {
+      return deviceType
+    }
+  }
+
+  return 'general'
 }
 
-// Get device-specific default intensity
+// Get device-specific default intensity using PatternLibrary configuration
 function getDeviceDefaultIntensity(dev) {
-const devName = (dev.displayName || dev.name || '').toLowerCase()
-if (devName.includes('gush')) return 117 // Gush 2 works better at 117%
-return 100 // Default for all other devices
+  const devName = (dev.displayName || dev.name || '').toLowerCase()
+  const type = getDeviceType(dev)
+  const intensities = PatternLibrary.devices.defaultIntensities
+
+  // Check for device type-specific intensity first
+  if (intensities[type] !== undefined && type !== 'default') {
+    return intensities[type]
+  }
+
+  // Check for device name match in shorthand patterns
+  const shorthandPatterns = PatternLibrary.devices.shorthandPatterns
+  for (const [shorthand, keywords] of Object.entries(shorthandPatterns)) {
+    if (keywords.some(keyword => devName.includes(keyword))) {
+      if (intensities[shorthand] !== undefined) {
+        return intensities[shorthand]
+      }
+    }
+  }
+
+  return intensities.default || 100
 }
 
-// Get shorthand for device
+// Get shorthand for device using PatternLibrary configuration
 function getDeviceShorthand(dev) {
-const devName = (dev.displayName || dev.name || '').toLowerCase()
-if (devName.includes('cage')) return 'cage'
-if (devName.includes('plug')) return 'plug'
-if (devName.includes('solace')) return 'solace'
-if (devName.includes('lush')) return 'lush'
-if (devName.includes('hush')) return 'hush'
-if (devName.includes('nora')) return 'nora'
-if (devName.includes('max')) return 'max'
-if (devName.includes('domi')) return 'domi'
-if (devName.includes('edge')) return 'edge'
-if (devName.includes('gush')) return 'gush'
-return devName.split(' ')[0]
+  const devName = (dev.displayName || dev.name || '').toLowerCase()
+  const patterns = PatternLibrary.devices.shorthandPatterns
+
+  // Check each shorthand pattern
+  for (const [shorthand, keywords] of Object.entries(patterns)) {
+    if (keywords.some(keyword => devName.includes(keyword))) {
+      return shorthand
+    }
+  }
+
+  // Return first word of device name as fallback
+  return devName.split(' ')[0]
 }
 
 function clickHandlerHack() {
@@ -5310,16 +4335,7 @@ prejac: ['rapid_micro', 'rapid_fire', 'flutter', 'sine', 'pulse']
                 pulse: PatternLibrary.presets.pulse,
                 edge: PatternLibrary.presets.edge
             }
-            // Add device-specific presets
-            if (deviceType === 'cage') {
-                presets.cage_tease = PatternLibrary.presets.cage_tease
-                presets.cage_denial = PatternLibrary.presets.cage_denial
-            } else if (deviceType === 'stroker') {
-                presets.stroker_slow = PatternLibrary.presets.stroker_slow
-                presets.stroker_fast = PatternLibrary.presets.stroker_fast
-                presets.stroker_edge = PatternLibrary.presets.stroker_edge
-            }
-            // Add basic waveform patterns (only in basic category)
+    // Add basic waveform patterns (only in basic category)
             const basicPatterns = ['sine', 'sawtooth', 'square', 'triangle', 'random', 'ramp_up', 'ramp_down']
             basicPatterns.forEach(patternName => {
                 presets[patternName] = {
@@ -5456,7 +4472,7 @@ executePlayModeSequence = async function(deviceIndex, modePreset) {
 
 // Execute a single pattern step
   executePatternStep = async function(deviceIndex, step) {
-    const patternFunc = PatternLibrary.waveforms[step.pattern]
+    const patternFunc = PlayModeLoader.getPattern(step.pattern)
     if (!patternFunc) return
     
     const steps = Math.floor(step.duration / 100)
@@ -5487,7 +4503,7 @@ executePlayModeSequence = async function(deviceIndex, modePreset) {
 // Get default values for any pattern (waveform or mode)
 function getPatternDefaults(patternName, category) {
   // Check if it's a waveform pattern
-  if (WaveformPatterns[patternName]) {
+  if (PlayModeLoader.hasPattern(patternName)) {
     return {
       min: 20,
       max: 80,
@@ -5835,7 +4851,7 @@ function convertTimelineToFunscripts() {
     
     // Generate waveform values for this block
     const steps = Math.floor(block.duration / 100) // 100ms resolution
-    const patternFunc = WaveformPatterns[block.patternName] || WaveformPatterns.sine
+    const patternFunc = PlayModeLoader.getPattern(block.patternName) || PlayModeLoader.getPattern('sine')
     const cycles = block.cycles || 1
     
     for (let i = 0; i < steps; i++) {
