@@ -206,36 +206,44 @@ Connect a device to see available patterns
                 <div class="timeline-track-lane" style="height: 28px; position: relative; background: rgba(0,0,0,0.2); cursor: pointer; border-bottom: 1px solid rgba(100,255,100,0.1);" data-channel="B" data-motor="1"></div>
             </div>
         </div>
-        <!-- Track C -->
-        <div class="timeline-track-container" data-channel="C" style="display: flex; flex-direction: column; border-radius: 3px; border: 1px solid rgba(100,100,255,0.2); overflow: hidden;">
-            <div class="timeline-track-header" style="display: flex; align-items: center; height: 24px; background: rgba(100,100,255,0.1);">
-                <div style="width: 60px; padding: 0 8px; font-size: 0.7em; color: #6464ff; font-weight: bold; display: flex; align-items: center; gap: 5px;">
-                    <i class="fa-solid fa-wave-square"></i> C
-                </div>
-                <div style="flex: 1;"></div>
-                <div style="display: flex; align-items: center; gap: 5px; padding: 0 8px; font-size: 0.65em;">
-                <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #888;">
-                    <input type="checkbox" id="channel-c-multi-motor" style="margin: 0;">
-                    <i class="fa-solid fa-fan" style="font-size: 0.8em;"></i>
-                </label>
-                <input type="number" id="channel-c-motor-count" min="1" max="8" value="2" style="width: 35px; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; color: #fff; text-align: center; display: none;">
-            </div>
-        </div>
-        <!-- Track D -->
-        <div class="timeline-track" data-channel="D" style="display: flex; align-items: center; height: 32px; background: rgba(255,0,255,0.1); border-radius: 3px; border: 1px solid rgba(255,0,255,0.2);">
-            <div style="width: 60px; padding: 0 8px; font-size: 0.7em; color: #ff00ff; font-weight: bold; display: flex; align-items: center; gap: 5px;">
-                <i class="fa-solid fa-wave-square"></i> D
-            </div>
-            <div class="timeline-track-lane" style="flex: 1; height: 100%; position: relative; background: rgba(0,0,0,0.2); cursor: pointer;" data-channel="D"></div>
-            <div style="display: flex; align-items: center; gap: 5px; padding: 0 8px; font-size: 0.65em;">
-                <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #888;">
-                    <input type="checkbox" id="channel-d-multi-motor" style="margin: 0;">
-                    <i class="fa-solid fa-fan" style="font-size: 0.8em;"></i>
-                </label>
-                <input type="number" id="channel-d-motor-count" min="1" max="8" value="2" style="width: 35px; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; color: #fff; text-align: center; display: none;">
-            </div>
-        </div>
+<!-- Track C -->
+<div class="timeline-track-container" data-channel="C" style="display: flex; flex-direction: column; border-radius: 3px; border: 1px solid rgba(100,100,255,0.2); overflow: hidden;">
+  <div class="timeline-track-header" style="display: flex; align-items: center; height: 24px; background: rgba(100,100,255,0.1); margin-left: -76px; padding-left: 76px;">
+    <div style="width: 60px; padding: 0 8px; font-size: 0.7em; color: #6464ff; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+      <i class="fa-solid fa-wave-square"></i> C
     </div>
+    <div style="flex: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 5px; padding: 0 8px; font-size: 0.65em;">
+      <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #888;">
+        <input type="checkbox" id="channel-c-multi-motor" style="margin: 0;">
+        <i class="fa-solid fa-fan" style="font-size: 0.8em;"></i>
+      </label>
+      <input type="number" id="channel-c-motor-count" min="1" max="8" value="2" style="width: 35px; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; color: #fff; text-align: center; display: none;">
+    </div>
+  </div>
+  <div class="timeline-track-lanes" data-channel="C" style="display: flex; flex-direction: column; flex: 1;">
+    <div class="timeline-track-lane" style="height: 28px; position: relative; background: rgba(0,0,0,0.2); cursor: pointer; border-bottom: 1px solid rgba(100,100,255,0.1);" data-channel="C" data-motor="1"></div>
+  </div>
+</div>
+<!-- Track D -->
+<div class="timeline-track-container" data-channel="D" style="display: flex; flex-direction: column; border-radius: 3px; border: 1px solid rgba(255,0,255,0.2); overflow: hidden;">
+  <div class="timeline-track-header" style="display: flex; align-items: center; height: 24px; background: rgba(255,0,255,0.1); margin-left: -76px; padding-left: 76px;">
+    <div style="width: 60px; padding: 0 8px; font-size: 0.7em; color: #ff00ff; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+      <i class="fa-solid fa-wave-square"></i> D
+    </div>
+    <div style="flex: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 5px; padding: 0 8px; font-size: 0.65em;">
+      <label style="display: flex; align-items: center; gap: 3px; cursor: pointer; color: #888;">
+        <input type="checkbox" id="channel-d-multi-motor" style="margin: 0;">
+        <i class="fa-solid fa-fan" style="font-size: 0.8em;"></i>
+      </label>
+      <input type="number" id="channel-d-motor-count" min="1" max="8" value="2" style="width: 35px; font-size: 0.7em; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 2px; color: #fff; text-align: center; display: none;">
+    </div>
+  </div>
+  <div class="timeline-track-lanes" data-channel="D" style="display: flex; flex-direction: column; flex: 1;">
+    <div class="timeline-track-lane" style="height: 28px; position: relative; background: rgba(0,0,0,0.2); cursor: pointer; border-bottom: 1px solid rgba(255,0,255,0.1);" data-channel="D" data-motor="1"></div>
+  </div>
+</div>
 
 <!-- Timeline Controls -->
 <div style="display: flex; align-items: center; gap: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 3px;">

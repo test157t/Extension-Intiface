@@ -1,6 +1,37 @@
 import { renderExtensionTemplateAsync } from "../../../extensions.js"
 import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles, getRequestHeaders, messageFormatting, appendMediaToMessage, addCopyToCodeBlocks } from "../../../../script.js"
 import { PlayModeLoader } from "./play_modes/_loader.js"
+import {
+  mediaPlayer,
+  funscriptCache,
+  initMediaModule,
+  initMediaPlayer,
+  loadMediaPlayerAppearance,
+  saveMediaPlayerAppearance,
+  applyMediaPlayerAppearance,
+  startInternalProxy,
+  stopInternalProxy,
+  updateProxyStatus,
+  refreshMenuMediaList,
+  loadFunscript,
+  processFunscript,
+  startFunscriptSync,
+  stopFunscriptSync,
+  startFunscriptSyncTimer,
+  stopFunscriptSyncTimer,
+  executeFunscriptAction,
+  stopMediaPlayback,
+  updateMediaPlayerStatus,
+  createChatSidebarPanel,
+  setupChatPanelEventHandlers,
+  showChatMediaPanel,
+  hideChatMediaPanel,
+  loadChatMediaFile,
+  setupChatVideoEventListeners,
+  updateChatFunscriptUI,
+  handleFunscriptView,
+  checkForVideoMentions
+} from "./media.js"
 
 // @ts-ignore: Hack to suppress IDE errors
 const $ = window.$
@@ -21,6 +52,7 @@ let intervalId
 let messageCommands = [] // Commands from current AI message
 let executedCommands = new Set() // Track executed commands
 let streamingText = '' // Accumulate streaming text
+let seenCommands = new Set() // Track command text signatures that have been seen complete
 let commandQueueInterval = null // Interval for sequential execution
 let isExecutingCommands = false
 let isStartingIntiface = false // Prevent multiple simultaneous start attempts
@@ -765,25 +797,29 @@ async function executeTeaseAndDenialMode(deviceIndex, modeName) {
   let foundModeId = null
   const enabledModes = PlayModeLoader.getEnabledModes()
   
+  console.log(`${NAME}: executeTeaseAndDenialMode - Looking for "${modeName}" in enabled modes:`, enabledModes)
+
   for (const modeId of enabledModes) {
+    console.log(`${NAME}: Checking mode "${modeId}" for sequence "${modeName}"`)
     const sequence = PlayModeLoader.getSequence(modeId, modeName)
+    console.log(`${NAME}: PlayModeLoader.getSequence("${modeId}", "${modeName}") returned:`, sequence ? 'FOUND' : 'NOT FOUND')
     if (sequence) {
       mode = sequence
       foundModeId = modeId
       break
     }
   }
-  
-  if (!mode) {
-    console.error(`${NAME}: Unknown mode: ${modeName}`)
-    return
-  }
+
+        if (!mode) {
+            // Silently skip - mode validation happens at parse time
+            return
+        }
 
   await stopDevicePattern(deviceIndex)
 
-  const deviceName = getDeviceDisplayName(targetDevice)
-const sequence = mode.sequence
-  const repeat = mode.repeat !== false
+        const deviceName = getDeviceDisplayName(targetDevice)
+        const sequence = mode.steps || mode.sequence
+        const repeat = mode.repeat !== false
 
   updateStatus(`${deviceName}: ${modeName} mode (${mode.description})`)
 
@@ -924,12 +960,27 @@ async function stopDevicePattern(deviceIndex) {
 // <cage:GRADIENT: start=0, end=90, duration=10000>
 // Media commands:
 // <media:LIST> - List available media files
-        // <media:PLAY: filename.ext> - Play a media file with optional funscript sync (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg)
+// <media:PLAY: filename.ext> - Play a media file with optional funscript sync (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg)
 // <media:STOP> - Stop media playback
-function parseDeviceCommands(text) {
-  const commands = []
-  
-  console.log(`${NAME}: Parsing commands from text:`, text.substring(0, 100) + '...')
+
+// Mode command configurations - maps command prefix to settings key and command type
+const MODE_COMMANDS = [
+    { prefix: 'DENIAL_DOMINA', settingKey: 'denialDomina', cmdType: 'denial_domina', logName: 'DENIAL_DOMINA' },
+    { prefix: 'MILK_MAID', settingKey: 'milkMaid', cmdType: 'milking', logName: 'MILK_MAID' },
+    { prefix: 'PET_TRAINING', settingKey: 'petTraining', cmdType: 'pet_training', logName: 'PET_TRAINING' },
+    { prefix: 'SISSY_SURRENDER', settingKey: 'sissySurrender', cmdType: 'sissy_surrender', logName: 'SISSY_SURRENDER' },
+    { prefix: 'PREJAC_PRINCESS', settingKey: 'prejacPrincess', cmdType: 'prejac_princess', logName: 'PREJAC_PRINCESS' },
+    { prefix: 'ROBOTIC_RUINATION', settingKey: 'roboticRuination', cmdType: 'robotic_ruination', logName: 'ROBOTIC_RUINATION' },
+    { prefix: 'EVIL_EDGING_MISTRESS', settingKey: 'evilEdgingMistress', cmdType: 'evil_edging_mistress', logName: 'EVIL_EDGING_MISTRESS' },
+    { prefix: 'FRUSTRATION_FAIRY', settingKey: 'frustrationFairy', cmdType: 'frustration_fairy', logName: 'FRUSTRATION_FAIRY' },
+    { prefix: 'HYPNO_HELPER', settingKey: 'hypnoHelper', cmdType: 'hypno_helper', logName: 'HYPNO_HELPER' },
+    { prefix: 'CHASTITY_CARETAKER', settingKey: 'chastityCaretaker', cmdType: 'chastity_caretaker', logName: 'CHASTITY_CARETAKER' }
+];
+
+function parseDeviceCommands(text, skipModeCommands = false) {
+    const commands = []
+
+    console.log(`${NAME}: Parsing commands from text:`, text.substring(0, 100) + '...', skipModeCommands ? '(skipping mode commands)' : '')
   
   // Match self-closing tags with device type: <type:command>
   const deviceRegex = /<([a-z]+):([^>]+)>/gi
@@ -963,19 +1014,19 @@ function parseDeviceCommands(text) {
     // Check for INTERFACE system commands (start, connect, disconnect)
     if (deviceType === 'interface' || deviceType === 'system') {
 if (commandText === 'START') {
-commands.push({ type: 'intiface_start' })
+commands.push({ type: 'interface_start' })
 continue
 }
 if (commandText === 'CONNECT') {
-commands.push({ type: 'intiface_connect' })
+commands.push({ type: 'interface_connect' })
 continue
 }
 if (commandText === 'DISCONNECT') {
-commands.push({ type: 'intiface_disconnect' })
+commands.push({ type: 'interface_disconnect' })
 continue
 }
 if (commandText === 'SCAN') {
-commands.push({ type: 'intiface_scan' })
+commands.push({ type: 'interface_scan' })
 continue
 }
 }
@@ -1037,135 +1088,27 @@ console.log(`${NAME}: Ignoring out-of-range media intensity: ${intensity}%`)
       continue
     }
 
-    // Parse DENIAL_DOMINA command
-    // Format: DENIAL_DOMINA: mind_games or DENIAL_DOMINA mind_games
-    const teaseDenialMatch = commandText.match(/DENIAL_DOMINA[\s:]+(\w+)/i)
-    if (teaseDenialMatch && modeSettings.denialDomina) {
-      const modeName = teaseDenialMatch[1].toLowerCase()
-      commands.push({
-        type: 'denial_domina',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse MILK_MAID command
-    // Format: MILK_MAID: milk_maid or MILK_MAID relentless_milking
-    const milkMaidMatch = commandText.match(/MILK_MAID[\s:]+(\w+)/i)
-    if (milkMaidMatch && modeSettings.milkMaid) {
-      const modeName = milkMaidMatch[1].toLowerCase()
-      commands.push({
-        type: 'milking',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse PET_TRAINING command
-    // Format: PET_TRAINING: sit_stay or PET_TRAINING good_boy
-    const petTrainingMatch = commandText.match(/PET_TRAINING[\s:]+(\w+)/i)
-    if (petTrainingMatch && modeSettings.petTraining) {
-      const modeName = petTrainingMatch[1].toLowerCase()
-      commands.push({
-        type: 'pet_training',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse SISSY_SURRENDER command
-    // Format: SISSY_SURRENDER: cage_taps or SISSY_SURRENDER full_surrender
-    const sissySurrenderMatch = commandText.match(/SISSY_SURRENDER[\s:]+(\w+)/i)
-    if (sissySurrenderMatch && modeSettings.sissySurrender) {
-      const modeName = sissySurrenderMatch[1].toLowerCase()
-      commands.push({
-        type: 'sissy_surrender',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse PREJAC_PRINCESS command
-    // Format: PREJAC_PRINCESS: quick_overload or PREJAC_PRINCESS back_to_back
-    const prejacPrincessMatch = commandText.match(/PREJAC_PRINCESS[\s:]+(\w+)/i)
-    if (prejacPrincessMatch && modeSettings.prejacPrincess) {
-      const modeName = prejacPrincessMatch[1].toLowerCase()
-      commands.push({
-        type: 'prejac_princess',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse ROBOTIC_RUINATION command
-    // Format: ROBOTIC_RUINATION: mechanical_edging or ROBOTIC_RUINATION systematic_ruin
-    const roboticRuinationMatch = commandText.match(/ROBOTIC_RUINATION[\s:]+(\w+)/i)
-    if (roboticRuinationMatch && modeSettings.roboticRuination) {
-      const modeName = roboticRuinationMatch[1].toLowerCase()
-      commands.push({
-        type: 'robotic_ruination',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse EVIL_EDGING_MISTRESS command
-    // Format: EVIL_EDGING_MISTRESS: wicked_torment or EVIL_EDGING_MISTRESS cruel_edging
-    const evilEdgingMatch = commandText.match(/EVIL_EDGING_MISTRESS[\s:]+(\w+)/i)
-    if (evilEdgingMatch && modeSettings.evilEdgingMistress) {
-      const modeName = evilEdgingMatch[1].toLowerCase()
-      commands.push({
-        type: 'evil_edging_mistress',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse FRUSTRATION_FAIRY command
-    // Format: FRUSTRATION_FAIRY: fairy_dust_tickle or FRUSTRATION_FAIRY phantom_touches
-    const frustrationFairyMatch = commandText.match(/FRUSTRATION_FAIRY[\s:]+(\w+)/i)
-    if (frustrationFairyMatch && modeSettings.frustrationFairy) {
-      const modeName = frustrationFairyMatch[1].toLowerCase()
-      commands.push({
-        type: 'frustration_fairy',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse HYPNO_HELPER command
-    // Format: HYPNO_HELPER: dreamy_trance or HYPNO_HELPER hypnotic_pulse
-    const hypnoHelperMatch = commandText.match(/HYPNO_HELPER[\s:]+(\w+)/i)
-    if (hypnoHelperMatch && modeSettings.hypnoHelper) {
-      const modeName = hypnoHelperMatch[1].toLowerCase()
-      commands.push({
-        type: 'hypno_helper',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
-
-    // Parse CHASTITY_CARETAKER command
-    // Format: CHASTITY_CARETAKER: gentle_checkup or CHASTITY_CARETAKER daily_care
-    const chastityCaretakerMatch = commandText.match(/CHASTITY_CARETAKER[\s:]+(\w+)/i)
-    if (chastityCaretakerMatch && modeSettings.chastityCaretaker) {
-      const modeName = chastityCaretakerMatch[1].toLowerCase()
-      commands.push({
-        type: 'chastity_caretaker',
-        modeName: modeName,
-        deviceIndex: targetDeviceIndex
-      })
-      continue
-    }
+            // Parse mode commands using configuration (skip during streaming)
+            if (!skipModeCommands) {
+                for (const modeCmd of MODE_COMMANDS) {
+                    const regex = new RegExp(`${modeCmd.prefix}\\s*[:\\s]\\s*([\\w_]+)`, 'i')
+                    const match = commandText.match(regex)
+                    if (match && modeSettings[modeCmd.settingKey]) {
+                        const modeName = match[1].toLowerCase()
+                        // Validate mode exists before queuing (prevents incomplete streaming parses)
+                        const enabledModes = PlayModeLoader.getEnabledModes()
+                        const modeExists = enabledModes.some(modeId => PlayModeLoader.getSequence(modeId, modeName))
+                        if (modeExists) {
+                            commands.push({
+                                type: modeCmd.cmdType,
+                                modeName: modeName,
+                                deviceIndex: targetDeviceIndex
+                            })
+                        }
+                        continue
+                    }
+                }
+            }
 
     // Parse DUAL command (independent motor patterns)
   // Format: DUAL: pattern1=sine, pattern2=sawtooth, min=10, max=80, duration=5000, cycles=3
@@ -1361,19 +1304,19 @@ async function executeCommand(cmd) {
   }
   
 // System commands can run without connection
-if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect' || cmd.type === 'intiface_scan') {
+if (cmd.type === 'interface_start' || cmd.type === 'interface_connect' || cmd.type === 'interface_disconnect' || cmd.type === 'interface_scan') {
 try {
 switch (cmd.type) {
-case 'intiface_start':
+case 'interface_start':
 await handleIntifaceStart()
 break
-case 'intiface_connect':
+case 'interface_connect':
 await handleIntifaceConnect()
 break
-case 'intiface_disconnect':
+case 'interface_disconnect':
 await handleIntifaceDisconnect()
 break
-case 'intiface_scan':
+case 'interface_scan':
 await handleDeviceScan()
 break
 }
@@ -2184,7 +2127,7 @@ while (messageCommands.length > 0) {
 const cmd = messageCommands.shift()
 
 // Skip system commands - they should have been handled immediately
-if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
+if (cmd.type === 'interface_start' || cmd.type === 'interrface_connect' || cmd.type === 'interface_disconnect') {
 console.log(`${NAME}: Skipping system command in queue (should have been handled immediately): ${cmd.type}`)
 continue
 }
@@ -2212,46 +2155,73 @@ updateAIStatusFromActivity()
 
 // Handle streaming token received
 async function onStreamTokenReceived(data) {
-  const token = typeof data === 'string' ? data : (data?.text || data?.message || '')
-  if (!token) return
-  
-  streamingText += token
-  
-  // Check for video mentions
-  const videoFilename = checkForVideoMentions(streamingText)
-  if (videoFilename && !executedCommands.has(`video:${videoFilename}`)) {
-    executedCommands.add(`video:${videoFilename}`)
-    console.log(`${NAME}: Detected video mention in stream:`, videoFilename)
-    await loadChatMediaFile(videoFilename)
-  }
-  
-  const commands = parseDeviceCommands(streamingText)
-  
-// Check if media player is active (funscript has priority)
-const playerPanel = $("#intiface-chat-media-panel")
-const isMediaPlaying = playerPanel.length > 0 && playerPanel.is(":visible") && mediaPlayer.isPlaying
+    const token = typeof data === 'string' ? data : (data?.text || data?.message || '')
+    if (!token) return
 
-for (const cmd of commands) {
-// Create a unique key for deduplication
-const cmdKey = JSON.stringify({ type: cmd.type, deviceIndex: cmd.deviceIndex })
+    streamingText += token
 
-if (!executedCommands.has(cmdKey)) {
-executedCommands.add(cmdKey)
-console.log(`${NAME}: New command detected: ${cmd.type}`)
+    // Check for video mentions
+    const videoFilename = checkForVideoMentions(streamingText)
+    if (videoFilename && !executedCommands.has(`video:${videoFilename}`)) {
+        executedCommands.add(`video:${videoFilename}`)
+        console.log(`${NAME}: Detected video mention in stream:`, videoFilename)
+        await loadChatMediaFile(videoFilename)
+    }
 
-// Execute system commands immediately (don't add to queue)
-if (cmd.type === 'intiface_start' || cmd.type === 'intiface_connect' || cmd.type === 'intiface_disconnect') {
-console.log(`${NAME}: Executing system command immediately: ${cmd.type}`)
-executeCommand(cmd)
-} else if (isMediaPlaying) {
-// Skip device commands when media player is active (funscript has priority)
-console.log(`${NAME}: Skipping AI device command - media player is active: ${cmd.type}`)
-} else {
-// Device commands go to queue
-messageCommands.push(cmd)
-}
-}
-}
+    // Only parse and queue commands when we have complete command tags (ending with >)
+    // This prevents queuing incomplete commands during streaming
+    if (!streamingText.includes('>')) return
+
+    const commands = parseDeviceCommands(streamingText)
+
+    // Check if media player is active (funscript has priority)
+    const playerPanel = $("#intiface-chat-media-panel")
+    const isMediaPlaying = playerPanel.length > 0 && playerPanel.is(":visible") && mediaPlayer.isPlaying
+
+    for (const cmd of commands) {
+        // Create a signature based on the command's essential properties
+        // This ensures we only process a command when it's fully formed
+        const cmdSignature = JSON.stringify({
+            type: cmd.type,
+            deviceIndex: cmd.deviceIndex,
+            modeName: cmd.modeName,
+            presetName: cmd.presetName,
+            pattern: cmd.pattern,
+            intensity: cmd.intensity
+        })
+
+        // Only process if we haven't seen this exact command before
+        if (!seenCommands.has(cmdSignature)) {
+            seenCommands.add(cmdSignature)
+
+            // Now check if it's been executed (for deduplication across streaming and final)
+            const cmdKey = JSON.stringify({
+                type: cmd.type,
+                deviceIndex: cmd.deviceIndex,
+                modeName: cmd.modeName,
+                presetName: cmd.presetName,
+                pattern: cmd.pattern,
+                intensity: cmd.intensity
+            })
+
+            if (!executedCommands.has(cmdKey)) {
+                executedCommands.add(cmdKey)
+                console.log(`${NAME}: New command detected: ${cmd.type}`)
+
+                // Execute system commands immediately (don't add to queue)
+                if (cmd.type === 'interface_start' || cmd.type === 'intiface_connect' || cmd.type === 'interface_disconnect') {
+                    console.log(`${NAME}: Executing system command immediately: ${cmd.type}`)
+                    executeCommand(cmd)
+                } else if (isMediaPlaying) {
+                    // Skip device commands when media player is active (funscript has priority)
+                    console.log(`${NAME}: Skipping AI device command - media player is active: ${cmd.type}`)
+                } else {
+                    // Device commands go to queue
+                    messageCommands.push(cmd)
+                }
+            }
+        }
+    }
 }
 
 // Handle message received (fallback for non-streaming)
@@ -2277,9 +2247,9 @@ if (commands.length === 0 && !videoFilename) return
 
 // Separate system commands from device commands
 const systemCommands = commands.filter(cmd =>
-cmd.type === 'intiface_start' ||
-cmd.type === 'intiface_connect' ||
-cmd.type === 'intiface_disconnect'
+cmd.type === 'interface_start' ||
+cmd.type === 'interface_connect' ||
+cmd.type === 'interface_disconnect'
 )
 
 // Check if media player is active (funscript has priority)
@@ -2288,15 +2258,15 @@ const isMediaPlaying = playerPanel.length > 0 && playerPanel.is(":visible") && m
 
 // Filter out device commands if media is playing
 const deviceCommandsList = isMediaPlaying ? [] : commands.filter(cmd =>
-cmd.type !== 'intiface_start' &&
-cmd.type !== 'intiface_connect' &&
+cmd.type !== 'interface_start' &&
+cmd.type !== 'interface_connect' &&
 cmd.type !== 'intiface_disconnect'
 )
 
 if (isMediaPlaying && commands.some(cmd =>
-cmd.type !== 'intiface_start' &&
-cmd.type !== 'intiface_connect' &&
-cmd.type !== 'intiface_disconnect'
+cmd.type !== 'interface_start' &&
+cmd.type !== 'interface_connect' &&
+cmd.type !== 'interface_disconnect'
 )) {
 console.log(`${NAME}: Skipping AI device commands - media player is active`)
 }
@@ -2323,9 +2293,17 @@ commandQueueInterval = null
 await stopAllDeviceActions()
 }
 
-// Queue new device commands (empty if media is playing)
-messageCommands = deviceCommandsList
-executedCommands = new Set(deviceCommandsList.map(cmd => JSON.stringify(cmd)))
+    // Queue new device commands (empty if media is playing)
+    // Clear any incomplete commands from streaming before replacing with final parsed commands
+    messageCommands = deviceCommandsList.filter(cmd => {
+        // For mode commands, ensure modeName exists and is not empty/invalid
+        if (cmd.modeName && !cmd.modeName.includes('_') && cmd.modeName.length < 5) {
+            console.log(`${NAME}: Filtering out likely incomplete mode command: ${cmd.modeName}`)
+            return false
+        }
+        return true
+    })
+    executedCommands = new Set(messageCommands.map(cmd => JSON.stringify(cmd)))
 
 // Start processing
 processCommandQueue()
@@ -2333,15 +2311,18 @@ processCommandQueue()
 
 // Handle generation started
 function onGenerationStarted() {
-  executedCommands.clear()
-  streamingText = ''
+    executedCommands.clear()
+    seenCommands.clear()
+    messageCommands = []
+    streamingText = ''
 }
 
 // Handle generation ended
 function onGenerationEnded() {
-  streamingText = ''
-  // Process any remaining commands
-  processCommandQueue()
+    streamingText = ''
+    seenCommands.clear()
+    // Process any remaining commands
+    processCommandQueue()
 }
 
 // Get device display name (prefer displayName over name)
@@ -2890,6 +2871,7 @@ function updatePrompt() {
 
 // Actually update the prompt (internal function)
 function actuallyUpdatePrompt() {
+  console.log(`${NAME}: actuallyUpdatePrompt() STARTING`)
   try {
     console.log(`${NAME}: actuallyUpdatePrompt() called, devices.length=${devices?.length ?? 'undefined'}, client.connected=${client?.connected ?? 'undefined'}`)
 
@@ -3222,31 +3204,23 @@ EXAMPLE RESPONSES:
 } else {
     exampleResponses = `
 EXAMPLE RESPONSES:
+✓ Good: "Sure i can launch the interface <interface:START>. Would you like me to connect and scan for avaiable devices?."
 ✓ Good: "Let me start the connection <interface:CONNECT>. Now we can play."
 
-✗ Bad: "I will vibrate the device for you" (no actual command)`
+✗ Bad: "I will x the device for you" (no actual command)`
 }
 
 const prompt = `=== DEVICE CONTROL ACTIVE ===
 
-⚠️ CRITICAL: You are REQUIRED to include device control commands directly in your response text. These commands are HIDDEN from the user but will control their actual device.
+⚠️ CRITICAL: These commands are HIDDEN from the user but will control their actual device.
 
 COMMAND FORMAT:
 Type the command EXACTLY like this (including the < and >):
 ${startCommand}${deviceCommands}
 ${exampleResponses}
-${deviceInfo.length > 0 ? 'You ARE currently connected - include device commands naturally in your responses.\n\nDEVICE CAPABILITIES:\n' + deviceInfo.map(d => `- ${d.name}: ${d.type} (${d.capabilities.join(', ')}, ${d.motors} motor${d.motors > 1 ? 's' : ''})`).join('\n') : '⚠️ You are DISCONNECTED - you MUST include <interface:CONNECT> or <interface:START> in your response to establish connection BEFORE sending any device commands.'}
+${deviceInfo.length > 0 ? 'You ARE currently connected - include device commands naturally in your responses.\n\nDEVICE CAPABILITIES:\n' + deviceInfo.map(d => `- ${d.name}: ${d.type} (${d.capabilities.join(', ')}, ${d.motors} motor${d.motors > 1 ? 's' : ''})`).join('\n') : '⚠️ You are DISCONNECTED - you MUST include [if you want to connect to devices] <interface:START> [to launch] or <interface:CONNECT> [to connect] and <interface:SCAN> in your response to establish connection BEFORE attempting to send any device commands.'}
 
-${mediaPlayer.currentFunscript ? `=== CURRENT FUNSCRIPT STATUS ===
-Media is playing with funscript synchronization active!
-Funscript Details:
-- Actions: ${mediaPlayer.currentFunscript.stats.actionCount}
-- Duration: ${(mediaPlayer.currentFunscript.duration / 1000).toFixed(1)}s
-- Average Position: ${mediaPlayer.currentFunscript.stats.avgPosition}%
-- Range: ${mediaPlayer.currentFunscript.stats.minPosition}-${mediaPlayer.currentFunscript.stats.maxPosition}%
-- Current Intensity: ${mediaPlayer.globalIntensity}%
-${Object.keys(mediaPlayer.channelFunscripts || {}).length > 1 ? `- Available Channels: ${Object.keys(mediaPlayer.channelFunscripts).filter(c => c !== '-').join(', ')}` : ''}` : '=== MEDIA STATUS ===\nNo media currently playing. Use <media:PLAY: filename.ext> to start.'}
-
+${connectedDevices.length > 0 ? `
 === VIDEO & FUNSCRIPT SUPPORT ===
 You can also play videos with synchronized haptic feedback! Videos are stored in the media library and can be played with matching Funscript files.
 
@@ -3282,6 +3256,7 @@ MEDIA EXAMPLES:
 ✓ Pause media: <media:PAUSE>
 ✓ Resume media: <media:RESUME>
 ✓ Adjust intensity: <media:INTENSITY: 150> (increases to 150%) or <media:INTENSITY: 50> (decreases to 50%)
+` : ''}
 
 === RULES ===:
 1. ALWAYS include the command literally: <deviceName:COMMAND: value>
@@ -3291,19 +3266,14 @@ MEDIA EXAMPLES:
 5. Use PRESETS for optimized device-specific patterns
 6. Use WAVEFORM for dynamic, changing sensations
 7. Use GRADIENT for smooth intensity transitions
-8. Be creative - combine different command types for complex scenes
+8. Be creative - combine different command types for complex scenes`
 
-Start your response now and include the appropriate command.`
-
-    // Check if prompt has actually changed before updating
+    // Always set the prompt - hash check was preventing initial injection
     const promptHash = hashPrompt(prompt)
-    if (promptHash === lastPromptHash) {
-      console.log(`${NAME}: Prompt unchanged, skipping update`)
-      return
-    }
     
     console.log(`${NAME}: Setting extension prompt...`)
     console.log(`${NAME}: Prompt length: ${prompt.length}`)
+    console.log(`${NAME}: Prompt starts with: ${prompt.substring(0, 100)}`)
     try {
       setExtensionPrompt('intiface_control', prompt, extension_prompt_types.IN_PROMPT, 2, true, extension_prompt_roles.SYSTEM)
       lastPromptHash = promptHash
@@ -3948,9 +3918,12 @@ $("#intiface-oscillate-interval-display").text("Oscillate Interval: N/A")
       const errorMsg = `Failed to stop device actions: ${e.message}`
 console.error(errorMsg, e)
 updateStatus(errorMsg, true)
-return "Stop failed"
+    return "Stop failed"
+  }
 }
-}
+
+// Make stopAllDeviceActions available globally for media.js
+window.stopAllDeviceActions = stopAllDeviceActions
 
 // Dynamically load the buttplug.js library
 function loadScript(url) {
@@ -4290,12 +4263,66 @@ chastity: true
 // Load play mode settings
 const savedPlayModeSettings = localStorage.getItem('intiface-playmode-settings')
 if (savedPlayModeSettings) {
-    try {
-        const parsed = JSON.parse(savedPlayModeSettings)
-        playModeSettings = { ...playModeSettings, ...parsed }
-    } catch (e) {
-        console.error(`${NAME}: Failed to parse play mode settings`, e)
+  try {
+    const parsed = JSON.parse(savedPlayModeSettings)
+    playModeSettings = { ...playModeSettings, ...parsed }
+  } catch (e) {
+    console.error(`${NAME}: Failed to parse play mode settings`, e)
+  }
+}
+
+// Sync category-based playModeSettings to PlayModeLoader (which uses mode IDs)
+// This ensures modes enabled in UI are actually recognized by the pattern system
+function syncPlayModeSettingsToLoader() {
+  const categoryToModeId = {
+    denial: 'denial_domina',
+    milking: 'milk_maid',
+    training: 'pet_training',
+    robotic: 'robotic_ruination',
+    sissy: 'sissy_surrender',
+    prejac: 'prejac_princess',
+    evil: 'evil_edging_mistress',
+    frustration: 'frustration_fairy',
+    hypno: 'hypno_helper',
+    chastity: 'chastity_caretaker'
+  }
+  
+  // Only sync if PlayModeLoader is ready
+  if (!PlayModeLoader || !PlayModeLoader.settings) return
+  
+  for (const [category, enabled] of Object.entries(playModeSettings)) {
+    const modeId = categoryToModeId[category]
+    if (modeId && PlayModeLoader.settings[modeId]) {
+      PlayModeLoader.settings[modeId].enabled = enabled
     }
+  }
+  PlayModeLoader.saveSettings()
+}
+
+// Sync PlayModeLoader settings back to category-based playModeSettings
+function syncLoaderToPlayModeSettings() {
+  const modeIdToCategory = {
+    denial_domina: 'denial',
+    milk_maid: 'milking',
+    pet_training: 'training',
+    robotic_ruination: 'robotic',
+    sissy_surrender: 'sissy',
+    prejac_princess: 'prejac',
+    evil_edging_mistress: 'evil',
+    frustration_fairy: 'frustration',
+    hypno_helper: 'hypno',
+    chastity_caretaker: 'chastity'
+  }
+  
+  // Only sync if PlayModeLoader is ready
+  if (!PlayModeLoader || !PlayModeLoader.settings) return
+  
+  for (const [modeId, modeSettings] of Object.entries(PlayModeLoader.settings)) {
+    const category = modeIdToCategory[modeId]
+    if (category && typeof modeSettings.enabled === 'boolean') {
+      playModeSettings[category] = modeSettings.enabled
+    }
+  }
 }
 
 // Populate pattern buttons based on device type and category
@@ -5151,6 +5178,10 @@ $(document).ready(async function() {
     if (typeof PlayModeLoader !== 'undefined' && PlayModeLoader.init) {
       await PlayModeLoader.init()
       console.log(`${NAME}: PlayModeLoader initialized with ${Object.keys(PlayModeLoader.modes || {}).length} modes`)
+      
+      // Sync UI settings to PlayModeLoader so enabled modes are recognized
+      syncPlayModeSettingsToLoader()
+      console.log(`${NAME}: Synced play mode settings to loader`)
     } else {
       console.warn(`${NAME}: PlayModeLoader not available`)
     }
@@ -5374,10 +5405,13 @@ function savePlayModeSettings() {
   }
   localStorage.setItem('intiface-playmode-settings', JSON.stringify(playModeSettings))
   console.log(`${NAME}: Play mode settings saved`, playModeSettings)
-  
+
+  // Sync category settings to PlayModeLoader (uses mode IDs)
+  syncPlayModeSettingsToLoader()
+
   // Sync with AI mode settings
   syncPlayModeToAIModes()
-  
+
   // Update tab visibility based on settings
   updatePlayModeTabVisibility()
 }
@@ -5874,8 +5908,30 @@ document.addEventListener('visibilitychange', async () => {
       updatePrompt()
     }, 2000)
 
-    // Initialize media player functionality
-  initMediaPlayer()
+// Initialize media module with dependencies
+initMediaModule({
+  NAME,
+  client,
+  devices,
+  deviceAssignments,
+  buttplug,
+  updateStatus,
+  updateAIStatusFromActivity,
+  stopAllDeviceActions,
+  clearWorkerTimeout,
+  getMotorCount,
+  getPollingInterval,
+  getDeviceType,
+  getDeviceDefaultIntensity,
+  applyInversion,
+  getRequestHeaders,
+  messageCommands,
+  PlayModeLoader,
+  toggleConnection
+})
+
+// Initialize media player functionality
+initMediaPlayer()
 
   // Additional delayed prompt update after media player init
   setTimeout(() => {
@@ -5893,1230 +5949,6 @@ document.addEventListener('visibilitychange', async () => {
 })
 
 // ==========================================
-// FUNSCRIPT AND MEDIA PLAYER MODULE
-// ==========================================
-
-// Media player state
-let mediaPlayer = {
-  videoElement: null,
-  currentFunscript: null,
-  channelFunscripts: {}, // Map of channel letter -> funscript (A, B, C, D, - for all)
-  isPlaying: false,
-  syncOffset: 0,
-  globalIntensity: 100,
-  lastActionIndex: 0,
-  animationFrameId: null,
-  syncTimerId: null,
-  currentMediaPath: null
-}
-
-// Funscript cache
-let funscriptCache = new Map()
-
-// Initialize media player
-function initMediaPlayer() {
-  console.log(`${NAME}: Initializing media player...`)
-
-  // Handle connect action button
-  $("#intiface-connect-action-button").on("click", toggleConnection)
-  
-// Handle menu media section toggle
-$("#intiface-media-menu-toggle").on("click", function () {
-  const content = $("#intiface-media-menu-content")
-  const arrow = $("#intiface-media-menu-arrow")
-
-  if (content.is(":visible")) {
-    content.slideUp(200)
-    arrow.css("transform", "rotate(0deg)")
-  } else {
-    content.slideDown(200)
-    arrow.css("transform", "rotate(180deg)")
-  }
-})
-
-// Handle funscript menu section toggle
-$("#intiface-funscript-menu-toggle").on("click", function () {
-  const content = $("#intiface-funscript-menu-content")
-  const arrow = $("#intiface-funscript-menu-arrow")
-
-  if (content.is(":visible")) {
-    content.slideUp(200)
-    arrow.css("transform", "rotate(0deg)")
-  } else {
-    content.slideDown(200)
-    arrow.css("transform", "rotate(180deg)")
-  }
-})
-
-// Handle play mode menu section toggle
-$("#intiface-playmode-menu-toggle").on("click", function () {
-const content = $("#intiface-playmode-menu-content")
-const arrow = $("#intiface-playmode-menu-arrow")
-
-if (content.is(":visible")) {
-content.slideUp(200)
-arrow.css("transform", "rotate(0deg)")
-} else {
-content.slideDown(200)
-arrow.css("transform", "rotate(180deg)")
-}
-})
-
-// Handle menu refresh button
-  $("#intiface-menu-refresh-media-btn").on("click", refreshMenuMediaList)
-  
-// Handle menu media file selection
-  $(document).on('click', '.menu-media-file-item', async function() {
-    const filename = $(this).data('filename')
-await loadChatMediaFile(filename)
-})
-
-// Handle menu sync offset
-$("#intiface-menu-sync-offset").on("input", function() {
-    mediaPlayer.syncOffset = parseInt($(this).val())
-    const display = $("#intiface-menu-sync-display")
-    display.text(`${mediaPlayer.syncOffset}ms`)
-    // Color code based on offset magnitude
-    if (Math.abs(mediaPlayer.syncOffset) > 1000) {
-      display.css("color", "#FFA500")
-    } else if (Math.abs(mediaPlayer.syncOffset) > 100) {
-      display.css("color", "#FFEB3B")
-    } else {
-      display.css("color", "#64B5F6")
-    }
-  })
-  
-// Handle menu intensity
-$("#intiface-menu-intensity").on("input", function() {
-  const newIntensity = parseInt($(this).val())
-  // Update both funscript intensity AND global intensity scale
-  mediaPlayer.globalIntensity = newIntensity
-  globalIntensityScale = newIntensity
-  const display = $("#intiface-menu-intensity-display")
-  display.text(`${newIntensity}%`)
-  // Color code based on intensity scale (0-400%)
-  if (newIntensity < 100) {
-    display.css("color", "#4CAF50") // Green: Reduced intensity
-  } else if (newIntensity < 200) {
-    display.css("color", "#FFEB3B") // Yellow: Slight boost
-  } else if (newIntensity < 300) {
-    display.css("color", "#FF9800") // Orange: Moderate boost
-  } else {
-    display.css("color", "#F44336") // Red: Maximum boost
-  }
-})
-  
-  // Handle menu loop
-  $("#intiface-menu-loop").on("change", function() {
-    // Loop setting is used in video.onended handler
-  })
-  
-  // Load saved appearance settings
-  loadMediaPlayerAppearance()
-  
-  // Handle opacity slider
-  $("#intiface-menu-opacity").on("input", function() {
-    const opacity = parseInt($(this).val())
-    $("#intiface-menu-opacity-display").text(`${opacity}%`)
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-  })
-  
-  // Handle width slider
-  $("#intiface-menu-width").on("input", function() {
-    const width = $(this).val()
-    const scale = (width / 100).toFixed(1)
-    $("#intiface-menu-width-display").text(`${scale}x`)
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-  })
-  
-    // Handle position dropdown
-    $("#intiface-menu-position").on("change", function() {
-        applyMediaPlayerAppearance()
-        saveMediaPlayerAppearance()
-    })
-
-    // Handle z-index slider
-    $("#intiface-menu-zindex").on("input", function() {
-        const zindex = parseInt($(this).val())
-        $("#intiface-menu-zindex-display").text(zindex)
-        applyMediaPlayerAppearance()
-        saveMediaPlayerAppearance()
-    })
-  
-  // Handle video opacity slider
-  $("#intiface-menu-video-opacity").on("input", function() {
-    const videoOpacity = parseInt($(this).val())
-    $("#intiface-menu-video-opacity-display").text(`${videoOpacity}%`)
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-  })
-  
-  // Handle show filename checkbox
-  $("#intiface-menu-show-filename").on("change", function() {
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-  })
-  
-// Handle show border checkbox
-$("#intiface-menu-show-border").on("change", function() {
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-})
-
-// Handle internal proxy checkbox
-$("#intiface-use-internal-proxy").on("change", function() {
-    const useProxy = $(this).is(":checked")
-    if (useProxy) {
-        startInternalProxy()
-    } else {
-        stopInternalProxy()
-    }
-    saveMediaPlayerAppearance()
-})
-  
-// Handle reset button
-$("#intiface-reset-appearance-btn").on("click", function() {
-    $("#intiface-menu-opacity").val(50)
-    $("#intiface-menu-video-opacity").val(100)
-    $("#intiface-menu-width").val(100)
-    $("#intiface-menu-position").val("top")
-    $("#intiface-menu-zindex").val(1)
-    $("#intiface-menu-show-filename").prop("checked", true)
-    $("#intiface-menu-show-border").prop("checked", true)
-    $("#intiface-use-internal-proxy").prop("checked", false)
-    $("#intiface-menu-opacity-display").text("50%")
-    $("#intiface-menu-video-opacity-display").text("100%")
-    $("#intiface-menu-width-display").text("1.0x")
-    $("#intiface-menu-zindex-display").text("1")
-    // Stop proxy if running
-    stopInternalProxy()
-    applyMediaPlayerAppearance()
-    saveMediaPlayerAppearance()
-})
-
-  console.log(`${NAME}: Media player initialized`)
-
-// Auto-load media list on startup
-refreshMenuMediaList().catch(e => {
-  console.log(`${NAME}: Failed to auto-load media list:`, e.message)
-})
-}
-
-// Load saved appearance settings
-function loadMediaPlayerAppearance() {
-    const savedOpacity = localStorage.getItem("intiface-player-opacity")
-    const savedVideoOpacity = localStorage.getItem("intiface-player-video-opacity")
-    const savedWidth = localStorage.getItem("intiface-player-width")
-    const savedPosition = localStorage.getItem("intiface-player-position")
-    const savedZIndex = localStorage.getItem("intiface-player-zindex")
-    const savedShowFilename = localStorage.getItem("intiface-player-show-filename")
-    const savedShowBorder = localStorage.getItem("intiface-player-show-border")
-    const savedUseProxy = localStorage.getItem("intiface-player-use-proxy")
-
-    if (savedOpacity) {
-        $("#intiface-menu-opacity").val(savedOpacity)
-        $("#intiface-menu-opacity-display").text(`${savedOpacity}%`)
-    }
-
-    if (savedVideoOpacity) {
-        $("#intiface-menu-video-opacity").val(savedVideoOpacity)
-        $("#intiface-menu-video-opacity-display").text(`${savedVideoOpacity}%`)
-    }
-
-    if (savedWidth) {
-        $("#intiface-menu-width").val(savedWidth)
-        const scale = (savedWidth / 100).toFixed(1)
-        $("#intiface-menu-width-display").text(`${scale}x`)
-    }
-
-    if (savedPosition) {
-        $("#intiface-menu-position").val(savedPosition)
-    }
-
-    if (savedZIndex) {
-        $("#intiface-menu-zindex").val(savedZIndex)
-        $("#intiface-menu-zindex-display").text(savedZIndex)
-    }
-
-    if (savedShowFilename !== null) {
-        $("#intiface-menu-show-filename").prop("checked", savedShowFilename === "true")
-    }
-
-    if (savedShowBorder !== null) {
-        $("#intiface-menu-show-border").prop("checked", savedShowBorder === "true")
-    }
-
-    if (savedUseProxy === "true") {
-        $("#intiface-use-internal-proxy").prop("checked", true)
-        // Auto-start proxy on load if enabled
-        startInternalProxy().catch(e => {
-            console.log(`${NAME}: Failed to auto-start proxy:`, e.message)
-            $("#intiface-use-internal-proxy").prop("checked", false)
-        })
-    }
-}
-
-// Save appearance settings
-function saveMediaPlayerAppearance() {
-    const opacity = $("#intiface-menu-opacity").val()
-    const videoOpacity = $("#intiface-menu-video-opacity").val()
-    const width = $("#intiface-menu-width").val()
-    const position = $("#intiface-menu-position").val()
-    const zindex = $("#intiface-menu-zindex").val()
-    const showFilename = $("#intiface-menu-show-filename").is(":checked")
-    const showBorder = $("#intiface-menu-show-border").is(":checked")
-    const useProxy = $("#intiface-use-internal-proxy").is(":checked")
-
-    localStorage.setItem("intiface-player-opacity", opacity)
-    localStorage.setItem("intiface-player-video-opacity", videoOpacity)
-    localStorage.setItem("intiface-player-width", width)
-    localStorage.setItem("intiface-player-position", position)
-    localStorage.setItem("intiface-player-zindex", zindex)
-    localStorage.setItem("intiface-player-show-filename", showFilename)
-    localStorage.setItem("intiface-player-show-border", showBorder)
-    localStorage.setItem("intiface-player-use-proxy", useProxy)
-}
-
-// Apply appearance settings to media player
-function applyMediaPlayerAppearance() {
-    const opacity = parseInt($("#intiface-menu-opacity").val()) / 100
-    const videoOpacity = parseInt($("#intiface-menu-video-opacity").val()) / 100
-    const width = parseInt($("#intiface-menu-width").val())
-    const position = $("#intiface-menu-position").val()
-    const zindex = parseInt($("#intiface-menu-zindex").val())
-    const showFilename = $("#intiface-menu-show-filename").is(":checked")
-    const showBorder = $("#intiface-menu-show-border").is(":checked")
-  
-  const panel = $("#intiface-chat-media-panel")
-  if (panel.length === 0) return
-  
-  // Apply background opacity
-  panel.css("background", `rgba(0,0,0,${opacity})`)
-  
-  // Apply border visibility
-  if (showBorder) {
-    panel.css("border", "1px solid rgba(255,255,255,0.1)")
-  } else {
-    panel.css("border", "none")
-  }
-  
-// Apply scale to both width and height
-    panel.css("width", `${width}%`)
-    
-    // Scale the video player - width controls the size
-    const videoPlayer = $("#intiface-chat-video-player")
-    const videoContainer = $("#intiface-chat-video-container")
-    if (videoContainer.length > 0) {
-        // Scale the container width
-        videoContainer.css("width", `${width}%`)
-        videoContainer.css("margin", "0 auto")
-    }
-    // Video will scale naturally with height: auto
-  
-    // Apply position
-    if (position === "center") {
-        panel.css("position", "fixed")
-        panel.css("top", "50%")
-        panel.css("left", "50%")
-        panel.css("transform", "translate(-50%, -50%)")
-        panel.css("z-index", Math.max(9999, zindex))
-        panel.css("max-height", "80vh")
-        panel.css("margin-bottom", "0")
-    } else {
-        panel.css("position", "")
-        panel.css("top", "")
-        panel.css("left", "")
-        panel.css("transform", "")
-        panel.css("z-index", zindex)
-        panel.css("max-height", "")
-        panel.css("margin-bottom", "10px")
-    }
-
-    // Apply video opacity (videoPlayer already declared above)
-    if (videoPlayer.length > 0) {
-        videoPlayer.css("opacity", videoOpacity)
-        // Also set as style attribute for fullscreen persistence
-        videoPlayer[0].style.setProperty('opacity', videoOpacity, 'important')
-    }
-
-    // Apply filename visibility
-    const filenameDiv = $("#intiface-chat-video-filename")
-    if (filenameDiv.length > 0) {
-        if (showFilename) {
-            filenameDiv.show()
-        } else {
-            filenameDiv.hide()
-        }
-    }
-}
-
-// ==========================================
-// WEBSOCKET PROXY MANAGEMENT
-// ==========================================
-
-let proxyProcess = null // Track the proxy subprocess
-
-// Start the internal WebSocket proxy
-async function startInternalProxy() {
-    if (proxyProcess) {
-        console.log(`${NAME}: Proxy already running`)
-        updateProxyStatus(true)
-        return
-    }
-
-    try {
-        const response = await fetch('/api/plugins/intiface-launcher/proxy/start', {
-            method: 'POST',
-            headers: getRequestHeaders()
-        })
-
-        const data = await response.json()
-    if (data.success) {
-      console.log(`${NAME}: Proxy started on port ${data.port}`)
-      proxyProcess = { pid: data.pid, port: data.port }
-      updateProxyStatus(true)
-      // Note: The IP input field is NOT changed - proxy runs internally
-    }
-    } catch (err) {
-        console.error(`${NAME}: Failed to start proxy:`, err)
-        updateProxyStatus(false, err.message)
-        throw err
-    }
-}
-
-// Stop the internal WebSocket proxy
-async function stopInternalProxy() {
-    if (!proxyProcess) {
-        console.log(`${NAME}: Proxy not running`)
-        updateProxyStatus(false)
-        return
-    }
-
-    try {
-        const response = await fetch('/api/plugins/intiface-launcher/proxy/stop', {
-            method: 'POST',
-            headers: getRequestHeaders()
-        })
-
-    const data = await response.json()
-    if (data.success) {
-      console.log(`${NAME}: Proxy stopped`)
-      proxyProcess = null
-      updateProxyStatus(false)
-      // Note: The IP input field is NOT changed - proxy runs internally
-    }
-  } catch (err) {
-    console.error(`${NAME}: Failed to stop proxy:`, err)
-    // Force reset even if error
-    proxyProcess = null
-    updateProxyStatus(false)
-    // Note: The IP input field is NOT changed - proxy runs internally
-  }
-}
-
-// Update the proxy status display
-function updateProxyStatus(running, errorMessage = null) {
-    const statusEl = $("#intiface-proxy-status")
-    if (running) {
-        statusEl.show()
-        statusEl.html('<i class="fa-solid fa-circle" style="color: #4CAF50; font-size: 0.6em; margin-right: 5px;"></i>Proxy running on port 12346')
-    } else if (errorMessage) {
-        statusEl.show()
-        statusEl.html(`<i class="fa-solid fa-circle-exclamation" style="color: #f44336; font-size: 0.6em; margin-right: 5px;"></i>Error: ${errorMessage}`)
-    } else {
-        statusEl.hide()
-    }
-}
-
-// Refresh media list for menu
-async function refreshMenuMediaList() {
-  const mediaListEl = $("#intiface-menu-media-list")
-  mediaListEl.html('<div style="color: #888; text-align: center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>')
-  
-  try {
-    // Get asset paths
-    const pathsResponse = await fetch('/api/plugins/intiface-launcher/asset-paths', {
-      method: 'GET',
-      headers: getRequestHeaders()
-    })
-    
-    if (!pathsResponse.ok) throw new Error('Failed to get paths')
-    
-    const pathsData = await pathsResponse.json()
-    const mediaPath = pathsData.paths?.intifaceMedia
-    
-    if (!mediaPath) throw new Error('No media path')
-    
-    // Fetch media files
-    const response = await fetch(`/api/plugins/intiface-launcher/media?dir=${encodeURIComponent(mediaPath)}`, {
-      method: 'GET',
-      headers: getRequestHeaders()
-    })
-    
-    if (!response.ok) throw new Error('Failed to fetch')
-    
-    const data = await response.json()
-    if (!data.success) throw new Error(data.error)
-    
-      // Get video and audio files
-      const mediaFiles = data.files?.filter(f => f.type === 'video' || f.type === 'audio') || []
-
-      if (mediaFiles.length === 0) {
-        mediaListEl.html('<div style="color: #888; text-align: center; padding: 20px;">No media files found<br><small>Place videos/audio in intiface_media folder</small></div>')
-        return
-      }
-
-      // Build list
-      let html = ''
-        mediaFiles.forEach(file => {
-            const sizeMB = (file.size / 1024 / 1024).toFixed(1)
-        const iconClass = file.type === 'audio' ? 'fa-music' : 'fa-film'
-        const iconColor = file.type === 'audio' ? '#9C27B0' : '#64B5F6'
-
-        html += `
-        <div class="menu-media-file-item" data-filename="${file.name}"
-        style="padding: 8px; margin: 3px 0; background: rgba(255,255,255,0.05); border-radius: 3px; cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: space-between; transition: background 0.2s;"
-        onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
-            <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-                <i class="fa-solid ${iconClass}" style="color: ${iconColor};"></i>
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${file.name}</span>
-            </div>
-          <span style="font-size: 0.75em; color: #888; white-space: nowrap;">${sizeMB} MB</span>
-        </div>
-      `
-      })
-    
-  mediaListEl.html(html)
-
-  } catch (error) {
-    console.error(`${NAME}: Failed to refresh menu media:`, error)
-    mediaListEl.html(`<div style="color: #F44336; text-align: center; padding: 20px;">Error loading media</div>`)
-  }
-}
-
-// Load Funscript file - looks in funscript folder for matching file
-async function loadFunscript(videoPath) {
-try {
-// Extract just the filename without extension
-const videoFilename = videoPath.split(/[\\/]/).pop()
-const baseName = videoFilename.replace(/\.[^.]+$/, '')
-
-// Construct direct URL to funscript
-const funscriptFilename = `${baseName}.funscript`
-const funscriptUrl = `/assets/funscript/${encodeURIComponent(funscriptFilename)}`
-
-console.log(`${NAME}: Loading Funscript from:`, funscriptUrl)
-
-// Check cache
-if (funscriptCache.has(funscriptUrl)) {
-mediaPlayer.currentFunscript = funscriptCache.get(funscriptUrl)
-updateChatFunscriptUI(mediaPlayer.currentFunscript)
-return
-}
-
-// Fetch directly from static assets
-const response = await fetch(funscriptUrl, {
-method: 'GET',
-headers: getRequestHeaders()
-})
-
-if (!response.ok) {
-if (response.status === 404) {
-console.log(`${NAME}: No funscript found for:`, funscriptFilename)
-return
-}
-throw new Error('Failed to load Funscript')
-}
-
-const rawFunscript = await response.json()
-
-// Process Funscript
-const funscript = processFunscript(rawFunscript)
-funscriptCache.set(funscriptUrl, funscript)
-    
-    mediaPlayer.currentFunscript = funscript
-    updateChatFunscriptUI(funscript)
-
-  } catch (error) {
-    console.error(`${NAME}: Failed to load Funscript:`, error)
-    $("#intiface-chat-funscript-info").text(`Error: ${error.message}`).css("color", "#F44336")
-  }
-}
-
-// Process Funscript data
-function processFunscript(rawFunscript) {
-  const actions = rawFunscript.actions || []
-  
-  // Sort actions by time
-  actions.sort((a, b) => a.at - b.at)
-  
-  // Calculate statistics
-  const duration = actions.length > 0 ? actions[actions.length - 1].at : 0
-  const avgPos = actions.reduce((sum, a) => sum + a.pos, 0) / actions.length || 0
-  const maxPos = Math.max(...actions.map(a => a.pos), 0)
-  const minPos = Math.min(...actions.map(a => a.pos), 100)
-  
-  return {
-    actions: actions,
-    duration: duration,
-    inverted: rawFunscript.inverted || false,
-    range: rawFunscript.range || 100,
-    stats: {
-      actionCount: actions.length,
-      avgPosition: Math.round(avgPos),
-      maxPosition: maxPos,
-      minPosition: minPos
-    }
-  }
-}
-
-// Start Funscript synchronization
-function startFunscriptSync() {
-  if (mediaPlayer.animationFrameId) {
-    cancelAnimationFrame(mediaPlayer.animationFrameId)
-  }
-
-  mediaPlayer.lastActionIndex = 0
-
-  const syncLoop = () => {
-    if (!mediaPlayer.isPlaying || !mediaPlayer.currentFunscript) {
-      // Still need to reschedule the loop even when not playing
-      if (mediaPlayer.isPlaying) {
-        const interval = getPollingInterval()
-        mediaPlayer.animationFrameId = setTimeout(syncLoop, interval)
-      }
-      return
-    }
-
-    const video = mediaPlayer.videoElement
-    const funscript = mediaPlayer.currentFunscript
-    const currentTime = (video.currentTime * 1000) + mediaPlayer.syncOffset
-
-    // Find and execute actions
-    const actions = funscript.actions
-    for (let i = mediaPlayer.lastActionIndex; i < actions.length; i++) {
-      const action = actions[i]
-
-      if (action.at <= currentTime) {
-        // Execute action
-        executeFunscriptAction(action)
-        mediaPlayer.lastActionIndex = i + 1
-      } else {
-        break
-      }
-    }
-
-    // Reset if video looped
-    if (currentTime < 0) {
-      mediaPlayer.lastActionIndex = 0
-    }
-
-    // Use polling rate interval instead of requestAnimationFrame for consistent timing
-    const interval = getPollingInterval()
-    mediaPlayer.animationFrameId = setTimeout(syncLoop, interval)
-  }
-
-  syncLoop()
-}
-
-// Stop Funscript synchronization
-function stopFunscriptSync() {
-  if (mediaPlayer.animationFrameId) {
-    clearTimeout(mediaPlayer.animationFrameId)
-    mediaPlayer.animationFrameId = null
-  }
-  stopFunscriptSyncTimer()
-}
-
-// Timer-based Funscript sync for background tab operation
-function startFunscriptSyncTimer() {
-  if (!mediaPlayer.videoElement || !mediaPlayer.currentFunscript) {
-    console.log(`${NAME}: Cannot start timer sync - videoElement: ${!!mediaPlayer.videoElement}, funscript: ${!!mediaPlayer.currentFunscript}`)
-    return
-  }
-  
-  // Clear any existing timer first
-  stopFunscriptSyncTimer()
-  
-  // If media is not paused, ensure isPlaying is true
-  if (!mediaPlayer.videoElement.paused) {
-    mediaPlayer.isPlaying = true
-  }
-  
-  console.log(`${NAME}: Starting timer-based funscript sync`)
-  
-  // Store last execution time to handle browser throttling
-  let lastExecutionTime = Date.now()
-
-  const syncLoop = () => {
-    // Only run while hidden and playing
-    if (!mediaPlayer.isPlaying || !mediaPlayer.currentFunscript || !document.hidden) {
-      console.log(`${NAME}: Timer sync stopping - isPlaying: ${mediaPlayer.isPlaying}, hasFunscript: ${!!mediaPlayer.currentFunscript}, hidden: ${document.hidden}`)
-      return
-    }
-
-    const video = mediaPlayer.videoElement
-    const funscript = mediaPlayer.currentFunscript
-    const currentTime = (video.currentTime * 1000) + mediaPlayer.syncOffset
-    
-    // Calculate time delta to catch up on missed actions due to throttling
-    const now = Date.now()
-    const timeDelta = now - lastExecutionTime
-    lastExecutionTime = now
-
-    // Find and execute actions - process ALL actions up to current time
-    // to catch up if browser throttled us
-    const actions = funscript.actions
-    const targetTime = currentTime + timeDelta // Look ahead by the time that passed
-    
-    for (let i = mediaPlayer.lastActionIndex; i < actions.length; i++) {
-      const action = actions[i]
-
-      if (action.at <= targetTime) {
-        // Execute action
-        executeFunscriptAction(action)
-        mediaPlayer.lastActionIndex = i + 1
-      } else {
-        break
-      }
-    }
-
-    // Reset if video looped
-    if (currentTime < 0) {
-      mediaPlayer.lastActionIndex = 0
-    }
-
-    // Continue loop only if still hidden
-    if (document.hidden && mediaPlayer.isPlaying) {
-      // Use polling rate interval for consistent device timing
-      const interval = getPollingInterval()
-      mediaPlayer.syncTimerId = setTimeout(syncLoop, interval)
-    }
-  }
-
-  syncLoop()
-}
-
-function stopFunscriptSyncTimer() {
-  if (mediaPlayer.syncTimerId) {
-    clearTimeout(mediaPlayer.syncTimerId)
-    mediaPlayer.syncTimerId = null
-  }
-}
-
-// Execute Funscript action
-async function executeFunscriptAction(action) {
-  // Check if media is still playing before executing
-  if (!mediaPlayer.isPlaying || !mediaPlayer.videoElement) return
-  if (!client.connected || devices.length === 0) return
-
-  // Send to devices based on their channel assignments
-  const promises = []
-  for (let i = 0; i < devices.length; i++) {
-    const targetDevice = devices[i]
-    const deviceIndex = targetDevice.index
-    const deviceType = getDeviceType(targetDevice)
-
-    // Get device channel assignment
-    const channel = deviceAssignments[deviceIndex] || '-'
-
-    // Get the appropriate funscript for this device
-    let deviceFunscript = mediaPlayer.currentFunscript
-    if (mediaPlayer.channelFunscripts[channel]) {
-      deviceFunscript = mediaPlayer.channelFunscripts[channel]
-    }
-
-    // If no device-specific funscript and channel is not '-', skip this device
-    if (channel !== '-' && !mediaPlayer.channelFunscripts[channel]) {
-      continue // Device has specific channel but no funscript for it
-    }
-
-    // Handle multi-motor arrays
-    const isMultiMotor = Array.isArray(action.pos)
-    const positions = isMultiMotor ? action.pos : [action.pos]
-    
-    // Get motor count for this device
-    const motorCount = getMotorCount(targetDevice)
-    
-    // Apply global intensity modifier using MultiFunPlayer's approach:
-    // Scale the deviation from default (50%), not the raw value
-    const defaultValue = 50 // Neutral point (50%)
-    const scale = mediaPlayer.globalIntensity / 100 // Convert percentage to multiplier
-    
-    try {
-      // Choose control method based on device type
-      if (deviceType === 'stroker' && targetDevice.messageAttributes?.LinearCmd) {
-        // Linear device (stroker) - use first motor position
-        const scriptValue = positions[0] || 50
-        const scaledValue = defaultValue + (scriptValue - defaultValue) * scale
-        let adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
-        adjustedPos = applyInversion(adjustedPos)
-        promises.push(targetDevice.linear(adjustedPos / 100, 100))
-      } else if (targetDevice.vibrateAttributes?.length > 0) {
-        // Vibration device - can have multiple motors
-        const vibrateAttrs = targetDevice.vibrateAttributes
-        
-        for (let motorIndex = 0; motorIndex < Math.min(vibrateAttrs.length, positions.length); motorIndex++) {
-          const scriptValue = positions[motorIndex]
-          const scaledValue = defaultValue + (scriptValue - defaultValue) * scale
-          let adjustedPos = Math.min(100, Math.max(0, Math.round(scaledValue)))
-          adjustedPos = applyInversion(adjustedPos)
-          
-          if (vibrateAttrs[motorIndex]) {
-            const scalarCmd = new buttplug.ScalarSubcommand(
-              vibrateAttrs[motorIndex].Index,
-              adjustedPos / 100,
-              "Vibrate"
-            )
-            promises.push(targetDevice.scalar(scalarCmd))
-          }
-        }
-      }
-    } catch (e) {
-      // Silent fail - don't spam errors during playback
-    }
-  }
-
-  // Execute all device commands in parallel
-  if (promises.length > 0) {
-    await Promise.all(promises)
-  }
-}
-
-// Stop media playback
-function stopMediaPlayback() {
-  if (mediaPlayer.videoElement) {
-    mediaPlayer.videoElement.pause()
-    mediaPlayer.videoElement.currentTime = 0
-  }
-  
-  mediaPlayer.isPlaying = false
-  mediaPlayer.lastActionIndex = 0
-  stopFunscriptSync()
-  stopAllDeviceActions()
-  
-  $("#intiface-funscript-state").text("Stopped").css("color", "#888")
-}
-
-// Update media player status
-function updateMediaPlayerStatus(status) {
-  $("#intiface-status-panel").text(`Status: ${status}`)
-}
-
-// ==========================================
-// CHAT SIDEBAR MEDIA PLAYER
-// ==========================================
-
-// Create chat media player panel (appears at top of chat)
-function createChatSidebarPanel() {
-  // Check if panel already exists
-  if ($("#intiface-chat-media-panel").length > 0) {
-    return
-  }
-  
-    // Create panel HTML
-    const panelHtml = `
-    <div id="intiface-chat-media-panel" style="display: none; width: 100%; position: relative; margin-bottom: 10px; padding: 0;">
-        <!-- Video Player -->
-        <div id="intiface-chat-video-container" style="position: relative; width: 100%; line-height: 0;">
-            <video id="intiface-chat-video-player" style="width: 100%; height: auto; border-radius: 4px; background: #000; display: block;" controls>
-                Your browser does not support the video tag.
-            </video>
-            <!-- Close button - appears on hover -->
-            <button id="intiface-close-chat-media" class="menu_button" style="position: absolute; top: 8px; right: 8px; padding: 4px 8px; font-size: 0.8em; opacity: 0; transition: opacity 0.2s; z-index: 10;" title="Close">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-    </div>
-    `
-  
-  // Insert BEFORE chat element (outside of it) so it remains visible when VoiceForge hides chat in call mode
-  const chatElement = $("#chat")
-  if (chatElement.length > 0) {
-    chatElement.before(panelHtml)
-    
-    // Setup event handlers for chat panel
-    setupChatPanelEventHandlers()
-  }
-}
-
-// Setup event handlers for chat panel
-function setupChatPanelEventHandlers() {
-  // Close button
-  $("#intiface-close-chat-media").on("click", () => {
-    hideChatMediaPanel()
-  })
-
-  // Add hover effect for close button visibility
-  const videoContainer = $("#intiface-chat-video-container")
-  const closeButton = $("#intiface-close-chat-media")
-
-  videoContainer.on("mouseenter", function() {
-    closeButton.css("opacity", "1")
-  }).on("mouseleave", function() {
-    closeButton.css("opacity", "0")
-  })
-
-}
-
-// Show chat media panel
-function showChatMediaPanel() {
-  const panel = $("#intiface-chat-media-panel")
-  if (panel.length === 0) {
-    createChatSidebarPanel()
-  }
-  
-  $("#intiface-chat-media-panel").show()
-  
-  // Apply appearance settings
-  applyMediaPlayerAppearance()
-}
-
-// Hide chat media panel
-function hideChatMediaPanel() {
-  $("#intiface-chat-media-panel").hide()
-  stopMediaPlayback()
-}
-
-// Load media file in chat panel
-async function loadChatMediaFile(filename) {
-  console.log(`${NAME}: Loading media file in chat:`, filename)
-  
-  try {
-    // Get asset paths
-    const pathsResponse = await fetch('/api/plugins/intiface-launcher/asset-paths', {
-      method: 'GET',
-      headers: getRequestHeaders()
-    })
-    
-    if (!pathsResponse.ok) throw new Error('Failed to get paths')
-    
-    const pathsData = await pathsResponse.json()
-    const mediaPath = pathsData.paths?.intifaceMedia
-    
-    if (!mediaPath) throw new Error('No media path')
-    
-    const videoPath = `${mediaPath}/${filename}`
-    const videoUrl = `/assets/intiface_media/${encodeURIComponent(filename)}`
-    
-    // Show panel
-    showChatMediaPanel()
-    
-    // Update UI
-    $("#intiface-chat-video-filename").text(filename)
-    
-// Set video source
-const videoPlayer = $("#intiface-chat-video-player")
-videoPlayer.attr('src', videoUrl)
-
-// Check if this is an audio file
-const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac', '.opus']
-const isAudioFile = audioExtensions.some(ext => filename.toLowerCase().endsWith(ext))
-
-// Adjust styling for audio files to remove extra padding
-if (isAudioFile) {
-videoPlayer.css({
-'height': '54px',
-'max-height': '54px',
-'object-fit': 'none',
-'background': 'transparent',
-'border': 'none',
-'padding': '0',
-'margin': '0',
-'display': 'block'
-})
-$("#intiface-chat-video-container").css({
-'height': '54px',
-'max-height': '54px',
-'line-height': '1',
-'margin-bottom': '0',
-'padding': '0',
-'overflow': 'hidden'
-})
-// Add class for future reference
-videoPlayer.addClass('audio-mode')
-} else {
-// Reset to video styling
-videoPlayer.css({
-'height': 'auto',
-'max-height': 'none',
-'object-fit': 'contain',
-'background': '#000',
-'border': '',
-'padding': '',
-'margin': ''
-})
-$("#intiface-chat-video-container").css({
-'height': '',
-'max-height': '',
-'line-height': '0',
-'margin-bottom': '0',
-'padding': '',
-'overflow': ''
-})
-videoPlayer.removeClass('audio-mode')
-}
-    
-    // Store reference
-    mediaPlayer.videoElement = videoPlayer[0]
-    mediaPlayer.currentMediaPath = videoPath
-    
-// Check for funscripts (look in funscript folder)
-// Support multiple funscripts: filename.funscript, filename_A.funscript, filename_B.funscript, etc.
-const baseName = filename.replace(/\.[^.]+$/, '')
-const funscriptFolder = pathsData.paths?.funscript
-
-// Clear previous channel funscripts
-mediaPlayer.channelFunscripts = {}
-
-// Get list of channels that actually have devices assigned
-const activeChannels = new Set(['-']) // Always include base channel
-for (const device of devices) {
-const channel = deviceAssignments[device.index] || '-'
-activeChannels.add(channel)
-}
-
-console.log(`${NAME}: Active channels: ${Array.from(activeChannels).join(', ')}`)
-
-// Load funscripts only for active channels
-const loadPromises = Array.from(activeChannels).map(async (channel) => {
-const suffix = channel === '-' ? '' : `_${channel}`
-const funscriptFilename = `${baseName}${suffix}.funscript`
-const funscriptUrl = `/assets/funscript/${encodeURIComponent(funscriptFilename)}`
-
-try {
-const funscriptResponse = await fetch(funscriptUrl, {
-method: 'GET',
-headers: getRequestHeaders()
-})
-
-if (funscriptResponse.ok) {
-const funscriptData = await funscriptResponse.json()
-const funscript = processFunscript(funscriptData)
-funscriptCache.set(funscriptUrl, funscript)
-mediaPlayer.channelFunscripts[channel] = funscript
-console.log(`${NAME}: Loaded funscript for channel ${channel}: ${funscriptFilename}`)
-return { channel, success: true }
-} else if (funscriptResponse.status === 404) {
-console.log(`${NAME}: Funscript not found for channel ${channel}: ${funscriptFilename}`)
-return { channel, success: false }
-} else {
-console.error(`${NAME}: Failed to load funscript for channel ${channel}: ${funscriptResponse.status}`)
-return { channel, success: false }
-}
-} catch (e) {
-console.error(`${NAME}: Error loading funscript for channel ${channel}:`, e)
-return { channel, success: false }
-}
-})
-
-const results = await Promise.all(loadPromises)
-
-// Set current funscript (base channel takes priority)
-if (mediaPlayer.channelFunscripts['-']) {
-mediaPlayer.currentFunscript = mediaPlayer.channelFunscripts['-']
-updateChatFunscriptUI(mediaPlayer.currentFunscript)
-} else {
-// Use first available channel
-const firstChannel = results.find(r => r.success)?.channel
-if (firstChannel) {
-mediaPlayer.currentFunscript = mediaPlayer.channelFunscripts[firstChannel]
-updateChatFunscriptUI(mediaPlayer.currentFunscript)
-    } else {
-      mediaPlayer.currentFunscript = null
-    }
-}
-    
-    // Setup video event listeners
-    setupChatVideoEventListeners()
-    
-    // Auto-play
-    videoPlayer[0].play().catch(e => {
-      console.log(`${NAME}: Auto-play prevented, user must click play`)
-    })
-    
-  } catch (error) {
-    console.error(`${NAME}: Failed to load media:`, error)
-    updateStatus(`Media load failed: ${error.message}`, true)
-  }
-}
-
-// Setup video event listeners for chat panel
-function setupChatVideoEventListeners() {
-  const video = mediaPlayer.videoElement
-  if (!video) {
-    console.log(`${NAME}: No video element found, cannot setup event listeners`)
-    return
-  }
-
-  console.log(`${NAME}: Setting up video event listeners`)
-
-  // Remove old listeners
-  video.onplay = null
-  video.onpause = null
-  video.onended = null
-
-// Add new listeners
-video.onplay = async () => {
-console.log(`${NAME}: Video onplay event fired`)
-
-// Wait a moment for device to finish stopping if it was just paused
-await new Promise(resolve => setTimeout(resolve, 50))
-
-mediaPlayer.isPlaying = true
-
-// Reset last action index to ensure we start from current position
-if (mediaPlayer.videoElement) {
-const currentTime = mediaPlayer.videoElement.currentTime * 1000
-// Find the correct starting position in the funscript
-if (mediaPlayer.currentFunscript && mediaPlayer.currentFunscript.actions) {
-const actions = mediaPlayer.currentFunscript.actions
-for (let i = 0; i < actions.length; i++) {
-if (actions[i].at > currentTime) {
-mediaPlayer.lastActionIndex = Math.max(0, i - 1)
-break
-}
-}
-}
-}
-
-// Clear any pending AI commands when video starts playing
-if (messageCommands.length > 0) {
-console.log(`${NAME}: Clearing ${messageCommands.length} pending AI commands - video playback has priority`)
-messageCommands = []
-executedCommands.clear()
-}
-
-startFunscriptSync()
-updateStatus(`Playing funscript on ${devices.length} device(s)`)
-$("#intiface-chat-funscript-info").text("Playing - Funscript active").css("color", "#4CAF50")
-}
-
-video.onpause = async () => {
-console.log(`${NAME}: Video onpause triggered - hidden: ${document.hidden}, devices: ${devices.length}, connected: ${client.connected}`)
-// Don't stop if tab is hidden - let visibility handler manage background mode
-if (document.hidden) {
-console.log(`${NAME}: Video/audio paused but tab is hidden - continuing in background mode`)
-// Keep isPlaying true so background sync can work
-return
-}
-console.log(`${NAME}: Video/audio paused - stopping funscript sync and device`)
-// Set isPlaying false FIRST to prevent any new commands from being sent
-mediaPlayer.isPlaying = false
-// Stop sync loops immediately
-stopFunscriptSync()
-// Small delay to let any in-flight commands complete, then stop device
-await new Promise(resolve => setTimeout(resolve, 100))
-await stopAllDeviceActions()
-$("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
-}
-
-  video.onended = () => {
-    console.log(`${NAME}: Video onended event fired`)
-    mediaPlayer.isPlaying = false
-    stopFunscriptSync()
-
-    if ($("#intiface-menu-loop").is(":checked")) {
-      video.currentTime = 0
-      mediaPlayer.lastActionIndex = 0
-      video.play()
-    } else {
-      $("#intiface-chat-funscript-info").text("Finished").css("color", "#888")
-      stopAllDeviceActions()
-    }
-  }
-
-  console.log(`${NAME}: Video event listeners setup complete`)
-}
-
-// Update Funscript UI in chat panel
-function updateChatFunscriptUI(funscript) {
-if (!funscript) return
-
-// Get available channels
-const availableChannels = Object.keys(mediaPlayer.channelFunscripts || {})
-const channelInfo = availableChannels.length > 1 
-? `<div style="font-size: 0.7em; color: #64B5F6; margin-top: 2px;">
-<i class="fa-solid fa-layer-group"></i> Channels: ${availableChannels.filter(c => c !== '-').join(', ')}
-</div>`
-: ''
-
-// Update chat panel
-$("#intiface-chat-funscript-duration").text(`${(funscript.duration / 1000).toFixed(1)}s`)
-$("#intiface-chat-funscript-info").html(`
-${funscript.stats.actionCount} actions |
-Range: ${funscript.stats.minPosition}-${funscript.stats.maxPosition}%
-${channelInfo}
-`).css("color", "#888")
-
-}
-
-
-
-// View funscript details (for AI to see the data)
-async function handleFunscriptView() {
-  if (!mediaPlayer.currentFunscript) {
-    console.log(`${NAME}: No funscript loaded to view`)
-    return false
-  }
-
-  const funscript = mediaPlayer.currentFunscript
-  const summary = {
-    actionCount: funscript.stats.actionCount,
-    duration: `${(funscript.duration / 1000).toFixed(1)}s`,
-    avgPosition: funscript.stats.avgPosition,
-    minPosition: funscript.stats.minPosition,
-    maxPosition: funscript.stats.maxPosition
-  }
-
-  console.log(`${NAME}: Funscript view requested:`, summary)
-  updateStatus(`Funscript: ${summary.actionCount} actions, ${summary.duration}`)
-
-  return true
-}
-
-// Check for video/MP4 mentions in chat messages
-function checkForVideoMentions(text) {
-  // Match various patterns:
-  // - "plays filename.mp4|.m4a|.mp3|.wav|.webm|.mkv|.avi|.mov|.ogg"
-  // - "filename.ext" (no spaces in filename)
-  // - <video:filename.ext>
-  // - <media:PLAY: filename with spaces.ext>
-  // - "playing filename.ext"
-  // - "load filename.ext"
-
-  const mediaExtensions = 'mp4|m4a|mp3|wav|webm|mkv|avi|mov|ogg|oga|ogv';
-  const patterns = [
-    // Match <media:PLAY: filename.ext> format (handles spaces in filename, non-greedy)
-    new RegExp(`<media:PLAY:\\s*([^<>]+?\\.(${mediaExtensions}))>`, 'i'),
-    // Match <video:filename.ext> format
-    new RegExp(`<video:\\s*([^<>]+?\\.(${mediaExtensions}))>`, 'i'),
-    // Match play/load commands with quoted filenames (handles spaces)
-    new RegExp(`(?:play|playing|loads?|show|watch)\\s+(?:the\\s+)?(?:video|audio|media)?\\s*["']([^"']+\\.(${mediaExtensions}))["']`, 'i'),
-    // Match play commands with unquoted filenames (no spaces)
-    new RegExp(`(?:play|playing|loads?|show|watch)\\s+(?:the\\s+)?(?:video|audio|media)?\\s*["']?([^"'\\s<>]+\\.(${mediaExtensions}))["']?`, 'i'),
-    // Match standalone quoted filenames
-    new RegExp(`["']([^"']+\\.(${mediaExtensions}))["']`, 'i'),
-    // Match standalone unquoted filenames (no spaces, no angle brackets)
-    new RegExp(`\\b([^"'\\s<>]+\\.(${mediaExtensions}))\\b`, 'i')
-  ]
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern)
-    if (match) {
-      const filename = match[1].trim()
-      console.log(`${NAME}: Detected video mention:`, filename)
-      return filename
-    }
-  }
-
-  return null
-}
-
-// ==========================================
-// END FUNSCRIPT AND MEDIA PLAYER MODULE
 // ==========================================
 
 // ==========================================
@@ -7139,7 +5971,7 @@ async function autoConnectOnLoad() {
   await new Promise(resolve => setTimeout(resolve, 2000))
 
   // Only connect if not already connected
-  if (!client.connected) {
+  if (!client || !client.connected) {
     try {
       await connect(true) // Pass true to indicate this is an auto-connect attempt
       updateStatus(`Auto-connected to Intiface`)
@@ -7157,3 +5989,28 @@ async function autoConnectOnLoad() {
 autoConnectOnLoad().catch(e => {
   console.error(`${NAME}: Auto-connect error:`, e)
 })
+
+// Export functions and state needed by other modules
+export {
+  stopAllDeviceActions,
+  clearWorkerTimeout,
+  getMotorCount,
+  getPollingInterval,
+  updateAIStatusFromActivity,
+  updateStatus,
+  getDeviceType,
+  getDeviceDefaultIntensity,
+  applyInversion,
+  NAME,
+  client,
+  devices,
+  deviceAssignments,
+  buttplug,
+  strokerIntervalId,
+  vibrateIntervalId,
+  oscillateIntervalId,
+  isStroking,
+  activePatterns,
+  messageCommands,
+  PlayModeLoader
+}
