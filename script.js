@@ -2,36 +2,53 @@ import { renderExtensionTemplateAsync } from "../../../extensions.js"
 import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles, getRequestHeaders, messageFormatting, appendMediaToMessage, addCopyToCodeBlocks } from "../../../../script.js"
 import { PlayModeLoader } from "./play_modes/_loader.js"
 import {
-  mediaPlayer,
-  funscriptCache,
-  initMediaModule,
-  initMediaPlayer,
-  loadMediaPlayerAppearance,
-  saveMediaPlayerAppearance,
-  applyMediaPlayerAppearance,
-  startInternalProxy,
-  stopInternalProxy,
-  updateProxyStatus,
-  refreshMenuMediaList,
-  loadFunscript,
-  processFunscript,
-  startFunscriptSync,
-  stopFunscriptSync,
-  startFunscriptSyncTimer,
-  stopFunscriptSyncTimer,
-  executeFunscriptAction,
-  stopMediaPlayback,
-  updateMediaPlayerStatus,
-  createChatSidebarPanel,
-  setupChatPanelEventHandlers,
-  showChatMediaPanel,
-  hideChatMediaPanel,
-  loadChatMediaFile,
-  setupChatVideoEventListeners,
-  updateChatFunscriptUI,
-  handleFunscriptView,
-  checkForVideoMentions
+mediaPlayer,
+funscriptCache,
+initMediaModule,
+initMediaPlayer,
+loadMediaPlayerAppearance,
+saveMediaPlayerAppearance,
+applyMediaPlayerAppearance,
+startInternalProxy,
+stopInternalProxy,
+updateProxyStatus,
+refreshMenuMediaList,
+loadFunscript,
+processFunscript,
+startFunscriptSync,
+stopFunscriptSync,
+startFunscriptSyncTimer,
+stopFunscriptSyncTimer,
+executeFunscriptAction,
+stopMediaPlayback,
+updateMediaPlayerStatus,
+createChatSidebarPanel,
+setupChatPanelEventHandlers,
+showChatMediaPanel,
+hideChatMediaPanel,
+loadChatMediaFile,
+setupChatVideoEventListeners,
+updateChatFunscriptUI,
+handleFunscriptView,
+checkForVideoMentions
 } from "./media.js"
+import {
+initPlaybackSystem,
+PatternLibrary,
+activePatterns,
+getMotorCount,
+applyMaxVibrate,
+applyMaxOscillate,
+generateWaveformValues,
+generateDualMotorWaveform,
+executeWaveformPattern,
+executeGradientPattern,
+executeLinearWaveform,
+executeLinearGradient,
+executeTeaseAndDenialMode,
+stopDevicePattern,
+executePattern
+} from "./playback.js"
 
 // @ts-ignore: Hack to suppress IDE errors
 const $ = window.$
@@ -63,39 +80,101 @@ let workerTimers = new Map() // timerId -> { callback, interval, createdAt, last
 let workerTimerId = 0
 let isWorkerTimerRunning = false
 
-// Mode settings (which mode categories are enabled)
-let modeSettings = {
-  denialDomina: true,
-  milkMaid: true,
-  petTraining: true,
-  sissySurrender: true,
-  prejacPrincess: true,
-  roboticRuination: true,
-  evilEdgingMistress: true,
-  frustrationFairy: true,
-  hypnoHelper: true,
-  chastityCaretaker: true
-}
+// Mode settings now managed by PlayModeLoader - removed hardcoded object
+
+// Compatibility function to map old modeSettings camelCase names to PlayModeLoader mode IDs
+// This allows existing code to work while using the modular system
+const modeSettings = new Proxy({}, {
+  get(target, prop) {
+    // Map camelCase property names to snake_case mode IDs
+    const modeMap = {
+      'denialDomina': 'denial_domina',
+      'milkMaid': 'milk_maid',
+      'petTraining': 'pet_training',
+      'sissySurrender': 'sissy_surrender',
+      'prejacPrincess': 'prejac_princess',
+      'roboticRuination': 'robotic_ruination',
+      'evilEdgingMistress': 'evil_edging_mistress',
+      'frustrationFairy': 'frustration_fairy',
+      'hypnoHelper': 'hypno_helper',
+      'chastityCaretaker': 'chastity_caretaker'
+    }
+    const modeId = modeMap[prop]
+    if (modeId) {
+      return PlayModeLoader.isModeEnabled(modeId)
+    }
+    return target[prop]
+  },
+  set(target, prop, value) {
+    const modeMap = {
+      'denialDomina': 'denial_domina',
+      'milkMaid': 'milk_maid',
+      'petTraining': 'pet_training',
+      'sissySurrender': 'sissy_surrender',
+      'prejacPrincess': 'prejac_princess',
+      'roboticRuination': 'robotic_ruination',
+      'evilEdgingMistress': 'evil_edging_mistress',
+      'frustrationFairy': 'frustration_fairy',
+      'hypnoHelper': 'hypno_helper',
+      'chastityCaretaker': 'chastity_caretaker'
+    }
+    const modeId = modeMap[prop]
+    if (modeId) {
+      PlayModeLoader.setModeEnabled(modeId, value)
+    }
+    target[prop] = value
+    return true
+  }
+})
+
+// Compatibility function to map old modeIntensityMultipliers camelCase names to PlayModeLoader
+// This allows existing UI code to work while using the modular system
+const modeIntensityMultipliers = new Proxy({}, {
+  get(target, prop) {
+    // Map camelCase property names to snake_case mode IDs
+    const modeMap = {
+      'denialDomina': 'denial_domina',
+      'milkMaid': 'milk_maid',
+      'petTraining': 'pet_training',
+      'sissySurrender': 'sissy_surrender',
+      'prejacPrincess': 'prejac_princess',
+      'roboticRuination': 'robotic_ruination',
+      'evilEdgingMistress': 'evil_edging_mistress',
+      'frustrationFairy': 'frustration_fairy',
+      'hypnoHelper': 'hypno_helper',
+      'chastityCaretaker': 'chastity_caretaker'
+    }
+    const modeId = modeMap[prop]
+    if (modeId) {
+      return PlayModeLoader.getIntensityMultiplier(modeId)
+    }
+    return target[prop]
+  },
+  set(target, prop, value) {
+    const modeMap = {
+      'denialDomina': 'denial_domina',
+      'milkMaid': 'milk_maid',
+      'petTraining': 'pet_training',
+      'sissySurrender': 'sissy_surrender',
+      'prejacPrincess': 'prejac_princess',
+      'roboticRuination': 'robotic_ruination',
+      'evilEdgingMistress': 'evil_edging_mistress',
+      'frustrationFairy': 'frustration_fairy',
+      'hypnoHelper': 'hypno_helper',
+      'chastityCaretaker': 'chastity_caretaker'
+    }
+    const modeId = modeMap[prop]
+    if (modeId) {
+      PlayModeLoader.setIntensityMultiplier(modeId, value)
+    }
+    target[prop] = value
+    return true
+  }
+})
 
 // Global intensity scale (affects ALL playback, not just funscripts)
 // AI can override this via INTENSITY command
 let globalIntensityScale = 100 // Default 100% (no scaling)
-
-// Mode-specific intensity multipliers (stacked on top of global intensity)
-// These add slight variations based on the mode's character
-// User can adjust these per mode (50%-150% range)
-let modeIntensityMultipliers = {
-  denialDomina: 1.0,
-  milkMaid: 1.0,
-  petTraining: 1.0,
-  sissySurrender: 1.0,
-  prejacPrincess: 1.0,
-  roboticRuination: 1.0,
-  evilEdgingMistress: 1.0,
-  frustrationFairy: 1.0,
-  hypnoHelper: 1.0,
-  chastityCaretaker: 1.0
-}
 
 // Prompt update tracking to prevent excessive reinjection
 let lastPromptHash = ''
@@ -176,15 +255,16 @@ function getPollingInterval() {
 }
 
 // Apply global intensity to values with optional mode scaling
-function applyIntensityScale(values, modeName = null) {
+function applyIntensityScale(values, modeId = null) {
   // Get base scale from global intensity (default 100%)
   let scale = globalIntensityScale / 100
-  
-  // Apply mode-specific multiplier if provided
-  if (modeName && modeIntensityMultipliers[modeName]) {
-    scale *= modeIntensityMultipliers[modeName]
+
+  // Apply mode-specific multiplier from PlayModeLoader if modeId is provided
+  if (modeId) {
+    const modeMultiplier = PlayModeLoader.getIntensityMultiplier(modeId)
+    scale *= modeMultiplier
   }
-  
+
   // Scale values around neutral point (50) to preserve dynamic range
   return values.map(v => {
     const scaled = 50 + (v - 50) * scale
@@ -312,670 +392,30 @@ function clearWorkerTimeout(id) {
 }
 
 
-// UNIFIED PLAY MODE SYSTEM
-// =======================
-// All patterns consolidated into one library with device compatibility
-
-const PatternLibrary = {
-  // Device compatibility metadata for patterns
-  // All patterns work with all devices by default, but some are optimized
-  compatibility: {
-    // Device type to waveform pattern mappings - which patterns work best with which device types
-    // All device types default to 'general' patterns if not specified here
-    byDeviceType: {
-      vibration: ['sine', 'pulse', 'heartbeat', 'tickle', 'edging', 'ruin', 'teasing', 'desperation',
-        'mercy', 'stop_start', 'random_tease', 'micro_tease', 'abrupt_edge', 'crescendo',
-        'tidal_wave', 'milking_pump', 'relentless', 'overload', 'tsunami', 'forbidden_peaks'],
-      linear: ['sine', 'sawtooth', 'triangle', 'pulse', 'ramp_up', 'ramp_down', 'ripple_thruster',
-        'crescendo', 'tsunami', 'milking_pump']
-    },
-    // All devices support all patterns - will be populated after initialization
-    all: []
-  },
-
-  // Device type detection configuration
-  // Maps device name patterns to device types and properties
-  devices: {
-    // Device type patterns - used to detect device type from device name
-    typePatterns: {
-      cage: ['cage'],
-      plug: ['plug'],
-      stroker: ['solace', 'stroker', 'launch'],
-      vibrator: ['lush', 'hush', 'nora', 'max', 'domi'],
-      gush: ['gush'],
-      general: [] // Fallback for unmatched devices
-    },
-    // Device-specific default intensities
-    defaultIntensities: {
-      gush: 117, // Gush 2 works better at 117%
-      default: 100
-    },
-    // Device shorthand mappings (for display)
-    shorthandPatterns: {
-      cage: ['cage'],
-      plug: ['plug'],
-      solace: ['solace'],
-      lush: ['lush'],
-      hush: ['hush'],
-      nora: ['nora'],
-      max: ['max'],
-      domi: ['domi'],
-      edge: ['edge'],
-      gush: ['gush']
-    }
-  },
-
-  // Preset patterns - ready-to-use configurations
-  presets: {
-    // Basic/simple patterns (always available)
-    warmup: {
-      type: 'waveform',
-      pattern: 'sine',
-      min: 10,
-      max: 30,
-      duration: 5000,
-      cycles: 3,
-      description: 'Gentle warmup pattern',
-      compatibleDevices: ['cage', 'plug', 'stroker', 'general']
-    },
-    tease: {
-      type: 'waveform',
-      pattern: 'teasing',
-      min: 20,
-      max: 60,
-      duration: 8000,
-      cycles: 4,
-      description: 'Irregular teasing pattern',
-      compatibleDevices: ['cage', 'plug', 'general']
-    },
-    pulse: {
-      type: 'waveform',
-      pattern: 'pulse',
-      min: 30,
-      max: 70,
-      duration: 4000,
-      cycles: 8,
-      description: 'Rhythmic pulsing',
-      compatibleDevices: ['cage', 'plug', 'general']
-    },
-    edge: {
-      type: 'waveform',
-      pattern: 'edging',
-      min: 10,
-      max: 90,
-      duration: 12000,
-      cycles: 2,
-      description: 'Build to edge then stop',
-      compatibleDevices: ['cage', 'plug', 'general']
-    },
-
-    // General patterns for all devices
-    build: { type: 'waveform', pattern: 'ramp_up', min: 30, max: 80, duration: 12000, cycles: 1, description: 'Gradual build', compatibleDevices: ['cage', 'plug', 'stroker', 'general'] },
-    peak: { type: 'waveform', pattern: 'square', min: 70, max: 100, duration: 3000, cycles: 3, description: 'Peak intensity', compatibleDevices: ['cage', 'plug', 'general'] },
-    cooldown: { type: 'gradient', start: 60, end: 10, duration: 8000, description: 'Cool down', compatibleDevices: ['cage', 'plug', 'stroker', 'general'] },
-    peak_and_drop: { type: 'waveform', pattern: 'peak_and_drop', min: 5, max: 95, duration: 6000, cycles: 3, description: 'Peak to 95% then drop', compatibleDevices: ['cage', 'plug', 'general'] },
-    flutter: { type: 'waveform', pattern: 'flutter', min: 5, max: 50, duration: 4000, cycles: 8, description: 'Light fluttering', compatibleDevices: ['cage', 'plug', 'general'] }
-  },
-
-
-
-  // Helper function to get compatible presets for a device type
-  getCompatiblePresets(deviceType) {
-    return Object.entries(this.presets)
-      .filter(([_, preset]) => 
-        preset.compatibleDevices.includes(deviceType) || 
-        preset.compatibleDevices.includes('general')
-      )
-      .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
-  },
-
-  // Helper function to check if pattern is compatible
-  isCompatible(patternName, deviceType) {
-    const preset = this.presets[patternName];
-    if (!preset) return true; // Unknown patterns assumed compatible
-    return preset.compatibleDevices.includes(deviceType) || 
-           preset.compatibleDevices.includes('general');
-  }
-};
-
-// Active pattern tracking
-let activePatterns = new Map(); // deviceIndex -> { pattern, interval, controls }
-
-// NOTE: All play modes have been migrated to the modular system
-// Each mode has its own directory in play_modes/ with mode.json, patterns.js, and sequences.json
-// The PlayModeLoader dynamically loads and manages these modes
-// Access modes via: PlayModeLoader.getSequence(modeId, sequenceName)
-
-function applyMaxVibrate(value, motorIndex = 0) {
-  // No max limit anymore, just return the value clamped to 0-100
-  return Math.min(value, 100)
-}
-
-function applyMaxOscillate(value) {
-  return Math.min(value, 100)
-}
-
-// Generate waveform pattern values
-function generateWaveformValues(pattern, steps, min, max) {
-  const values = []
-  const generator = PlayModeLoader.getPattern(pattern) || PlayModeLoader.getPattern('sine')
-  const range = max - min
-  
-  for (let i = 0; i < steps; i++) {
-    const phase = i / steps
-    const normalized = generator(phase, 1)
-    const value = min + (normalized * range)
-    values.push(Math.max(0, Math.min(100, Math.round(value))))
-  }
-  return values
-}
-
-// Generate dual motor waveform values with phase offset for motor 2
-function generateDualMotorWaveform(pattern, steps, min, max) {
-  const motor1Values = []
-  const motor2Values = []
-  const generator = PlayModeLoader.getPattern(pattern) || PlayModeLoader.getPattern('sine')
-  const range = max - min
-
-  for (let i = 0; i < steps; i++) {
-    // Motor 1: Normal phase
-    const phase1 = i / steps
-    const normalized1 = generator(phase1, 1)
-    const value1 = min + (normalized1 * range)
-    motor1Values.push(Math.max(0, Math.min(100, Math.round(value1))))
-
-    // Motor 2: Phase offset by 0.5 (opposite timing) for diversity
-    const phase2 = ((i / steps) + 0.5) % 1
-    const normalized2 = generator(phase2, 1)
-    const value2 = min + (normalized2 * range)
-    motor2Values.push(Math.max(0, Math.min(100, Math.round(value2))))
-  }
-
-  return { motor1: motor1Values, motor2: motor2Values }
-}
-
-// Check if device has multiple motors
-function getMotorCount(device) {
-  if (!device || !device.vibrateAttributes) return 1
-  return device.vibrateAttributes.length || 1
-}
-async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
-  const targetDevice = devices[deviceIndex] || devices[0]
-  if (!targetDevice) {
-    console.error(`${NAME}: No device found for waveform pattern`)
-    return
-  }
-
-  // Determine device type using PatternLibrary configuration
-  const deviceType = getDeviceType(targetDevice)
-
-  // Get preset from PatternLibrary
-  let preset = PatternLibrary.presets[presetName]
-  // Check compatibility - if not compatible with this device type, try device-specific version
-  if (preset && !PatternLibrary.isCompatible(presetName, deviceType)) {
-    const deviceSpecificName = `${deviceType}_${presetName}`
-    if (PatternLibrary.presets[deviceSpecificName]) {
-      preset = PatternLibrary.presets[deviceSpecificName]
-    }
-  }
-  // Fall back to warmup if preset not found or not compatible
-  if (!preset || !PatternLibrary.isCompatible(presetName, deviceType)) {
-    preset = PatternLibrary.presets.warmup || { type: 'waveform', pattern: 'sine', min: 20, max: 60, duration: 3000, cycles: 3 }
-  }
-
-  // Merge with options
-  const config = { ...preset, ...options }
-
-  // Stop existing pattern for this device
-  await stopDevicePattern(deviceIndex)
-
-  const deviceName = getDeviceDisplayName(targetDevice)
-
-  if (config.type === 'waveform') {
-    const steps = Math.floor(config.duration / 100) // 100ms resolution
-    const intervals = Array(steps).fill(100)
-
-    // Check if device has multiple motors
-    const motorCount = getMotorCount(targetDevice)
-    let patternData
-
-    if (motorCount >= 2) {
-      // Generate dual motor pattern with phase offset
-      const dualValues = generateDualMotorWaveform(config.pattern, steps, config.min, config.max)
-      // Apply global intensity scaling
-      dualValues.motor1 = applyIntensityScale(dualValues.motor1)
-      dualValues.motor2 = applyIntensityScale(dualValues.motor2)
-      // Apply device inversion
-      dualValues.motor1 = dualValues.motor1.map(v => applyInversion(v))
-      dualValues.motor2 = dualValues.motor2.map(v => applyInversion(v))
-      patternData = {
-          pattern: dualValues,
-          intervals: intervals,
-          loop: config.cycles || 1,
-          fromTimeline: config.fromTimeline || false
-        }
-        updateStatus(`${deviceName}: ${presetName} dual-motor pattern (${config.pattern}) [${globalIntensityScale}%]`)
-      } else {
-        // Single motor - traditional approach
-        const values = generateWaveformValues(config.pattern, steps, config.min, config.max)
-        // Apply global intensity scaling
-        const scaledValues = applyIntensityScale(values)
-        // Apply device inversion
-        const invertedValues = scaledValues.map(v => applyInversion(v))
-        patternData = {
-          pattern: invertedValues,
-          intervals: intervals,
-          loop: config.cycles || 1,
-          fromTimeline: config.fromTimeline || false
-        }
-      updateStatus(`${deviceName}: ${presetName} pattern (${config.pattern}) [${globalIntensityScale}%]`)
-    }
-
-    const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
-    // Store pattern result for proper cleanup
-    // patternResult is a Promise with a .stop() method attached
-    if (patternResult && typeof patternResult.stop === 'function') {
-      activePatterns.set(deviceIndex, {
-        mode: 'pattern',
-        modeName: `waveform_${presetName}`,
-        stop: patternResult.stop
-      })
-    }
-  } else if (config.type === 'gradient') {
-    await executeGradientPattern(deviceIndex, config)
-    updateStatus(`${deviceName}: ${presetName} gradient`)
-  } else if (config.type === 'linear_waveform') {
-    await executeLinearWaveform(deviceIndex, config)
-    updateStatus(`${deviceName}: ${presetName} linear pattern`)
-  } else if (config.type === 'linear_gradient') {
-    await executeLinearGradient(deviceIndex, config)
-    updateStatus(`${deviceName}: ${presetName} linear gradient`)
-  }
-}
-
-// Execute gradient pattern (smooth intensity transition)
-async function executeGradientPattern(deviceIndex, config) {
-  const { start, end, duration, hold = 0, release = 0 } = config
-  const steps = Math.floor(duration / 50) // 50ms steps
-  const motor1Values = []
-  const motor2Values = []
-  const intervals = []
-
-  // Ramp up
-  for (let i = 0; i < steps; i++) {
-    const progress = i / steps
-    const value = Math.round(start + (end - start) * progress)
-    motor1Values.push(value)
-    // Motor 2: Inverted gradient for diversity
-    motor2Values.push(Math.round(start + (end - start) * (1 - progress)))
-    intervals.push(50)
-  }
-
-  // Hold
-  if (hold > 0) {
-    const holdSteps = Math.floor(hold / 100)
-    for (let i = 0; i < holdSteps; i++) {
-      motor1Values.push(end)
-      motor2Values.push(end)
-      intervals.push(100)
-    }
-  }
-
-  // Release
-  if (release > 0) {
-    const releaseSteps = Math.floor(release / 50)
-    for (let i = 0; i < releaseSteps; i++) {
-      const progress = i / releaseSteps
-      const value = Math.round(end - (end * progress))
-      motor1Values.push(value)
-      // Motor 2: Inverted release
-      motor2Values.push(Math.round(end * progress))
-      intervals.push(50)
-    }
-  }
-
-// Check if device has multiple motors
-  const targetDevice = devices[deviceIndex] || devices[0]
-  const motorCount = getMotorCount(targetDevice)
-
-  // Apply global intensity scaling to gradient values
-  const scaledMotor1Values = applyIntensityScale(motor1Values)
-  const scaledMotor2Values = applyIntensityScale(motor2Values)
-
-  // Apply device inversion
-  const invertedMotor1Values = scaledMotor1Values.map(v => applyInversion(v))
-  const invertedMotor2Values = scaledMotor2Values.map(v => applyInversion(v))
-
-  let patternData
-  if (motorCount >= 2) {
-    patternData = {
-      pattern: { motor1: invertedMotor1Values, motor2: invertedMotor2Values },
-      intervals
-    }
-  } else {
-    patternData = { pattern: invertedMotor1Values, intervals }
-  }
-
-  const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
-// Store pattern result for proper cleanup
-if (patternResult && typeof patternResult === 'function') {
-activePatterns.set(deviceIndex, {
-mode: 'pattern',
-modeName: 'gradient',
-stop: patternResult
+// Initialize playback system with required dependencies
+initPlaybackSystem({
+  NAME,
+  devices,
+  client,
+  buttplug,
+  PlayModeLoader,
+  applyIntensityScale,
+  applyInversion,
+  getPollingInterval,
+  setWorkerTimeout,
+  clearWorkerTimeout,
+  updateStatus,
+  getDeviceDisplayName,
+  getDeviceType,
+  executeCommand,
+  stopAllDeviceActions,
+  mediaPlayer,
+  globalIntensityScale,
+  deviceAssignments
 })
-}
-return patternResult
-}
 
-// Execute linear waveform (position-based)
-async function executeLinearWaveform(deviceIndex, config) {
-  const { pattern, positions, duration, cycles } = config
-  const [startPos, endPos] = positions
-  const steps = Math.floor(duration / 100)
-  const generator = PlayModeLoader.getPattern(pattern) || PlayModeLoader.getPattern('sine')
-
-  const targetDevice = devices[deviceIndex] || devices[0]
-  if (!targetDevice) return
-
-  // Apply device inversion to positions
-  const invertedStartPos = applyInversion(startPos)
-  const invertedEndPos = applyInversion(endPos)
-
-  let currentCycle = 0
-  let currentStep = 0
-  let stepTimeoutId = null
-  let isRunning = true
-
-  const executeStep = async () => {
-    if (!isRunning || currentCycle >= cycles || !client.connected) {
-      activePatterns.delete(deviceIndex)
-      return
-    }
-
-    const phase = currentStep / steps
-    const normalized = generator(phase, 1)
-    const position = Math.round(invertedStartPos + (invertedEndPos - invertedStartPos) * normalized)
-
-    try {
-      await targetDevice.linear(position / 100, 100)
-    } catch (e) {
-      console.error(`${NAME}: Linear waveform step failed:`, e)
-    }
-
-    currentStep++
-    if (currentStep >= steps) {
-      currentStep = 0
-      currentCycle++
-    }
-
-    if (currentCycle < cycles && isRunning) {
-      stepTimeoutId = setWorkerTimeout(executeStep, 100)
-      // Update active patterns with the timeout ID
-      activePatterns.set(deviceIndex, {
-        mode: 'linear_waveform',
-        modeName: `linear_${pattern}`,
-        interval: stepTimeoutId
-      })
-    }
-  }
-
-  // Start execution
-  stepTimeoutId = setWorkerTimeout(executeStep, 100)
-  activePatterns.set(deviceIndex, {
-    mode: 'linear_waveform',
-    modeName: `linear_${pattern}`,
-    interval: stepTimeoutId
-  })
-}
-
-// Execute linear gradient
-async function executeLinearGradient(deviceIndex, config) {
-  const { positions, duration, hold = 0 } = config
-  const [startPos, endPos] = positions
-  const steps = Math.floor(duration / 50)
-
-  const targetDevice = devices[deviceIndex] || devices[0]
-  if (!targetDevice) return
-
-  // Apply device inversion to positions
-  const invertedStartPos = applyInversion(startPos)
-  const invertedEndPos = applyInversion(endPos)
-
-  // Create a controller to allow stopping
-  let isRunning = true
-  const stopController = () => { isRunning = false }
-  activePatterns.set(deviceIndex, {
-    mode: 'linear_gradient',
-    modeName: 'linear_gradient',
-    stop: stopController
-  })
-
-  for (let i = 0; i < steps; i++) {
-    if (!isRunning || !client.connected) break
-    const progress = i / steps
-    const position = Math.round(invertedStartPos + (invertedEndPos - invertedStartPos) * progress)
-    try {
-      await targetDevice.linear(position / 100, 50)
-    } catch (e) {
-      console.error(`${NAME}: Linear gradient step failed:`, e)
-    }
-    if (isRunning) {
-      await new Promise(resolve => setTimeout(resolve, 50))
-    }
-  }
-
-  if (isRunning && hold > 0 && client.connected) {
-    await new Promise(resolve => {
-      const holdTimeout = setTimeout(resolve, hold)
-      // Store timeout so it can be cleared
-      activePatterns.set(deviceIndex, {
-        mode: 'linear_gradient',
-        modeName: 'linear_gradient',
-        stop: () => {
-          isRunning = false
-          clearTimeout(holdTimeout)
-        },
-        interval: holdTimeout
-      })
-    })
-  }
-
-  activePatterns.delete(deviceIndex)
-}
-
-// Execute Mode sequence (Denial Domina, Milk Maid, Pet Training)
-async function executeTeaseAndDenialMode(deviceIndex, modeName) {
-  const targetDevice = devices[deviceIndex] || devices[0]
-  if (!targetDevice) {
-    console.error(`${NAME}: No device found for mode`)
-    return
-  }
-
-  // Search for sequence across all enabled modes
-  let mode = null
-  let foundModeId = null
-  const enabledModes = PlayModeLoader.getEnabledModes()
-  
-  console.log(`${NAME}: executeTeaseAndDenialMode - Looking for "${modeName}" in enabled modes:`, enabledModes)
-
-  for (const modeId of enabledModes) {
-    console.log(`${NAME}: Checking mode "${modeId}" for sequence "${modeName}"`)
-    const sequence = PlayModeLoader.getSequence(modeId, modeName)
-    console.log(`${NAME}: PlayModeLoader.getSequence("${modeId}", "${modeName}") returned:`, sequence ? 'FOUND' : 'NOT FOUND')
-    if (sequence) {
-      mode = sequence
-      foundModeId = modeId
-      break
-    }
-  }
-
-        if (!mode) {
-            // Silently skip - mode validation happens at parse time
-            return
-        }
-
-  await stopDevicePattern(deviceIndex)
-
-        const deviceName = getDeviceDisplayName(targetDevice)
-        const sequence = mode.steps || mode.sequence
-        const repeat = mode.repeat !== false
-
-  updateStatus(`${deviceName}: ${modeName} mode (${mode.description})`)
-
-  // Get device ID for inversion
-
-  let sequenceIndex = 0
-  let isRunning = true
-  let stepTimeoutId = null
-
-  const executeSequenceStep = async () => {
-    if (!isRunning || !client.connected) return
-
-    const step = sequence[sequenceIndex]
-    const { pattern, min, max, duration, pause } = step
-
-    try {
-      const steps = Math.floor(duration / 100)
-      const motorCount = getMotorCount(targetDevice)
-      let patternData
-
-      if (motorCount >= 2) {
-        // Use dual motor patterns with phase offset
-        const dualValues = generateDualMotorWaveform(pattern, steps, min, max)
-        // Apply global intensity with mode-specific scaling
-        dualValues.motor1 = applyIntensityScale(dualValues.motor1, modeName)
-        dualValues.motor2 = applyIntensityScale(dualValues.motor2, modeName)
-        // Apply device inversion
-        dualValues.motor1 = dualValues.motor1.map(v => applyInversion(v))
-        dualValues.motor2 = dualValues.motor2.map(v => applyInversion(v))
-        patternData = {
-          pattern: dualValues,
-          intervals: Array(steps).fill(100),
-          loop: 1
-        }
-      } else {
-        // Single motor
-        const values = generateWaveformValues(pattern, steps, min, max)
-        // Apply global intensity with mode-specific scaling
-        const scaledValues = applyIntensityScale(values, modeName)
-        // Apply device inversion
-        const invertedValues = scaledValues.map(v => applyInversion(v))
-        patternData = {
-          pattern: invertedValues,
-          intervals: Array(steps).fill(100),
-          loop: 1
-        }
-      }
-      
-      const patternResult = await executePattern(patternData, 'vibrate', deviceIndex)
-
-      if (pause && pause > 0) {
-        updateStatus(`${deviceName}: Pausing for ${pause}ms...`)
-        await new Promise(resolve => setTimeout(resolve, pause))
-      }
-
-      sequenceIndex++
-      if (sequenceIndex >= sequence.length) {
-        if (repeat) {
-          sequenceIndex = 0
-          updateStatus(`${deviceName}: Repeating ${modeName} mode...`)
-        } else {
-          updateStatus(`${deviceName}: ${modeName} mode complete`)
-          return
-        }
-      }
-
-      if (isRunning && client.connected) {
-        stepTimeoutId = setWorkerTimeout(executeSequenceStep, 100)
-      }
-    } catch (e) {
-      console.error(`${NAME}: Step failed:`, e)
-      isRunning = false
-    }
-  }
-
-  activePatterns.set(deviceIndex, {
-    mode: 'sequence',
-    modeName: modeName,
-    interval: stepTimeoutId,
-    stop: () => {
-      isRunning = false
-      if (stepTimeoutId) {
-        clearWorkerTimeout(stepTimeoutId)
-        stepTimeoutId = null
-      }
-    }
-  })
-
-  executeSequenceStep()
-}
-
-// Stop pattern for specific device
-async function stopDevicePattern(deviceIndex) {
-  if (activePatterns.has(deviceIndex)) {
-    const active = activePatterns.get(deviceIndex)
-    if (active.interval) {
-      clearWorkerTimeout(active.interval)
-    }
-    if (active.stop && typeof active.stop === 'function') {
-      active.stop()
-    }
-    activePatterns.delete(deviceIndex)
-  }
-
-  // Stop the device
-  const targetDevice = devices[deviceIndex]
-  if (targetDevice) {
-    try {
-      // Try simple vibrate method first (better for Lovense), fallback to scalar
-      try {
-        await targetDevice.vibrate(0)
-      } catch (e) {
-        // Fallback to scalar command
-        const vibrateAttributes = targetDevice.vibrateAttributes
-        if (vibrateAttributes && vibrateAttributes.length > 0) {
-          for (let i = 0; i < vibrateAttributes.length; i++) {
-            const scalarCommand = new buttplug.ScalarSubcommand(vibrateAttributes[i].Index, 0, "Vibrate")
-            await targetDevice.scalar(scalarCommand)
-          }
-        }
-      }
-      await targetDevice.oscillate(0)
-    } catch (e) {
-      // Ignore errors
-    }
-  }
-}
-
-// Parse device commands from AI text
-// Supports self-closing format with device type matching:
-// <cage:VIBRATE: 50> - Matches devices with "cage" in name
-// <plug:OSCILLATE: 75> - Matches devices with "plug" in its name
-// <any:VIBRATE: 50> - Matches any device (first available)
-// <solace:LINEAR: start=10, end=90, duration=1000>
-// <toy:PATTERN: [20, 40, 60], interval=[1000, 500, 1000], loop=3>
-// <cage:PRESET: tease> - Use device-specific preset
-// <any:WAVEFORM: sine, min=10, max=80, duration=5000>
-// <cage:GRADIENT: start=0, end=90, duration=10000>
-// Media commands:
-// <media:LIST> - List available media files
-// <media:PLAY: filename.ext> - Play a media file with optional funscript sync (supports: mp4, m4a, mp3, wav, webm, mkv, avi, mov, ogg)
-// <media:STOP> - Stop media playback
-
-// Mode command configurations - maps command prefix to settings key and command type
-const MODE_COMMANDS = [
-    { prefix: 'DENIAL_DOMINA', settingKey: 'denialDomina', cmdType: 'denial_domina', logName: 'DENIAL_DOMINA' },
-    { prefix: 'MILK_MAID', settingKey: 'milkMaid', cmdType: 'milking', logName: 'MILK_MAID' },
-    { prefix: 'PET_TRAINING', settingKey: 'petTraining', cmdType: 'pet_training', logName: 'PET_TRAINING' },
-    { prefix: 'SISSY_SURRENDER', settingKey: 'sissySurrender', cmdType: 'sissy_surrender', logName: 'SISSY_SURRENDER' },
-    { prefix: 'PREJAC_PRINCESS', settingKey: 'prejacPrincess', cmdType: 'prejac_princess', logName: 'PREJAC_PRINCESS' },
-    { prefix: 'ROBOTIC_RUINATION', settingKey: 'roboticRuination', cmdType: 'robotic_ruination', logName: 'ROBOTIC_RUINATION' },
-    { prefix: 'EVIL_EDGING_MISTRESS', settingKey: 'evilEdgingMistress', cmdType: 'evil_edging_mistress', logName: 'EVIL_EDGING_MISTRESS' },
-    { prefix: 'FRUSTRATION_FAIRY', settingKey: 'frustrationFairy', cmdType: 'frustration_fairy', logName: 'FRUSTRATION_FAIRY' },
-    { prefix: 'HYPNO_HELPER', settingKey: 'hypnoHelper', cmdType: 'hypno_helper', logName: 'HYPNO_HELPER' },
-    { prefix: 'CHASTITY_CARETAKER', settingKey: 'chastityCaretaker', cmdType: 'chastity_caretaker', logName: 'CHASTITY_CARETAKER' }
-];
+// AI status check interval
+let aiStatusCheckInterval = null
 
 function parseDeviceCommands(text, skipModeCommands = false) {
     const commands = []
@@ -1088,27 +528,32 @@ console.log(`${NAME}: Ignoring out-of-range media intensity: ${intensity}%`)
       continue
     }
 
-            // Parse mode commands using configuration (skip during streaming)
-            if (!skipModeCommands) {
-                for (const modeCmd of MODE_COMMANDS) {
-                    const regex = new RegExp(`${modeCmd.prefix}\\s*[:\\s]\\s*([\\w_]+)`, 'i')
-                    const match = commandText.match(regex)
-                    if (match && modeSettings[modeCmd.settingKey]) {
-                        const modeName = match[1].toLowerCase()
-                        // Validate mode exists before queuing (prevents incomplete streaming parses)
-                        const enabledModes = PlayModeLoader.getEnabledModes()
-                        const modeExists = enabledModes.some(modeId => PlayModeLoader.getSequence(modeId, modeName))
-                        if (modeExists) {
-                            commands.push({
-                                type: modeCmd.cmdType,
-                                modeName: modeName,
-                                deviceIndex: targetDeviceIndex
-                            })
-                        }
-                        continue
-                    }
-                }
-            }
+// Parse mode commands dynamically from PlayModeLoader (skip during streaming)
+    if (!skipModeCommands) {
+      const enabledModes = PlayModeLoader.getEnabledModes()
+      for (const modeId of enabledModes) {
+        const modeData = PlayModeLoader.modes[modeId]
+        if (!modeData) continue
+        
+        // Build regex from mode ID (convert snake_case to UPPER_SNAKE_CASE)
+        const modePrefix = modeId.toUpperCase().replace(/_/g, '_')
+        const regex = new RegExp(`${modePrefix}\\s*[:\\s]\\s*([\\w_]+)`, 'i')
+        const match = commandText.match(regex)
+        
+        if (match) {
+          const modeName = match[1].toLowerCase()
+          // Validate sequence exists before queuing
+          if (PlayModeLoader.getSequence(modeId, modeName)) {
+            commands.push({
+              type: modeId,
+              modeName: modeName,
+              deviceIndex: targetDeviceIndex
+            })
+          }
+          break // Found a match, no need to check other modes
+        }
+      }
+    }
 
     // Parse DUAL command (independent motor patterns)
   // Format: DUAL: pattern1=sine, pattern2=sawtooth, min=10, max=80, duration=5000, cycles=3
@@ -1489,30 +934,26 @@ case 'vibrate':
       await executePattern(patternDataDual, 'vibrate', deviceIndex)
       break
       
-      case 'gradient':
-        await executeGradientPattern(deviceIndex, {
-          start: cmd.start,
-          end: cmd.end,
-          duration: cmd.duration,
-          hold: cmd.hold,
-          release: cmd.release
-        })
-        updateStatus(`${deviceName}: gradient ${cmd.start}% → ${cmd.end}%`)
-        break
+case 'gradient':
+      await executeGradientPattern(deviceIndex, {
+        start: cmd.start,
+        end: cmd.end,
+        duration: cmd.duration,
+        hold: cmd.hold,
+        release: cmd.release
+      })
+      updateStatus(`${deviceName}: gradient ${cmd.start}% → ${cmd.end}%`)
+      break
 
-      case 'denial_domina':
-      case 'milking':
-      case 'pet_training':
-      case 'sissy_surrender':
-      case 'prejac_princess':
-      case 'robotic_ruination':
-      case 'evil_edging_mistress':
-      case 'frustration_fairy':
-      case 'hypno_helper':
-      case 'chastity_caretaker':
+    default:
+      // Check if cmd.type is a valid mode ID from PlayModeLoader
+      if (PlayModeLoader.isModeEnabled(cmd.type)) {
         await executeTeaseAndDenialMode(cmd.deviceIndex, cmd.modeName)
         updateStatus(`${deviceName}: Mode - ${cmd.modeName}`)
-        break
+      } else {
+        console.warn(`${NAME}: Unknown command type: ${cmd.type}`)
+      }
+      break
     }
   } catch (e) {
     console.error(`${NAME}: Command execution failed:`, e)
@@ -1589,11 +1030,12 @@ async function handleIntifaceConnect() {
     console.log(`${NAME}: Already connected`)
     return
   }
-  try {
+try {
     await connect()
     updateStatus(`Connected to Intiface`)
   } catch (e) {
-    updateStatus(`Connection failed: ${e.message}`, true)
+    const errorMsg = e?.message || String(e) || 'Unknown error'
+    updateStatus(`Connection failed: ${errorMsg}`, true)
   }
 }
 
@@ -1966,111 +1408,6 @@ console.error(`${NAME}: Media intensity error:`, e)
 }
 }
 
-// Execute pattern commands with intervals
-async function executePattern(cmd, actionType, deviceIndex = 0) {
-  const pattern = cmd.pattern || [50]
-  const intervals = cmd.intervals || [1000]
-  const loopCount = cmd.loop || 1
-
-  // Check if this is a dual motor pattern
-  const isDualMotor = pattern && typeof pattern === 'object' && pattern.motor1 && pattern.motor2
-  const motor1Pattern = isDualMotor ? pattern.motor1 : pattern
-  const motor2Pattern = isDualMotor ? pattern.motor2 : null
-
-  // Get device motor count
-  const targetDevice = devices[deviceIndex] || devices[0]
-  const motorCount = getMotorCount(targetDevice)
-  const shouldUseDual = isDualMotor && motorCount >= 2
-
-  let currentLoop = 0
-  let patternIndex = 0
-  let patternIntervalId = null
-  let isRunning = true
-  let resolvePromise = null
-
-  const executeStep = async () => {
-    // Check timeline status for timeline-triggered patterns
-    if (!mediaPlayer.isPlaying && cmd.fromTimeline) {
-      isRunning = false
-    }
-      
-      if (!isRunning || !client.connected || currentLoop >= loopCount) {
-        if (resolvePromise) {
-          resolvePromise()
-          resolvePromise = null
-        }
-        return
-      }
-
-      const intensity = motor1Pattern[patternIndex % motor1Pattern.length]
-      const interval = intervals[patternIndex % intervals.length]
-
-      // Check isRunning again before sending commands (might have changed during await)
-      if (!isRunning) return
-
-      if (actionType === 'vibrate') {
-      // Always send to motor 1
-      await executeCommand({ type: 'vibrate', intensity, motorIndex: 0, deviceIndex })
-
-      // Check isRunning after first motor command
-      if (!isRunning) return
-
-      // Send to motor 2 if available and dual pattern provided
-      if (shouldUseDual && motor2Pattern) {
-        const intensity2 = motor2Pattern[patternIndex % motor2Pattern.length]
-        await executeCommand({ type: 'vibrate', intensity: intensity2, motorIndex: 1, deviceIndex })
-      }
-    } else if (actionType === 'oscillate') {
-      await executeCommand({ type: 'oscillate', intensity, deviceIndex })
-    }
-
-    // Check isRunning before continuing
-    if (!isRunning) return
-
-    patternIndex++
-    if (patternIndex >= motor1Pattern.length) {
-      patternIndex = 0
-      currentLoop++
-    }
-
-    if (!isRunning) return
-
-    if (currentLoop < loopCount || cmd.loop === undefined) {
-      patternIntervalId = setWorkerTimeout(executeStep, interval)
-    } else {
-      isRunning = false
-      if (resolvePromise) {
-        resolvePromise()
-        resolvePromise = null
-      }
-    }
-  }
-
-  const completionPromise = new Promise(resolve => {
-    resolvePromise = resolve
-    executeStep()
-  })
-
-  const stopPattern = () => {
-    isRunning = false
-    if (patternIntervalId) {
-      clearWorkerTimeout(patternIntervalId)
-      patternIntervalId = null
-    }
-    if (resolvePromise) {
-      resolvePromise()
-      resolvePromise = null
-    }
-  }
-
-  const result = completionPromise
-  result.stop = stopPattern
-  return result
-}
-
-// AI status check interval
-let aiStatusCheckInterval = null
-
 // Update AI control status indicator based on actual activity
 function updateAIStatusFromActivity() {
 const statusEl = $("#intiface-ai-status")
@@ -2331,59 +1668,22 @@ function getDeviceDisplayName(dev) {
   return dev.displayName || dev.name || 'Unknown Device'
 }
 
-// Get device type classification using PatternLibrary configuration
+// Get device type - simplified, all devices are treated generically
 function getDeviceType(dev) {
-  const devName = (dev.displayName || dev.name || '').toLowerCase()
-  const patterns = PatternLibrary.devices.typePatterns
-
-  // Check each device type in order
-  for (const [deviceType, keywords] of Object.entries(patterns)) {
-    if (deviceType === 'general') continue // Skip fallback, check last
-    if (keywords.some(keyword => devName.includes(keyword))) {
-      return deviceType
-    }
-  }
-
+  // All devices use generic type - capabilities are detected dynamically
   return 'general'
 }
 
-// Get device-specific default intensity using PatternLibrary configuration
+// Get device-specific default intensity - simplified
 function getDeviceDefaultIntensity(dev) {
-  const devName = (dev.displayName || dev.name || '').toLowerCase()
-  const type = getDeviceType(dev)
-  const intensities = PatternLibrary.devices.defaultIntensities
-
-  // Check for device type-specific intensity first
-  if (intensities[type] !== undefined && type !== 'default') {
-    return intensities[type]
-  }
-
-  // Check for device name match in shorthand patterns
-  const shorthandPatterns = PatternLibrary.devices.shorthandPatterns
-  for (const [shorthand, keywords] of Object.entries(shorthandPatterns)) {
-    if (keywords.some(keyword => devName.includes(keyword))) {
-      if (intensities[shorthand] !== undefined) {
-        return intensities[shorthand]
-      }
-    }
-  }
-
-  return intensities.default || 100
+  // Return default intensity for all devices
+  // User can adjust per-device intensity via UI
+  return 100
 }
 
-// Get shorthand for device using PatternLibrary configuration
+// Get shorthand for device - simplified to first word of name
 function getDeviceShorthand(dev) {
   const devName = (dev.displayName || dev.name || '').toLowerCase()
-  const patterns = PatternLibrary.devices.shorthandPatterns
-
-  // Check each shorthand pattern
-  for (const [shorthand, keywords] of Object.entries(patterns)) {
-    if (keywords.some(keyword => devName.includes(keyword))) {
-      return shorthand
-    }
-  }
-
-  // Return first word of device name as fallback
   return devName.split(' ')[0]
 }
 
@@ -4022,65 +3322,40 @@ $("#intiface-ip-input").on("input", function () {
       console.log(`${NAME}: Auto-connect set to: ${$(this).is(":checked")}`)
     })
 
-// Load and set up mode settings
-const savedModeSettings = localStorage.getItem("intiface-mode-settings")
-if (savedModeSettings) {
-  try {
-    modeSettings = JSON.parse(savedModeSettings)
-  } catch (e) {
-    console.error(`${NAME}: Failed to parse mode settings`, e)
+// Set mode checkboxes from PlayModeLoader settings
+  $("#intiface-mode-denial-domina").prop("checked", PlayModeLoader.isModeEnabled('denial_domina'))
+  $("#intiface-mode-milk-maid").prop("checked", PlayModeLoader.isModeEnabled('milk_maid'))
+  $("#intiface-mode-pet-training").prop("checked", PlayModeLoader.isModeEnabled('pet_training'))
+  $("#intiface-mode-sissy-surrender").prop("checked", PlayModeLoader.isModeEnabled('sissy_surrender'))
+  $("#intiface-mode-prejac-princess").prop("checked", PlayModeLoader.isModeEnabled('prejac_princess'))
+  $("#intiface-mode-robotic-ruination").prop("checked", PlayModeLoader.isModeEnabled('robotic_ruination'))
+  $("#intiface-mode-evil-edging-mistress").prop("checked", PlayModeLoader.isModeEnabled('evil_edging_mistress'))
+  $("#intiface-mode-frustration-fairy").prop("checked", PlayModeLoader.isModeEnabled('frustration_fairy'))
+  $("#intiface-mode-hypno-helper").prop("checked", PlayModeLoader.isModeEnabled('hypno_helper'))
+  $("#intiface-mode-chastity-caretaker").prop("checked", PlayModeLoader.isModeEnabled('chastity_caretaker'))
+
+  // Save mode intensity multipliers - PlayModeLoader handles persistence
+  const saveModeIntensity = () => {
+    // PlayModeLoader automatically saves to localStorage
+    console.log(`${NAME}: Mode intensity settings saved`)
   }
-}
 
-// Load mode intensity multipliers
-const savedModeIntensities = localStorage.getItem("intiface-mode-intensities")
-if (savedModeIntensities) {
-  try {
-    const parsed = JSON.parse(savedModeIntensities)
-    // Merge with defaults to ensure all modes exist
-    modeIntensityMultipliers = { ...modeIntensityMultipliers, ...parsed }
-  } catch (e) {
-    console.error(`${NAME}: Failed to parse mode intensity settings`, e)
+  // Save mode settings on change and refresh UI - PlayModeLoader handles persistence
+  const saveModeSettings = () => {
+    PlayModeLoader.setModeEnabled('denial_domina', $("#intiface-mode-denial-domina").is(":checked"))
+    PlayModeLoader.setModeEnabled('milk_maid', $("#intiface-mode-milk-maid").is(":checked"))
+    PlayModeLoader.setModeEnabled('pet_training', $("#intiface-mode-pet-training").is(":checked"))
+    PlayModeLoader.setModeEnabled('sissy_surrender', $("#intiface-mode-sissy-surrender").is(":checked"))
+    PlayModeLoader.setModeEnabled('prejac_princess', $("#intiface-mode-prejac-princess").is(":checked"))
+    PlayModeLoader.setModeEnabled('robotic_ruination', $("#intiface-mode-robotic-ruination").is(":checked"))
+    PlayModeLoader.setModeEnabled('evil_edging_mistress', $("#intiface-mode-evil-edging-mistress").is(":checked"))
+    PlayModeLoader.setModeEnabled('frustration_fairy', $("#intiface-mode-frustration-fairy").is(":checked"))
+    PlayModeLoader.setModeEnabled('hypno_helper', $("#intiface-mode-hypno-helper").is(":checked"))
+    PlayModeLoader.setModeEnabled('chastity_caretaker', $("#intiface-mode-chastity-caretaker").is(":checked"))
+    console.log(`${NAME}: Mode settings saved`)
+    // Refresh device display to show/hide buttons
+    devices.forEach(device => handleDeviceAdded(device))
   }
-}
-
-// Set mode checkboxes from loaded settings
-$("#intiface-mode-denial-domina").prop("checked", modeSettings.denialDomina)
-$("#intiface-mode-milk-maid").prop("checked", modeSettings.milkMaid)
-$("#intiface-mode-pet-training").prop("checked", modeSettings.petTraining)
-$("#intiface-mode-sissy-surrender").prop("checked", modeSettings.sissySurrender)
-$("#intiface-mode-prejac-princess").prop("checked", modeSettings.prejacPrincess)
-$("#intiface-mode-robotic-ruination").prop("checked", modeSettings.roboticRuination)
-$("#intiface-mode-evil-edging-mistress").prop("checked", modeSettings.evilEdgingMistress)
-$("#intiface-mode-frustration-fairy").prop("checked", modeSettings.frustrationFairy)
-$("#intiface-mode-hypno-helper").prop("checked", modeSettings.hypnoHelper)
-$("#intiface-mode-chastity-caretaker").prop("checked", modeSettings.chastityCaretaker)
-
-// Save mode intensity multipliers
-const saveModeIntensity = () => {
-  localStorage.setItem("intiface-mode-intensities", JSON.stringify(modeIntensityMultipliers))
-  console.log(`${NAME}: Mode intensity settings saved`, modeIntensityMultipliers)
-}
-
-// Save mode settings on change and refresh UI
-    const saveModeSettings = () => {
-      modeSettings = {
-        denialDomina: $("#intiface-mode-denial-domina").is(":checked"),
-        milkMaid: $("#intiface-mode-milk-maid").is(":checked"),
-        petTraining: $("#intiface-mode-pet-training").is(":checked"),
-        sissySurrender: $("#intiface-mode-sissy-surrender").is(":checked"),
-        prejacPrincess: $("#intiface-mode-prejac-princess").is(":checked"),
-        roboticRuination: $("#intiface-mode-robotic-ruination").is(":checked"),
-        evilEdgingMistress: $("#intiface-mode-evil-edging-mistress").is(":checked"),
-        frustrationFairy: $("#intiface-mode-frustration-fairy").is(":checked"),
-        hypnoHelper: $("#intiface-mode-hypno-helper").is(":checked"),
-        chastityCaretaker: $("#intiface-mode-chastity-caretaker").is(":checked")
-      }
-      localStorage.setItem("intiface-mode-settings", JSON.stringify(modeSettings))
-      console.log(`${NAME}: Mode settings saved`, modeSettings)
-      // Refresh device display to show/hide buttons
-      devices.forEach(device => handleDeviceAdded(device))
-    }
 
     $("#intiface-mode-denial-domina").on("change", saveModeSettings)
     $("#intiface-mode-milk-maid").on("change", saveModeSettings)
@@ -4354,28 +3629,20 @@ prejac: ['rapid_micro', 'rapid_fire', 'flutter', 'sine', 'pulse']
         // Get presets for current category
         let presets = {}
 
-        if (currentPatternCategory === 'basic') {
-            // Basic category: show basic presets + basic waveform patterns
-            presets = {
-                warmup: PatternLibrary.presets.warmup,
-                tease: PatternLibrary.presets.tease,
-                pulse: PatternLibrary.presets.pulse,
-                edge: PatternLibrary.presets.edge
-            }
-    // Add basic waveform patterns (only in basic category)
-            const basicPatterns = ['sine', 'sawtooth', 'square', 'triangle', 'random', 'ramp_up', 'ramp_down']
-            basicPatterns.forEach(patternName => {
-                presets[patternName] = {
-                    type: 'waveform',
-                    pattern: patternName,
-                    min: 20,
-                    max: 80,
-                    duration: 5000,
-                    cycles: 3,
-                    compatibleDevices: ['general', 'cage', 'plug', 'stroker']
-                }
-            })
-        } else {
+if (currentPatternCategory === 'basic') {
+    // Basic category: show basic waveform patterns from PlayModeLoader
+    const basicPatterns = ['sine', 'sawtooth', 'square', 'triangle', 'random', 'ramp_up', 'ramp_down']
+    basicPatterns.forEach(patternName => {
+      presets[patternName] = {
+        type: 'waveform',
+        pattern: patternName,
+        min: 20,
+        max: 80,
+        duration: 5000,
+        cycles: 3
+      }
+    })
+  } else {
             // Other categories: only show category-specific patterns and sequences
             // Map category to mode ID
             const categoryToModeId = {
@@ -5534,19 +4801,17 @@ $('#intiface-global-intensity').val(globalIntensityScale)
 
 // Handle reset button
 $("#intiface-reset-mode-intensities").on("click", function() {
-  // Reset all to 100%
-  modeIntensityMultipliers = {
-    denialDomina: 1.0,
-    milkMaid: 1.0,
-    petTraining: 1.0,
-    sissySurrender: 1.0,
-    prejacPrincess: 1.0,
-    roboticRuination: 1.0,
-    evilEdgingMistress: 1.0,
-    frustrationFairy: 1.0,
-    hypnoHelper: 1.0,
-    chastityCaretaker: 1.0
-  }
+  // Reset all to 100% via PlayModeLoader
+  PlayModeLoader.setIntensityMultiplier('denial_domina', 1.0)
+  PlayModeLoader.setIntensityMultiplier('milk_maid', 1.0)
+  PlayModeLoader.setIntensityMultiplier('pet_training', 1.0)
+  PlayModeLoader.setIntensityMultiplier('sissy_surrender', 1.0)
+  PlayModeLoader.setIntensityMultiplier('prejac_princess', 1.0)
+  PlayModeLoader.setIntensityMultiplier('robotic_ruination', 1.0)
+  PlayModeLoader.setIntensityMultiplier('evil_edging_mistress', 1.0)
+  PlayModeLoader.setIntensityMultiplier('frustration_fairy', 1.0)
+  PlayModeLoader.setIntensityMultiplier('hypno_helper', 1.0)
+  PlayModeLoader.setIntensityMultiplier('chastity_caretaker', 1.0)
   // Update all sliders
   $("#intiface-mode-intensity-denial").val(100)
   $("#intiface-mode-intensity-denial-display").text("100%")
