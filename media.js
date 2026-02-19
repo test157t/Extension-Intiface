@@ -598,6 +598,9 @@ function startFunscriptSync() {
 
   mediaPlayer.lastActionIndex = 0
 
+  // Track last processed time to detect time jumps
+  let lastProcessedTime = (mediaPlayer.videoElement?.currentTime || 0) * 1000
+
   const syncLoop = () => {
     if (!mediaPlayer.isPlaying || !mediaPlayer.currentFunscript) {
       // Still need to reschedule the loop even when not playing
@@ -611,6 +614,35 @@ function startFunscriptSync() {
     const video = mediaPlayer.videoElement
     const funscript = mediaPlayer.currentFunscript
     const currentTime = (video.currentTime * 1000) + mediaPlayer.syncOffset
+    
+    // Detect large time jumps (>2 seconds) - user likely seeked
+    const timeDelta = currentTime - lastProcessedTime
+    if (Math.abs(timeDelta) > 2000) {
+      console.log(`${d("NAME") || "Intiface"}: Time jump detected (${timeDelta}ms), recalculating action index`)
+      
+      // Recalculate lastActionIndex based on current time
+      const actions = funscript.actions
+      let newIndex = 0
+      for (let i = 0; i < actions.length; i++) {
+        if (actions[i].at <= currentTime) {
+          newIndex = i + 1
+        } else {
+          break
+        }
+      }
+      mediaPlayer.lastActionIndex = newIndex
+      
+      // If seeking backwards, execute the action at the new position immediately
+      if (timeDelta < 0 && newIndex > 0) {
+        const actionToReplay = actions[newIndex - 1]
+        if (actionToReplay) {
+          console.log(`${d("NAME") || "Intiface"}: Replaying action at ${actionToReplay.at}ms after backward jump`)
+          executeFunscriptAction(actionToReplay)
+        }
+      }
+    }
+    
+    lastProcessedTime = currentTime
 
     // Find and execute actions
     const actions = funscript.actions
@@ -632,6 +664,7 @@ function startFunscriptSync() {
     // Reset if video looped
     if (currentTime < 0) {
       mediaPlayer.lastActionIndex = 0
+      lastProcessedTime = 0
     }
 
     // Use polling rate interval instead of requestAnimationFrame for consistent timing
@@ -670,6 +703,7 @@ function startFunscriptSyncTimer() {
   
   // Store last execution time to handle browser throttling
   let lastExecutionTime = Date.now()
+  let lastProcessedTimeTimer = (mediaPlayer.videoElement?.currentTime || 0) * 1000
 
   const syncLoop = () => {
     // Only run while hidden and playing
@@ -681,17 +715,46 @@ function startFunscriptSyncTimer() {
     const video = mediaPlayer.videoElement
     const funscript = mediaPlayer.currentFunscript
     const currentTime = (video.currentTime * 1000) + mediaPlayer.syncOffset
-    
+
     // Calculate time delta to catch up on missed actions due to throttling
     const now = Date.now()
-    const timeDelta = now - lastExecutionTime
+    const executionDelta = now - lastExecutionTime
     lastExecutionTime = now
+    
+    // Detect large time jumps (>2 seconds) - user likely seeked
+    const timeDelta = currentTime - lastProcessedTimeTimer
+    if (Math.abs(timeDelta) > 2000) {
+      console.log(`${d("NAME") || "Intiface"}: Timer sync - Time jump detected (${timeDelta}ms), recalculating action index`)
+      
+      // Recalculate lastActionIndex based on current time
+      const actions = funscript.actions
+      let newIndex = 0
+      for (let i = 0; i < actions.length; i++) {
+        if (actions[i].at <= currentTime) {
+          newIndex = i + 1
+        } else {
+          break
+        }
+      }
+      mediaPlayer.lastActionIndex = newIndex
+      
+      // If seeking backwards, execute the action at the new position immediately
+      if (timeDelta < 0 && newIndex > 0) {
+        const actionToReplay = actions[newIndex - 1]
+        if (actionToReplay) {
+          console.log(`${d("NAME") || "Intiface"}: Timer sync - Replaying action at ${actionToReplay.at}ms after backward jump`)
+          executeFunscriptAction(actionToReplay)
+        }
+      }
+    }
+    
+    lastProcessedTimeTimer = currentTime
 
     // Find and execute actions - process ALL actions up to current time
     // to catch up if browser throttled us
     const actions = funscript.actions
-    const targetTime = currentTime + timeDelta // Look ahead by the time that passed
-    
+    const targetTime = currentTime + executionDelta // Look ahead by the time that passed
+
     for (let i = mediaPlayer.lastActionIndex; i < actions.length; i++) {
       const action = actions[i]
 
@@ -707,6 +770,7 @@ function startFunscriptSyncTimer() {
     // Reset if video looped
     if (currentTime < 0) {
       mediaPlayer.lastActionIndex = 0
+      lastProcessedTimeTimer = 0
     }
 
     // Continue loop only if still hidden
@@ -1177,6 +1241,44 @@ $("#intiface-chat-funscript-info").text("Paused").css("color", "#FFA500")
     } else {
       $("#intiface-chat-funscript-info").text("Finished").css("color", "#888")
       d("stopAllDeviceActions")()
+    }
+  }
+
+  // Handle video seeking - recalculate lastActionIndex to prevent sync loss
+  video.onseeked = () => {
+    console.log(`${d("NAME") || "Intiface"}: Video seeked to ${video.currentTime}s`)
+    
+    if (!mediaPlayer.currentFunscript || !mediaPlayer.currentFunscript.actions) {
+      return
+    }
+    
+    const currentTimeMs = video.currentTime * 1000
+    const actions = mediaPlayer.currentFunscript.actions
+    
+    // Find the correct action index for the new time position
+    // We want the last action that should have been executed by this time
+    let newIndex = 0
+    for (let i = 0; i < actions.length; i++) {
+      if (actions[i].at <= currentTimeMs) {
+        newIndex = i + 1
+      } else {
+        break
+      }
+    }
+    
+    const oldIndex = mediaPlayer.lastActionIndex
+    mediaPlayer.lastActionIndex = newIndex
+    
+    console.log(`${d("NAME") || "Intiface"}: Seek corrected - lastActionIndex ${oldIndex} -> ${newIndex} at ${currentTimeMs}ms`)
+    
+    // If seeking backwards, we need to re-execute the action at the new position
+    // to ensure the device is at the correct intensity
+    if (newIndex < oldIndex && newIndex > 0) {
+      const actionToReplay = actions[newIndex - 1]
+      if (actionToReplay) {
+        console.log(`${d("NAME") || "Intiface"}: Replaying action at ${actionToReplay.at}ms after backward seek`)
+        executeFunscriptAction(actionToReplay)
+      }
     }
   }
 

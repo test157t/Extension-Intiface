@@ -13,7 +13,16 @@ export function initPlaybackSystem(dependencies) {
 }
 
 // Helper to access dependencies
-const d = (name) => deps?.[name]
+const d = (name) => {
+  // Special cases: check window object first for values that get reassigned
+  if (name === 'devices') {
+    return (typeof window !== 'undefined' && window.devices) || deps?.[name] || []
+  }
+  if (name === 'client') {
+    return (typeof window !== 'undefined' && window.client) || deps?.[name]
+  }
+  return deps?.[name]
+}
 
 // Active pattern tracking
 let activePatterns = new Map() // deviceIndex -> { pattern, interval, controls }
@@ -130,19 +139,24 @@ export function generateDualMotorWaveform(pattern, steps, min, max) {
 
 // Execute waveform pattern on device
 export async function executeWaveformPattern(deviceIndex, presetName, options = {}) {
-  const devices = d('devices')
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   const targetDevice = devices[deviceIndex] || devices[0]
   if (!targetDevice) {
     console.error(`${d('NAME')}: No device found for waveform pattern`)
     return
   }
 
+  // Get pattern function from PlayModeLoader
   const PlayModeLoader = d('PlayModeLoader')
-  const buttplug = d('buttplug')
+  const patternFunc = PlayModeLoader.getPattern(presetName)
+  if (!patternFunc) {
+    console.error(`${d('NAME')}: Pattern ${presetName} not found`)
+    return
+  }
+
   const applyIntensityScale = d('applyIntensityScale')
   const applyInversion = d('applyInversion')
-  const updateStatus = d('updateStatus')
-  const executePattern = d('executePattern') || window.executePattern
+  // executePattern is hoisted, call directly
 
   // Determine device type using PatternLibrary configuration
   const deviceType = getDeviceType(targetDevice)
@@ -246,7 +260,7 @@ export async function executeWaveformPattern(deviceIndex, presetName, options = 
 
 // Execute gradient pattern (smooth intensity transition)
 export async function executeGradientPattern(deviceIndex, config) {
-  const devices = d('devices')
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   const targetDevice = devices[deviceIndex] || devices[0]
   const { start, end, duration, hold = 0, release = 0 } = config
   const steps = Math.floor(duration / 50) // 50ms steps
@@ -290,7 +304,7 @@ export async function executeGradientPattern(deviceIndex, config) {
   const motorCount = getMotorCount(targetDevice)
   const applyIntensityScale = d('applyIntensityScale')
   const applyInversion = d('applyInversion')
-  const executePattern = d('executePattern') || window.executePattern
+  // executePattern is hoisted, call directly
 
   // Apply global intensity scaling to gradient values
   const scaledMotor1Values = applyIntensityScale(motor1Values)
@@ -324,7 +338,7 @@ export async function executeGradientPattern(deviceIndex, config) {
 
 // Execute linear waveform (position-based)
 export async function executeLinearWaveform(deviceIndex, config) {
-  const devices = d('devices')
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   const client = d('client')
   const { pattern, positions, duration, cycles } = config
   const [startPos, endPos] = positions
@@ -391,7 +405,7 @@ export async function executeLinearWaveform(deviceIndex, config) {
 
 // Execute linear gradient
 export async function executeLinearGradient(deviceIndex, config) {
-  const devices = d('devices')
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   const client = d('client')
   const { positions, duration, hold = 0 } = config
   const [startPos, endPos] = positions
@@ -450,12 +464,16 @@ export async function executeLinearGradient(deviceIndex, config) {
 
 // Execute Mode sequence (Denial Domina, Milk Maid, Pet Training)
 export async function executeTeaseAndDenialMode(deviceIndex, modeName) {
-  const devices = d('devices')
+  // Get devices from deps or fallback to global window.devices (handles reassignment)
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   const client = d('client')
   const PlayModeLoader = d('PlayModeLoader')
+  
+  console.log(`${d('NAME') || 'Intiface'}: executeTeaseAndDenialMode - deviceIndex: ${deviceIndex}, devices count: ${devices?.length || 0}, modeName: ${modeName}`)
+  
   const targetDevice = devices[deviceIndex] || devices[0]
   if (!targetDevice) {
-    console.error(`${d('NAME')}: No device found for mode`)
+    console.error(`${d('NAME') || 'Intiface'}: No device found for mode - devices array has ${devices?.length || 0} devices`)
     return
   }
 
@@ -491,7 +509,7 @@ export async function executeTeaseAndDenialMode(deviceIndex, modeName) {
   const applyIntensityScale = d('applyIntensityScale')
   const applyInversion = d('applyInversion')
   const setWorkerTimeout = d('setWorkerTimeout')
-  const executePattern = d('executePattern') || window.executePattern
+  // executePattern is hoisted in ES modules, so we can reference it directly
 
   updateStatus(`${deviceName}: ${modeName} mode (${mode.description})`)
 
@@ -584,7 +602,7 @@ export async function executeTeaseAndDenialMode(deviceIndex, modeName) {
 // Stop pattern for specific device
 export async function stopDevicePattern(deviceIndex) {
   const buttplug = d('buttplug')
-  const devices = d('devices')
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   const clearWorkerTimeout = d('clearWorkerTimeout')
 
   if (activePatterns.has(deviceIndex)) {
@@ -627,7 +645,7 @@ export async function executePattern(cmd, actionType, deviceIndex = 0) {
   const pattern = cmd.pattern || [50]
   const intervals = cmd.intervals || [1000]
   const loopCount = cmd.loop || 1
-  const devices = d('devices')
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   const client = d('client')
   const mediaPlayer = d('mediaPlayer')
   const executeCommand = d('executeCommand')
@@ -731,7 +749,7 @@ export async function executePattern(cmd, actionType, deviceIndex = 0) {
 
 // Stop all device patterns
 export async function stopAllDevicePatterns() {
-  const devices = d('devices')
+  const devices = d('devices') || (typeof window !== 'undefined' && window.devices) || []
   for (let i = 0; i < devices.length; i++) {
     await stopDevicePattern(i)
   }

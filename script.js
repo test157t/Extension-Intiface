@@ -2,6 +2,33 @@ import { renderExtensionTemplateAsync } from "../../../extensions.js"
 import { eventSource, event_types, setExtensionPrompt, extension_prompt_types, extension_prompt_roles, getRequestHeaders, messageFormatting, appendMediaToMessage, addCopyToCodeBlocks } from "../../../../script.js"
 import { PlayModeLoader } from "./play_modes/_loader.js"
 import {
+  initTimelineModule,
+  selectPatternForTimeline,
+  addTimelineBlock,
+  removeTimelineBlock,
+  clearTimeline,
+  getTimelineDuration,
+  getContentDuration,
+  formatTimelineTime,
+  formatDurationShort,
+  getChannelMotorCount,
+  getPatternDefaults,
+  getPatternDuration,
+  renderTimeline,
+  convertTimelineToFunscripts,
+  playTimeline,
+  pauseTimeline,
+  resumeTimeline,
+  stopTimeline,
+  scrubTimeline,
+  updateMotorLanes,
+  attachLaneClickHandlers,
+  setupTimelineEventHandlers,
+  getTimelineBlocks,
+  getTimelineCurrentPosition,
+  isTimelinePlaying
+} from "./timeline.js"
+import {
 mediaPlayer,
 funscriptCache,
 initMediaModule,
@@ -59,9 +86,11 @@ const extensionName = "Extension-Intiface"
 
 let buttplug
 let client
+if (typeof window !== 'undefined') window.client = null // Will be set when initialized
 let connector
 let device
 let devices = [] // Track all connected devices
+if (typeof window !== 'undefined') window.devices = devices // Make available globally for playback module
 let deviceAssignments = {} // device.index -> 'A', 'B', 'C', etc. for multi-funscript support
 let intervalId
 
@@ -73,6 +102,7 @@ let seenCommands = new Set() // Track command text signatures that have been see
 let commandQueueInterval = null // Interval for sequential execution
 let isExecutingCommands = false
 let isStartingIntiface = false // Prevent multiple simultaneous start attempts
+let playModeSequenceTimeouts = new Set() // Track timeouts for play mode sequence cleanup
 
 // Timer worker for background vibration (avoids setTimeout throttling in hidden tabs)
 let timerWorker = null
@@ -1837,9 +1867,10 @@ async function disconnect() {
     updateStatus("Disconnected")
     $("#intiface-status-panel").removeClass("connected").addClass("disconnected")
     updateButtonStates(false)
-    $("#intiface-devices").empty()
-    devices = [] // Clear devices array
-    device = null
+$("#intiface-devices").empty()
+devices = [] // Clear devices array
+if (typeof window !== 'undefined') window.devices = devices
+device = null
     if (intervalId) {
       clearWorkerTimeout(intervalId) // Stop processing messages
       intervalId = null
@@ -1864,8 +1895,9 @@ async function disconnect() {
     const errorMsg = e?.message || String(e) || 'Unknown error'
     updateStatus(`Error disconnecting: ${errorMsg}`, true)
     console.error(`${NAME}: Disconnect error:`, e)
-    // Even on error, clear the state and update UI
+// Even on error, clear the state and update UI
     devices = []
+    if (typeof window !== 'undefined') window.devices = devices
     device = null
     $("#intiface-devices").empty()
     $("#intiface-status-panel").removeClass("connected").addClass("disconnected")
@@ -2094,13 +2126,14 @@ function handleDeviceRemoved(removedDevice) {
   const deviceName = removedDevice?.name || devices[0]?.name || 'Unknown'
   updateStatus(`Device removed: ${deviceName}`)
 
-  // Remove from devices array
+// Remove from devices array
   if (removedDevice) {
     devices = devices.filter(d => d.index !== removedDevice.index)
   } else {
     // Fallback: clear all if no specific device info
     devices = []
   }
+  if (typeof window !== 'undefined') window.devices = devices
 
   // Update active device
   device = devices.length > 0 ? devices[0] : null
@@ -3251,11 +3284,13 @@ $(async () => {
     // Load device polling rate
     loadDevicePollingRate()
 
-    client = new buttplug.ButtplugClient("SillyTavern Intiface Client")
+client = new buttplug.ButtplugClient("SillyTavern Intiface Client")
+  if (typeof window !== 'undefined') window.client = client
 
   // Clear any stale device data on initialization
   console.log(`${NAME}: Clearing stale device data on init`)
   devices = []
+  if (typeof window !== 'undefined') window.devices = devices
   device = null
   
   // Ensure any lingering patterns are cleared
@@ -3459,68 +3494,6 @@ $("#intiface-mode-intensity-chastity").on("input", function() {
 // Current pattern category
 let currentPatternCategory = 'basic'
 
-// Timeline Sequencer - multi-track pattern editor
-let timelineBlocks = [] // Array of { id, patternName, category, channel, startTime, duration }
-let timelineBlockIdCounter = 0
-let timelineSelectedPattern = null // Currently selected pattern from palette
-let timelinePlaybackStartTime = 0
-let timelinePlaybackTimer = null
-let timelineCurrentPosition = 0 // Current playback position in ms
-const TIMELINE_MIN_DURATION = 30000 // Minimum 30 seconds
-const TIMELINE_PADDING_MULTIPLIER = 2.0 // Double the content duration (100% extra space)
-
-// Calculate dynamic timeline duration based on blocks (with padding for visual editing)
-function getTimelineDuration() {
-  if (timelineBlocks.length === 0) {
-    return TIMELINE_MIN_DURATION
-  }
-
-  // Find the end time of the last block
-  const lastEndTime = Math.max(...timelineBlocks.map(b => b.startTime + b.duration))
-  // Add 100% extra space (double the content duration)
-  const dynamicDuration = lastEndTime * TIMELINE_PADDING_MULTIPLIER
-
-  return Math.max(TIMELINE_MIN_DURATION, dynamicDuration)
-}
-
-// Get the actual content duration (longest pattern end time) without padding
-// This is used for playback slider max and funscript export
-function getContentDuration() {
-  if (timelineBlocks.length === 0) {
-    return 0
-  }
-
-  // Find the end time of the last block (actual content end, no padding)
-  const lastEndTime = Math.max(...timelineBlocks.map(b => b.startTime + b.duration))
-  
-  return lastEndTime
-}
-
-// Format milliseconds to mm:ss for timeline display
-function formatTimelineTime(ms) {
-  const totalSeconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
-
-// Format duration in ms to compact string (e.g., "5s", "1m05s", "30m00s")
-function formatDurationShort(ms) {
-  const totalSeconds = Math.floor(ms / 1000)
-  if (totalSeconds < 60) {
-    return `${totalSeconds}s`
-  }
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}m${seconds.toString().padStart(2, '0')}s`
-}
-
-let timelineIsDragging = false
-let timelineDragBlock = null
-let timelineDragStartX = 0
-let timelineDragStartTime = 0
-let timelineSequenceTimeouts = new Set() // Track timeouts for cleanup
-
 // Play Mode settings (which modes are enabled)
 let playModeSettings = {
 denial: true,
@@ -3535,16 +3508,9 @@ hypno: true,
 chastity: true
 }
 
-// Load play mode settings
-const savedPlayModeSettings = localStorage.getItem('intiface-playmode-settings')
-if (savedPlayModeSettings) {
-  try {
-    const parsed = JSON.parse(savedPlayModeSettings)
-    playModeSettings = { ...playModeSettings, ...parsed }
-  } catch (e) {
-    console.error(`${NAME}: Failed to parse play mode settings`, e)
-  }
-}
+// Note: PlayModeLoader now manages mode persistence via localStorage
+// We initialize with defaults and sync from PlayModeLoader after init
+// Don't load from localStorage here - PlayModeLoader handles that
 
 // Sync category-based playModeSettings to PlayModeLoader (which uses mode IDs)
 // This ensures modes enabled in UI are actually recognized by the pattern system
@@ -3738,28 +3704,28 @@ executePlayModeSequence = async function(deviceIndex, modePreset) {
         if (repeat) {
           currentStep = 0
         } else {
-          // Clean up timeout tracking when sequence ends
-          if (sequenceTimeoutId !== null) {
-            timelineSequenceTimeouts.delete(sequenceTimeoutId)
-          }
-          return
-        }
-      }
-
-    const step = sequence[currentStep]
-    await executePatternStep(deviceIndex, step)
-    currentStep++
-
-    if (currentStep < sequence.length || repeat) {
-      sequenceTimeoutId = setTimeout(playStep, step.duration + (step.pause || 0))
-      timelineSequenceTimeouts.add(sequenceTimeoutId)
-    } else {
-      // Clean up timeout tracking when sequence ends
+// Clean up timeout tracking when sequence ends
       if (sequenceTimeoutId !== null) {
-        timelineSequenceTimeouts.delete(sequenceTimeoutId)
+        playModeSequenceTimeouts.delete(sequenceTimeoutId)
       }
+      return
     }
   }
+
+  const step = sequence[currentStep]
+  await executePatternStep(deviceIndex, step)
+  currentStep++
+
+  if (currentStep < sequence.length || repeat) {
+    sequenceTimeoutId = setTimeout(playStep, step.duration + (step.pause || 0))
+    playModeSequenceTimeouts.add(sequenceTimeoutId)
+  } else {
+    // Clean up timeout tracking when sequence ends
+    if (sequenceTimeoutId !== null) {
+      playModeSequenceTimeouts.delete(sequenceTimeoutId)
+    }
+  }
+}
 
   playStep()
 }
@@ -3787,858 +3753,43 @@ executePlayModeSequence = async function(deviceIndex, modePreset) {
         loop: 1
     }
     
-    await executePattern(patternData, 'vibrate', deviceIndex)
+await executePattern(patternData, 'vibrate', deviceIndex)
 }
 
-// ==========================================
-// TIMELINE SEQUENCER - Multi-track pattern editor
-// ==========================================
-
-// Get default values for any pattern (waveform or mode)
-function getPatternDefaults(patternName, category) {
-  // Check if it's a waveform pattern
-  if (PlayModeLoader.hasPattern(patternName)) {
-    return {
-      min: 20,
-      max: 80,
-      duration: 5000,
-      cycles: 3
-    }
-  }
-
-  // Check if it's a sequence from PlayModeLoader
-  const enabledSequences = PlayModeLoader.getEnabledSequences()
-  for (const [modeId, modeData] of Object.entries(enabledSequences)) {
-    if (modeData.mode && modeData.mode.category === category) {
-      const sequence = modeData.sequences[patternName]
-      if (sequence && sequence.steps && sequence.steps.length > 0) {
-        // Calculate total duration and average min/max from sequence
-        let totalDuration = 0
-        let totalMin = 0, totalMax = 0
-        sequence.steps.forEach(step => {
-          totalDuration += step.duration || 5000
-          totalMin += step.min || 20
-          totalMax += step.max || 80
-        })
-        const avgMin = Math.round(totalMin / sequence.steps.length)
-        const avgMax = Math.round(totalMax / sequence.steps.length)
-        return {
-          min: avgMin,
-          max: avgMax,
-          duration: totalDuration, // One complete cycle duration
-          cycles: 1 // Always default to 1 cycle for auto-scaling
-        }
-      }
-    }
-  }
-
-  // Basic patterns
-  if (category === 'basic') {
-    const basicPresets = {
-      warmup: { min: 10, max: 30, duration: 5000, cycles: 3 },
-      tease: { min: 20, max: 60, duration: 8000, cycles: 4 },
-      pulse: { min: 30, max: 70, duration: 4000, cycles: 8 },
-      edge: { min: 10, max: 90, duration: 12000, cycles: 2 }
-    }
-    if (basicPresets[patternName]) {
-      return basicPresets[patternName]
-    }
-  }
-
-  // Default fallback
-  return { min: 20, max: 80, duration: 5000, cycles: 3 }
-}
-
-// Select a pattern from the palette (click to select, then click timeline to place)
-function selectPatternForTimeline(patternName, category) {
-  // Get pattern defaults first
-  const defaults = getPatternDefaults(patternName, category)
-  
-  timelineSelectedPattern = {
-    patternName,
-    category,
-    defaultDuration: defaults.duration, // Store for cycle calculation
-    defaultCycles: defaults.cycles // Store for multiplicative scaling
-  }
-
-  // Show selected pattern indicator
-  const displayName = patternName.replace(/_/g, ' ')
-  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1)
-  $('#intiface-timeline-selected').show()
-  $('#intiface-timeline-selected-text').text(`Click on Channel A, B, C, or D track to place "${displayName}" (${categoryLabel})`)
-
-  // Highlight pattern buttons
-  $('.pattern-btn').css('opacity', '0.5')
-  $(`.pattern-btn[data-pattern="${patternName}"]`).css('opacity', '1')
-
-  // Update sliders with defaults
-  $('#intiface-pattern-duration').val(defaults.duration)
-  $('#intiface-pattern-duration-display').text(formatDurationShort(defaults.duration))
-  $('#intiface-pattern-min').val(defaults.min)
-  $('#intiface-pattern-min-display').text(`${defaults.min}%`)
-  $('#intiface-pattern-max').val(defaults.max)
-  $('#intiface-pattern-max-display').text(`${defaults.max}%`)
-  $('#intiface-pattern-cycles').val(defaults.cycles)
-  $('#intiface-pattern-cycles-display').text(defaults.cycles)
-
-  updateStatus(`Selected: ${displayName} - Click timeline track to place (${(defaults.duration/1000).toFixed(1)}s)`)
-}
-
-// Add pattern block to timeline
-function addTimelineBlock(channel, startTime, motor = 1) {
-if (!timelineSelectedPattern) {
-updateStatus('Select a pattern first, then click timeline track')
-return
-}
-
-// Get duration from slider (user-adjustable)
-const sliderDuration = parseInt($('#intiface-pattern-duration').val()) || 5000
-
-// Get intensity and cycles from sliders
-const sliderMin = parseInt($('#intiface-pattern-min').val()) || 20
-const sliderMax = parseInt($('#intiface-pattern-max').val()) || 80
-const sliderCycles = parseInt($('#intiface-pattern-cycles').val()) || 3
-
-  timelineBlockIdCounter++
-  const block = {
-    id: timelineBlockIdCounter,
-    patternName: timelineSelectedPattern.patternName,
-    category: timelineSelectedPattern.category,
-    channel: channel,
-    motor: motor,
-    startTime: startTime,
-    duration: sliderDuration, // Use slider value as default
-    min: sliderMin,
-    max: sliderMax,
-    cycles: sliderCycles
-  }
-  
-  // The slider value is already set as block.duration (line 6846)
-  // We don't override it with calculated duration - user adjustment takes precedence
-  // Pattern sequences will be scaled/adapted to fit the user-selected duration during playback
-  
-  timelineBlocks.push(block)
-  renderTimeline()
-  
-  const displayName = block.patternName.replace(/_/g, ' ')
-  const motorText = motor > 1 ? ` (M${motor})` : ''
-  updateStatus(`Added "${displayName}" to Channel ${channel}${motorText} at ${formatTimelineTime(startTime)}`)
-
-// Clear selection
-// timelineSelectedPattern = null
-// $('#intiface-timeline-selected').hide()
-// $('.pattern-btn').css('opacity', '1')
-}
-
-// Remove block from timeline
-function removeTimelineBlock(id) {
-timelineBlocks = timelineBlocks.filter(block => block.id !== id)
-renderTimeline()
-}
-
-// Clear all timeline blocks
-async function clearTimeline() {
-  // Stop playback if running
-  if (mediaPlayer.isPlaying) {
-    await stopTimeline()
-  }
-  
-  // Clear ALL timeline-related state
-  timelineBlocks = []
-  timelineBlockIdCounter = 0
-  timelineCurrentPosition = 0
-  clearInterval(timelinePlaybackTimer)
-  timelinePlaybackTimer = null
-  
-  // Clear funscript data to prevent stale state
-  mediaPlayer.currentFunscript = null
-  mediaPlayer.channelFunscripts = {}
-  
-  $('#intiface-timeline-scrubber').val(0)
-  $('#intiface-timeline-current-time').text('0:00')
-  renderTimeline()
-  updateStatus('Timeline cleared')
-}
-
-// Get motor count for a channel (returns 1 if multi-motor not enabled)
-function getChannelMotorCount(channel) {
-  const channelLower = channel.toLowerCase()
-  const checkbox = $(`#channel-${channelLower}-multi-motor`)
-  const input = $(`#channel-${channelLower}-motor-count`)
-  
-  if (checkbox.is(':checked')) {
-    const count = parseInt(input.val()) || 2
-    return Math.max(1, Math.min(8, count))
-  }
-  
-  return 1
-}
-
-// Category colors for timeline blocks (matching the UI theme)
-const categoryColors = {
-  basic: { bg: 'rgba(100,100,100,0.6)', border: 'rgba(150,150,150,0.8)' },
-  denial: { bg: 'rgba(255,100,100,0.6)', border: 'rgba(255,100,100,0.8)' },
-  milking: { bg: 'rgba(100,255,100,0.6)', border: 'rgba(100,255,100,0.8)' },
-  training: { bg: 'rgba(100,100,255,0.6)', border: 'rgba(100,100,255,0.8)' },
-  robotic: { bg: 'rgba(255,0,255,0.6)', border: 'rgba(255,0,255,0.8)' },
-  sissy: { bg: 'rgba(255,100,200,0.6)', border: 'rgba(255,100,200,0.8)' },
-  prejac: { bg: 'rgba(0,255,255,0.6)', border: 'rgba(0,255,255,0.8)' },
-  evil: { bg: 'rgba(191,0,255,0.6)', border: 'rgba(191,0,255,0.8)' },
-  frustration: { bg: 'rgba(255,255,0,0.6)', border: 'rgba(255,255,0,0.8)' },
-  hypno: { bg: 'rgba(221,160,221,0.6)', border: 'rgba(221,160,221,0.8)' },
-  chastity: { bg: 'rgba(255,192,203,0.6)', border: 'rgba(255,192,203,0.8)' }
-}
-
-// Render timeline blocks
-function renderTimeline() {
-  // Clear existing blocks
-  $('.timeline-block').remove()
-
-  // Get both durations: visual (padded) and content (actual)
-  const visualDuration = getTimelineDuration()
-  const contentDuration = getContentDuration()
-  
-  // Debug logging
-  console.log(`${NAME}: renderTimeline - visualDuration: ${visualDuration}ms (${formatDurationShort(visualDuration)}), contentDuration: ${contentDuration}ms (${formatDurationShort(contentDuration)})`)
-  timelineBlocks.forEach((b, i) => {
-    console.log(`${NAME}: Block ${i}: startTime=${b.startTime}ms, duration=${b.duration}ms, endTime=${b.startTime + b.duration}ms`)
-  })
-  
-  // Set scrubber max to content duration (not padded visual duration)
-  // This ensures playback stops at the actual end of patterns, not the padded end
-  $('#intiface-timeline-scrubber').attr('max', contentDuration)
-
-  // Update end time label to show actual content end time
-  const totalSeconds = Math.floor(contentDuration / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  if (minutes > 0) {
-    $('#intiface-timeline-end-time').text(`${minutes}m ${seconds}s`)
-  } else {
-    $('#intiface-timeline-end-time').text(`${seconds}s`)
-  }
-
-  // Update scale markers (0%, 25%, 50%, 75%, 100%) using visual (padded) duration
-  // This keeps the timeline visually usable for editing with extra space
-  const scalePositions = [0, 0.25, 0.5, 0.75, 1.0]
-  scalePositions.forEach((pos, index) => {
-    const timeMs = Math.round(visualDuration * pos)
-    const timeSec = Math.floor(timeMs / 1000)
-    const timeMin = Math.floor(timeSec / 60)
-    const timeRem = timeSec % 60
-    const timeLabel = timeMin > 0 ? `${timeMin}:${timeRem.toString().padStart(2, '0')}` : `${timeSec}s`
-    $(`#timeline-scale-${index}`).text(timeLabel)
-  })
-
-  // Render blocks on each track
-  // Use visual duration (padded) for positioning so blocks appear in correct visual positions
-  timelineBlocks.forEach(block => {
-    const displayName = block.patternName.replace(/_/g, ' ')
-    const leftPercent = (block.startTime / visualDuration) * 100
-    const widthPercent = (block.duration / visualDuration) * 100
-
-    // Use full display name - CSS will handle overflow with ellipsis
-    const truncatedName = displayName
-    
-    // Get color based on category
-    const colors = categoryColors[block.category] || categoryColors.basic
-
-    const blockHtml = `
-    <div class="timeline-block" data-id="${block.id}"
-      style="position: absolute; top: 2px; left: ${leftPercent}%; width: ${widthPercent}%;
-             height: calc(100% - 4px); background: ${colors.bg}; border: 1px solid ${colors.border};
-             border-radius: 2px; cursor: move; display: flex; align-items: center; justify-content: center;
-             font-size: 0.65em; color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 4px; user-select: none;"
-      title="${displayName} (${block.category}) - Click and drag to move, right-click to delete">
-      ${truncatedName}
-    </div>
-    `
-
-    $(`.timeline-track-lane[data-channel="${block.channel}"][data-motor="${block.motor || 1}"]`).append(blockHtml)
-})
-
-// Attach event handlers to blocks
-$('.timeline-block').on('mousedown', function(e) {
-if (e.button === 2) return // Right click
-const id = parseInt($(this).data('id'))
-startDraggingBlock(id, e)
-})
-
-$('.timeline-block').on('contextmenu', function(e) {
-e.preventDefault()
-const id = parseInt($(this).data('id'))
-removeTimelineBlock(id)
-})
-}
-
-// Dragging logic
-function startDraggingBlock(id, e) {
-timelineIsDragging = true
-timelineDragBlock = timelineBlocks.find(b => b.id === id)
-timelineDragStartX = e.pageX
-
-const lane = $(e.target).closest('.timeline-track-lane')[0]
-if (lane) {
-const rect = lane.getBoundingClientRect()
-timelineDragStartTime = timelineDragBlock.startTime
-
-// Mouse move handler
-const onMouseMove = (e) => {
-if (!timelineIsDragging || !timelineDragBlock) return
-
-const deltaX = e.pageX - timelineDragStartX
-const laneWidth = rect.width
-const deltaTime = (deltaX / laneWidth) * getTimelineDuration()
-
-let newTime = timelineDragStartTime + deltaTime
-newTime = Math.max(0, Math.min(newTime, getTimelineDuration() - timelineDragBlock.duration))
-
-timelineDragBlock.startTime = Math.round(newTime)
-renderTimeline()
-}
-
-// Mouse up handler
-const onMouseUp = () => {
-timelineIsDragging = false
-timelineDragBlock = null
-$(document).off('mousemove', onMouseMove)
-$(document).off('mouseup', onMouseUp)
-}
-
-$(document).on('mousemove', onMouseMove)
-$(document).on('mouseup', onMouseUp)
-}
-}
-
-// Convert timeline blocks to funscript format for unified playback
-// Each channel gets its own funscript with actions at the appropriate times
-function convertTimelineToFunscripts() {
-  const channelFunscripts = {}
-  const channels = ['A', 'B', 'C', 'D', '-']
-  
-  // Initialize funscripts for each channel
-  // Use content duration (not padded) for funscript metadata
-  const contentDuration = getContentDuration()
-  channels.forEach(channel => {
-    channelFunscripts[channel] = {
-      actions: [],
-      inverted: false,
-      metadata: {
-        creator: 'Extension-Intiface Timeline',
-        description: `Timeline playback for channel ${channel}`,
-        duration: contentDuration,
-        type: 'funscript'
-      }
-    }
-  })
-  
-  // Get all blocks sorted by start time
-  const sortedBlocks = [...timelineBlocks].sort((a, b) => a.startTime - b.startTime)
-  
-  // Generate actions for each block
-  sortedBlocks.forEach(block => {
-    const funscript = channelFunscripts[block.channel]
-    if (!funscript) return
-    
-    // Get motor count for this channel
-    const motorCount = getChannelMotorCount(block.channel)
-    
-    // Generate waveform values for this block
-    const steps = Math.floor(block.duration / 100) // 100ms resolution
-    const patternFunc = PlayModeLoader.getPattern(block.patternName) || PlayModeLoader.getPattern('sine')
-    const cycles = block.cycles || 1
-    
-    for (let i = 0; i < steps; i++) {
-      // Calculate phase across multiple cycles
-      // phase goes from 0 to cycles over the duration
-      const progress = i / steps
-      const phase = (progress * cycles) % 1
-      const rawValue = patternFunc(phase, 1) // Get normalized pattern value
-      
-      // Scale to min/max range
-      const min = block.min || 20
-      const max = block.max || 80
-      const normalizedValue = (rawValue + 1) / 2 // Convert from -1..1 to 0..1
-      const pos = Math.round(min + (max - min) * normalizedValue)
-      
-      // Calculate timestamp
-      const at = block.startTime + (i * 100)
-      
-      if (motorCount > 1) {
-        // Multi-motor: generate phase-shifted patterns for each motor
-        const positions = []
-        for (let motor = 0; motor < motorCount; motor++) {
-          const motorPhase = (phase + (motor / motorCount)) % 1
-          const motorRawValue = patternFunc(motorPhase, 1)
-          const motorNormalized = (motorRawValue + 1) / 2
-          const motorPos = Math.round(min + (max - min) * motorNormalized)
-          positions.push(Math.min(100, Math.max(0, motorPos)))
-        }
-        funscript.actions.push({
-          at: at,
-          pos: positions // Array of positions for each motor
-        })
-      } else {
-        // Single motor: just use single value
-        funscript.actions.push({
-          at: at,
-          pos: Math.min(100, Math.max(0, pos))
-        })
-      }
-    }
-  })
-  
-  // Sort actions by timestamp for each channel
-  channels.forEach(channel => {
-    channelFunscripts[channel].actions.sort((a, b) => a.at - b.at)
-    
-    // Calculate actual max action time for this funscript (not the padded timeline duration)
-    const actions = channelFunscripts[channel].actions
-    if (actions.length > 0) {
-      const maxActionTime = actions[actions.length - 1].at
-      channelFunscripts[channel].metadata.duration = maxActionTime
-    } else {
-      channelFunscripts[channel].metadata.duration = 0
-    }
-  })
-  
-  return channelFunscripts
-}
-
-// Start timeline playback using unified media player system
-async function playTimeline() {
-  if (timelineBlocks.length === 0) {
-    updateStatus('Timeline is empty - add patterns first')
-    return
-  }
-
-  if (devices.length === 0) {
-    updateStatus('No devices connected')
-    return
-  }
-
-  // Stop any existing playback first
-  if (mediaPlayer.isPlaying) {
-    await stopMediaPlayback()
-  }
-
-  // Convert timeline to funscripts per channel
-  const timelineFunscripts = convertTimelineToFunscripts()
-  
-  // Load funscripts into media player channels
-  mediaPlayer.channelFunscripts = {}
-  Object.keys(timelineFunscripts).forEach(channel => {
-    const funscript = timelineFunscripts[channel]
-    if (funscript.actions.length > 0) {
-      mediaPlayer.channelFunscripts[channel] = funscript
-      console.log(`${NAME}: Loaded timeline funscript for channel ${channel} with ${funscript.actions.length} actions`)
-    }
-  })
-  
-  // Use the first available channel as the main funscript
-  const availableChannels = Object.keys(mediaPlayer.channelFunscripts)
-  if (availableChannels.length > 0) {
-    mediaPlayer.currentFunscript = mediaPlayer.channelFunscripts[availableChannels[0]]
-  }
-  
-  // Create a dummy video element for timeline playback (no actual video, just timing)
-  if (!mediaPlayer.videoElement) {
-    mediaPlayer.videoElement = {
-      currentTime: timelineCurrentPosition / 1000,
-      paused: false,
-      play: function() { this.paused = false },
-      pause: function() { this.paused = true },
-      addEventListener: function() {},
-      removeEventListener: function() {}
-    }
-  }
-  
-  // Set up timeline sync loop (simulates video playback)
-  timelinePlaybackStartTime = Date.now() - timelineCurrentPosition
-  mediaPlayer.isPlaying = true
-  
-  updateStatus('Playing timeline...')
-  
-  // Start the unified funscript sync
-  startFunscriptSync()
-  
-  // Start timeline position tracking
-  timelinePlaybackTimer = setInterval(() => {
-    if (!mediaPlayer.isPlaying) return
-    
-    timelineCurrentPosition = Date.now() - timelinePlaybackStartTime
-    
-    // Update video element time for sync
-    if (mediaPlayer.videoElement) {
-      mediaPlayer.videoElement.currentTime = timelineCurrentPosition / 1000
-    }
-    
-    // Update scrubber
-    $('#intiface-timeline-scrubber').val(timelineCurrentPosition)
-    $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
-    
-    // Stop at end of actual content (not padded visual duration)
-    if (timelineCurrentPosition >= getContentDuration()) {
-      stopTimeline()
-      timelineCurrentPosition = 0
-      $('#intiface-timeline-scrubber').val(0)
-      $('#intiface-timeline-current-time').text('0:00')
-      updateStatus('Timeline playback complete')
-    }
-  }, 50) // 50ms = 20fps
-}
-
-// Pause timeline playback (maintains position)
-async function pauseTimeline() {
-  console.log(`${NAME}: pauseTimeline called`)
-
-  if (!mediaPlayer.isPlaying) {
-    console.log(`${NAME}: Timeline not playing, nothing to pause`)
-    return
-  }
-
-  // Pause the unified playback
-  mediaPlayer.isPlaying = false
-
-  // Clear timeline timer but keep position
-  if (timelinePlaybackTimer) {
-    clearInterval(timelinePlaybackTimer)
-    timelinePlaybackTimer = null
-  }
-  
-  // Stop funscript sync to prevent background execution
-  stopFunscriptSync()
-
-  // Stop device actions
-  stopAllDeviceActions()
-
-  updateStatus('Timeline paused')
-  $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition) + ' (paused)')
-}
-
-// Resume timeline playback from current position
-async function resumeTimeline() {
-  console.log(`${NAME}: resumeTimeline called`)
-
-  if (mediaPlayer.isPlaying) {
-    console.log(`${NAME}: Timeline already playing`)
-    return
-  }
-  
-  // Check if there are actually timeline blocks to play
-  if (timelineBlocks.length === 0) {
-    console.log(`${NAME}: No timeline blocks to resume`)
-    updateStatus('Timeline is empty - add patterns first')
-    return
-  }
-
-  // Check if we have timeline data loaded
-  if (!mediaPlayer.currentFunscript || Object.keys(mediaPlayer.channelFunscripts).length === 0) {
-    // No timeline loaded, need to convert blocks again
-    const timelineFunscripts = convertTimelineToFunscripts()
-
-    // Load funscripts into media player channels
-    mediaPlayer.channelFunscripts = {}
-    Object.keys(timelineFunscripts).forEach(channel => {
-      const funscript = timelineFunscripts[channel]
-      if (funscript.actions.length > 0) {
-        mediaPlayer.channelFunscripts[channel] = funscript
-      }
-    })
-
-    // Use the first available channel as the main funscript
-    const availableChannels = Object.keys(mediaPlayer.channelFunscripts)
-    if (availableChannels.length > 0) {
-      mediaPlayer.currentFunscript = mediaPlayer.channelFunscripts[availableChannels[0]]
-    }
-  }
-  
-  // Resume from current position
-  timelinePlaybackStartTime = Date.now() - timelineCurrentPosition
-  mediaPlayer.isPlaying = true
-  
-  // Restart the unified funscript sync
-  startFunscriptSync()
-  
-  // Restart timeline position tracking
-  timelinePlaybackTimer = setInterval(() => {
-    if (!mediaPlayer.isPlaying) return
-    
-    timelineCurrentPosition = Date.now() - timelinePlaybackStartTime
-    
-    // Update video element time for sync
-    if (mediaPlayer.videoElement) {
-      mediaPlayer.videoElement.currentTime = timelineCurrentPosition / 1000
-    }
-    
-    // Update scrubber
-    $('#intiface-timeline-scrubber').val(timelineCurrentPosition)
-    $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
-    
-    // Stop at end of actual content (not padded visual duration)
-    if (timelineCurrentPosition >= getContentDuration()) {
-      stopTimeline()
-      timelineCurrentPosition = 0
-      $('#intiface-timeline-scrubber').val(0)
-      $('#intiface-timeline-current-time').text('0:00')
-      updateStatus('Timeline playback complete')
-    }
-  }, 50)
-
-  updateStatus('Timeline resumed')
-}
-
-// Stop timeline playback using unified system
-async function stopTimeline() {
-  console.log(`${NAME}: stopTimeline called`)
-
-  // Use unified stop
-  stopMediaPlayback()
-
-  // Clear timeline timer
-  if (timelinePlaybackTimer) {
-    clearInterval(timelinePlaybackTimer)
-    timelinePlaybackTimer = null
-  }
-  
-  // Clear funscript data to prevent stale state
-  mediaPlayer.currentFunscript = null
-  mediaPlayer.channelFunscripts = {}
-
-  // Reset position
-  timelineCurrentPosition = 0
-  $('#intiface-timeline-scrubber').val(0)
-  $('#intiface-timeline-current-time').text('0:00')
-
-  updateStatus('Timeline stopped')
-}
-
-// Update timeline from scrubber
-function scrubTimeline(value) {
-  timelineCurrentPosition = parseInt(value)
-  $('#intiface-timeline-current-time').text(formatDurationShort(timelineCurrentPosition))
-
-  if (mediaPlayer.isPlaying) {
-    timelinePlaybackStartTime = Date.now() - timelineCurrentPosition
-  }
-}
-
-// Get pattern duration for display
-function getPatternDuration(patternName, category) {
-  // Search in PlayModeLoader
-  const enabledSequences = PlayModeLoader.getEnabledSequences()
-  for (const [modeId, modeData] of Object.entries(enabledSequences)) {
-    if (modeData.mode && modeData.mode.category === category) {
-      const sequence = modeData.sequences[patternName]
-      if (sequence && sequence.steps) {
-        return sequence.steps.reduce((sum, step) => sum + step.duration + (step.pause || 0), 0)
-      }
-    }
-  }
-  return 5000 // Default 5 seconds
-}
-
-// Timeline Sequencer Event Handlers (must be after function definitions)
 $(document).ready(async function() {
   // Initialize PlayModeLoader first before any UI setup
   try {
     if (typeof PlayModeLoader !== 'undefined' && PlayModeLoader.init) {
       await PlayModeLoader.init()
       console.log(`${NAME}: PlayModeLoader initialized with ${Object.keys(PlayModeLoader.modes || {}).length} modes`)
+
+      // Pull saved settings FROM PlayModeLoader into playModeSettings
+      syncLoaderToPlayModeSettings()
+      console.log(`${NAME}: Synced play mode settings from loader`)
       
-      // Sync UI settings to PlayModeLoader so enabled modes are recognized
-      syncPlayModeSettingsToLoader()
-      console.log(`${NAME}: Synced play mode settings to loader`)
+      // Update UI checkboxes to reflect loaded settings
+      $('#intiface-mode-denial').prop('checked', playModeSettings.denial)
+      $('#intiface-mode-milking').prop('checked', playModeSettings.milking)
+      $('#intiface-mode-training').prop('checked', playModeSettings.training)
+      $('#intiface-mode-robotic').prop('checked', playModeSettings.robotic)
+      $('#intiface-mode-sissy').prop('checked', playModeSettings.sissy)
+      $('#intiface-mode-prejac').prop('checked', playModeSettings.prejac)
+      $('#intiface-mode-evil').prop('checked', playModeSettings.evil)
+      $('#intiface-mode-frustration').prop('checked', playModeSettings.frustration)
+      $('#intiface-mode-hypno').prop('checked', playModeSettings.hypno)
+      $('#intiface-mode-chastity').prop('checked', playModeSettings.chastity)
+      
+      // Update tab visibility
+      updatePlayModeTabVisibility()
     } else {
       console.warn(`${NAME}: PlayModeLoader not available`)
     }
   } catch (e) {
     console.error(`${NAME}: Failed to initialize PlayModeLoader:`, e)
   }
-  // Timeline control buttons
-  $("#intiface-timeline-play").on("click", async function() {
-    console.log(`${NAME}: Timeline play button clicked`)
 
-    // If paused (has data but not playing), resume from current position
-    if (!mediaPlayer.isPlaying && Object.keys(mediaPlayer.channelFunscripts || {}).length > 0) {
-      resumeTimeline()
-    } else if (mediaPlayer.isPlaying) {
-      // Already playing - restart from beginning
-      await stopTimeline()
-      playTimeline()
-    } else {
-      // Fresh start
-      playTimeline()
-    }
-  })
-  $("#intiface-timeline-pause").on("click", async function() {
-    console.log(`${NAME}: Pause button clicked`)
-    await pauseTimeline()
-  })
-$("#intiface-timeline-clear").on("click", function() { clearTimeline() })
-$("#intiface-timeline-scrubber").on("input", function() {
-scrubTimeline($(this).val())
-})
-
-// Pattern duration slider
-  $("#intiface-pattern-duration").on("input", function() {
-    const duration = parseInt($(this).val())
-    $("#intiface-pattern-duration-display").text(formatDurationShort(duration))
-    
-    // Auto-calculate cycles multiplicatively
-    if (timelineSelectedPattern && timelineSelectedPattern.defaultDuration && timelineSelectedPattern.defaultCycles) {
-      const defaultDuration = timelineSelectedPattern.defaultDuration
-      const defaultCycles = timelineSelectedPattern.defaultCycles
-      // Multiplicative: cycles = defaultCycles * (duration / defaultDuration)
-      // Round to nearest integer, minimum 1
-      const cycles = Math.max(1, Math.round(defaultCycles * duration / defaultDuration))
-      $("#intiface-pattern-cycles").val(cycles)
-      $("#intiface-pattern-cycles-display").text(cycles)
-    }
-  })
-
-// Channel motor count controls
-const channels = ['a', 'b', 'c', 'd']
-channels.forEach(channel => {
-  const checkbox = $(`#channel-${channel}-multi-motor`)
-  const input = $(`#channel-${channel}-motor-count`)
-  const channelUpper = channel.toUpperCase()
-  
-  checkbox.on('change', function() {
-    const isChecked = $(this).is(':checked')
-    const lanesContainer = $(`.timeline-track-lanes[data-channel="${channelUpper}"]`)
-    
-    if (isChecked) {
-      input.show()
-      if (!input.val() || parseInt(input.val()) < 2) {
-        input.val(2)
-      }
-      // Create multiple motor lanes
-      updateMotorLanes(channelUpper, parseInt(input.val()) || 2)
-    } else {
-      input.hide()
-      // Revert to single lane
-      updateMotorLanes(channelUpper, 1)
-    }
-  })
-  
-  input.on('change', function() {
-    let val = parseInt($(this).val())
-    if (val < 1) val = 1
-    if (val > 8) val = 8
-    $(this).val(val)
-    // Update lanes when motor count changes
-    if (checkbox.is(':checked')) {
-      updateMotorLanes(channelUpper, val)
-    }
-  })
-})
-
-// Update motor lanes for a channel
-function updateMotorLanes(channel, motorCount) {
-  const lanesContainer = $(`.timeline-track-lanes[data-channel="${channel}"]`)
-  const trackContainer = lanesContainer.closest('.timeline-track-container')
-  
-  // Get channel color
-  const channelColors = {
-    'A': '255,100,100',
-    'B': '100,255,100',
-    'C': '100,100,255',
-    'D': '255,0,255'
-  }
-  const color = channelColors[channel] || '100,100,100'
-  
-  // Clear existing lanes
-  lanesContainer.empty()
-  
-  // Create lanes for each motor
-  for (let i = 1; i <= motorCount; i++) {
-    const lane = $(`
-      <div class="timeline-track-lane" 
-           style="height: ${motorCount === 1 ? '28px' : '24px'}; position: relative; background: rgba(0,0,0,0.2); cursor: pointer; ${i < motorCount ? `border-bottom: 1px solid rgba(${color},0.15);` : ''}"
-           data-channel="${channel}" 
-           data-motor="${i}">
-        ${motorCount > 1 ? `<span style="position: absolute; left: 2px; top: 2px; font-size: 0.5em; color: rgba(${color},0.5);">${i}</span>` : ''}
-      </div>
-    `)
-    lanesContainer.append(lane)
-  }
-  
-  // Re-attach click handlers
-  attachLaneClickHandlers()
-  
-  // Re-render blocks if any exist
-  renderTimeline()
-}
-
-// Attach click handlers to timeline lanes
-function attachLaneClickHandlers() {
-  $(document).off('click', '.timeline-track-lane')
-  $(document).on('click', '.timeline-track-lane', function(e) {
-    if (e.target !== this) return
-
-    const lane = $(this)
-    const channel = lane.data('channel')
-    const motor = lane.data('motor') || 1
-
-    if (!timelineSelectedPattern) {
-      updateStatus('Select a pattern first, then click on a timeline track')
-      return
-    }
-
-    // Calculate position from click
-    const rect = this.getBoundingClientRect()
-    const clickX = e.clientX - rect.left
-    const laneWidth = rect.width
-    const clickPercent = Math.max(0, Math.min(1, clickX / laneWidth))
-    const startTime = Math.round(clickPercent * getTimelineDuration())
-    
-    console.log(`${NAME}: Click on lane - clickX: ${clickX}, laneWidth: ${laneWidth}, clickPercent: ${clickPercent}, startTime: ${startTime}ms, visualDuration: ${getTimelineDuration()}ms`)
-
-    // Add block with motor info
-    addTimelineBlock(channel, startTime, motor)
-  })
-}
-
-  // Pattern intensity range sliders
-$("#intiface-pattern-min").on("input", function() {
-const min = parseInt($(this).val())
-$("#intiface-pattern-min-display").text(`${min}%`)
-// Ensure min doesn't exceed max
-const max = parseInt($("#intiface-pattern-max").val())
-if (min > max) {
-$("#intiface-pattern-max").val(min)
-$("#intiface-pattern-max-display").text(`${min}%`)
-}
-})
-
-$("#intiface-pattern-max").on("input", function() {
-const max = parseInt($(this).val())
-$("#intiface-pattern-max-display").text(`${max}%`)
-// Ensure max doesn't go below min
-const min = parseInt($("#intiface-pattern-min").val())
-if (max < min) {
-$("#intiface-pattern-min").val(max)
-$("#intiface-pattern-min-display").text(`${max}%`)
-}
-})
-
-$("#intiface-pattern-cycles").on("input", function() {
-const cycles = parseInt($(this).val())
-$("#intiface-pattern-cycles-display").text(cycles)
-})
-
-  // Initialize all channels with single motor lanes
-  try {
-    if (typeof updateMotorLanes === 'function') {
-      ['A', 'B', 'C', 'D'].forEach(channel => updateMotorLanes(channel, 1))
-    }
-  } catch (e) {
-    console.error(`${NAME}: Error initializing motor lanes:`, e)
-  }
-  
-  // Attach initial lane click handlers
-  attachLaneClickHandlers()
+  // Setup timeline event handlers from timeline module
+  setupTimelineEventHandlers()
 })
 
 // Play Mode UI Event Handlers
@@ -4753,31 +3904,8 @@ function updatePlayModeTabVisibility() {
   })
 }
 
-  // On init, sync Play Mode from AI Mode settings (AI settings are the source of truth)
-  playModeSettings.denial = modeSettings.denialDomina
-  playModeSettings.milking = modeSettings.milkMaid
-  playModeSettings.training = modeSettings.petTraining
-  playModeSettings.robotic = modeSettings.roboticRuination
-  playModeSettings.sissy = modeSettings.sissySurrender
-  playModeSettings.prejac = modeSettings.prejacPrincess
-  playModeSettings.evil = modeSettings.evilEdgingMistress
-  playModeSettings.frustration = modeSettings.frustrationFairy
-  playModeSettings.hypno = modeSettings.hypnoHelper
-  playModeSettings.chastity = modeSettings.chastityCaretaker
-  
-  $('#intiface-mode-denial').prop('checked', playModeSettings.denial)
-  $('#intiface-mode-milking').prop('checked', playModeSettings.milking)
-  $('#intiface-mode-training').prop('checked', playModeSettings.training)
-  $('#intiface-mode-robotic').prop('checked', playModeSettings.robotic)
-  $('#intiface-mode-sissy').prop('checked', playModeSettings.sissy)
-  $('#intiface-mode-prejac').prop('checked', playModeSettings.prejac)
-  $('#intiface-mode-evil').prop('checked', playModeSettings.evil)
-  $('#intiface-mode-frustration').prop('checked', playModeSettings.frustration)
-  $('#intiface-mode-hypno').prop('checked', playModeSettings.hypno)
-  $('#intiface-mode-chastity').prop('checked', playModeSettings.chastity)
-
-  // Initialize tab visibility based on saved settings
-  updatePlayModeTabVisibility()
+// Play mode settings are initialized in $(document).ready() after PlayModeLoader loads
+// The modeSettings Proxy handles real-time sync with PlayModeLoader
 
   $('#intiface-mode-denial, #intiface-mode-milking, #intiface-mode-training, #intiface-mode-robotic, #intiface-mode-sissy, #intiface-mode-prejac, #intiface-mode-evil, #intiface-mode-frustration, #intiface-mode-hypno, #intiface-mode-chastity')
   .on('change', savePlayModeSettings)
@@ -5197,6 +4325,24 @@ initMediaModule({
 
 // Initialize media player functionality
 initMediaPlayer()
+
+// Initialize timeline module with dependencies
+initTimelineModule({
+  NAME,
+  devices,
+  mediaPlayer,
+  PlayModeLoader,
+  updateStatus,
+  stopMediaPlayback,
+  startFunscriptSync,
+  stopFunscriptSync,
+  stopAllDeviceActions,
+  applyIntensityScale,
+  applyInversion,
+  getMotorCount,
+  executePattern,
+  clearWorkerTimeout
+})
 
   // Additional delayed prompt update after media player init
   setTimeout(() => {
