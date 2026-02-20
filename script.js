@@ -110,46 +110,44 @@ let workerTimers = new Map() // timerId -> { callback, interval, createdAt, last
 let workerTimerId = 0
 let isWorkerTimerRunning = false
 
-// Mode settings now managed by PlayModeLoader - removed hardcoded object
-
-// Compatibility function to map old modeSettings camelCase names to PlayModeLoader mode IDs
-// This allows existing code to work while using the modular system
+// Mode settings now managed by PlayModeLoader - uses folder names consistently
+// Proxy provides backwards compatibility for any code expecting modeSettings object
 const modeSettings = new Proxy({}, {
   get(target, prop) {
-    // Map camelCase property names to snake_case mode IDs
-    const modeMap = {
-      'denialDomina': 'denial_domina',
-      'milkMaid': 'milk_maid',
-      'petTraining': 'pet_training',
-      'sissySurrender': 'sissy_surrender',
-      'prejacPrincess': 'prejac_princess',
-      'roboticRuination': 'robotic_ruination',
-      'evilEdgingMistress': 'evil_edging_mistress',
-      'frustrationFairy': 'frustration_fairy',
-      'hypnoHelper': 'hypno_helper',
-      'chastityCaretaker': 'chastity_caretaker'
+    // Convert camelCase property names to folder names
+    const camelCaseToFolder = {
+      'denialDomina': 'denial',
+      'milkMaid': 'milking',
+      'petTraining': 'training',
+      'sissySurrender': 'sissy',
+      'prejacPrincess': 'prejac',
+      'roboticRuination': 'robotic',
+      'evilEdgingMistress': 'evil',
+      'frustrationFairy': 'frustration',
+      'hypnoHelper': 'hypno',
+      'chastityCaretaker': 'chastity'
     }
-    const modeId = modeMap[prop]
-    if (modeId) {
+    const modeId = camelCaseToFolder[prop] || prop
+    if (PlayModeLoader && PlayModeLoader.isModeEnabled) {
       return PlayModeLoader.isModeEnabled(modeId)
     }
     return target[prop]
   },
   set(target, prop, value) {
-    const modeMap = {
-      'denialDomina': 'denial_domina',
-      'milkMaid': 'milk_maid',
-      'petTraining': 'pet_training',
-      'sissySurrender': 'sissy_surrender',
-      'prejacPrincess': 'prejac_princess',
-      'roboticRuination': 'robotic_ruination',
-      'evilEdgingMistress': 'evil_edging_mistress',
-      'frustrationFairy': 'frustration_fairy',
-      'hypnoHelper': 'hypno_helper',
-      'chastityCaretaker': 'chastity_caretaker'
+    const camelCaseToFolder = {
+      'denialDomina': 'denial',
+      'milkMaid': 'milking',
+      'petTraining': 'training',
+      'sissySurrender': 'sissy',
+      'prejacPrincess': 'prejac',
+      'roboticRuination': 'robotic',
+      'evilEdgingMistress': 'evil',
+      'frustrationFairy': 'frustration',
+      'hypnoHelper': 'hypno',
+      'chastityCaretaker': 'chastity'
     }
-    const modeId = modeMap[prop]
-    if (modeId) {
+    const modeId = camelCaseToFolder[prop] || prop
+    if (PlayModeLoader && PlayModeLoader.setModeEnabled) {
       PlayModeLoader.setModeEnabled(modeId, value)
     }
     target[prop] = value
@@ -157,44 +155,42 @@ const modeSettings = new Proxy({}, {
   }
 })
 
-// Compatibility function to map old modeIntensityMultipliers camelCase names to PlayModeLoader
-// This allows existing UI code to work while using the modular system
+// Compatibility function for modeIntensityMultipliers
 const modeIntensityMultipliers = new Proxy({}, {
   get(target, prop) {
-    // Map camelCase property names to snake_case mode IDs
-    const modeMap = {
-      'denialDomina': 'denial_domina',
-      'milkMaid': 'milk_maid',
-      'petTraining': 'pet_training',
-      'sissySurrender': 'sissy_surrender',
-      'prejacPrincess': 'prejac_princess',
-      'roboticRuination': 'robotic_ruination',
-      'evilEdgingMistress': 'evil_edging_mistress',
-      'frustrationFairy': 'frustration_fairy',
-      'hypnoHelper': 'hypno_helper',
-      'chastityCaretaker': 'chastity_caretaker'
+    const camelCaseToFolder = {
+      'denialDomina': 'denial',
+      'milkMaid': 'milking',
+      'petTraining': 'training',
+      'sissySurrender': 'sissy',
+      'prejacPrincess': 'prejac',
+      'roboticRuination': 'robotic',
+      'evilEdgingMistress': 'evil',
+      'frustrationFairy': 'frustration',
+      'hypnoHelper': 'hypno',
+      'chastityCaretaker': 'chastity'
     }
-    const modeId = modeMap[prop]
-    if (modeId) {
+    const modeId = camelCaseToFolder[prop] || prop
+    if (PlayModeLoader && PlayModeLoader.getIntensityMultiplier) {
       return PlayModeLoader.getIntensityMultiplier(modeId)
     }
     return target[prop]
   },
   set(target, prop, value) {
-    const modeMap = {
-      'denialDomina': 'denial_domina',
-      'milkMaid': 'milk_maid',
-      'petTraining': 'pet_training',
-      'sissySurrender': 'sissy_surrender',
-      'prejacPrincess': 'prejac_princess',
-      'roboticRuination': 'robotic_ruination',
-      'evilEdgingMistress': 'evil_edging_mistress',
-      'frustrationFairy': 'frustration_fairy',
-      'hypnoHelper': 'hypno_helper',
-      'chastityCaretaker': 'chastity_caretaker'
+    const camelCaseToFolder = {
+      'denialDomina': 'denial',
+      'milkMaid': 'milking',
+      'petTraining': 'training',
+      'sissySurrender': 'sissy',
+      'prejacPrincess': 'prejac',
+      'roboticRuination': 'robotic',
+      'evilEdgingMistress': 'evil',
+      'frustrationFairy': 'frustration',
+      'hypnoHelper': 'hypno',
+      'chastityCaretaker': 'chastity'
     }
-    const modeId = modeMap[prop]
-    if (modeId) {
+    const modeId = camelCaseToFolder[prop] || prop
+    if (PlayModeLoader && PlayModeLoader.setIntensityMultiplier) {
       PlayModeLoader.setIntensityMultiplier(modeId, value)
     }
     target[prop] = value
@@ -3491,114 +3487,51 @@ $("#intiface-mode-intensity-chastity").on("input", function() {
 // PLAY MODE - UNIFIED PATTERN SYSTEM
 // ==========================================
 
-// Current pattern category
+// Current pattern category - use folder name
 let currentPatternCategory = 'basic'
 
-// Play Mode settings (which modes are enabled)
-let playModeSettings = {
-denial: true,
-milking: true,
-training: true,
-robotic: true,
-sissy: true,
-prejac: true,
-evil: true,
-frustration: true,
-hypno: true,
-chastity: true
-}
+// Play Mode settings are now managed entirely by PlayModeLoader
+// No hardcoded settings object needed - loaded dynamically from filesystem
 
 // Note: PlayModeLoader now manages mode persistence via localStorage
 // We initialize with defaults and sync from PlayModeLoader after init
 // Don't load from localStorage here - PlayModeLoader handles that
 
-// Sync category-based playModeSettings to PlayModeLoader (which uses mode IDs)
-// This ensures modes enabled in UI are actually recognized by the pattern system
-function syncPlayModeSettingsToLoader() {
-  const categoryToModeId = {
-    denial: 'denial_domina',
-    milking: 'milk_maid',
-    training: 'pet_training',
-    robotic: 'robotic_ruination',
-    sissy: 'sissy_surrender',
-    prejac: 'prejac_princess',
-    evil: 'evil_edging_mistress',
-    frustration: 'frustration_fairy',
-    hypno: 'hypno_helper',
-    chastity: 'chastity_caretaker'
-  }
-  
-  // Only sync if PlayModeLoader is ready
-  if (!PlayModeLoader || !PlayModeLoader.settings) return
-  
-  for (const [category, enabled] of Object.entries(playModeSettings)) {
-    const modeId = categoryToModeId[category]
-    if (modeId && PlayModeLoader.settings[modeId]) {
-      PlayModeLoader.settings[modeId].enabled = enabled
-    }
-  }
-  PlayModeLoader.saveSettings()
-}
-
-// Sync PlayModeLoader settings back to category-based playModeSettings
+// Sync PlayModeLoader settings to local state
+// Uses folder names consistently as mode IDs
 function syncLoaderToPlayModeSettings() {
-  const modeIdToCategory = {
-    denial_domina: 'denial',
-    milk_maid: 'milking',
-    pet_training: 'training',
-    robotic_ruination: 'robotic',
-    sissy_surrender: 'sissy',
-    prejac_princess: 'prejac',
-    evil_edging_mistress: 'evil',
-    frustration_fairy: 'frustration',
-    hypno_helper: 'hypno',
-    chastity_caretaker: 'chastity'
-  }
-  
   // Only sync if PlayModeLoader is ready
   if (!PlayModeLoader || !PlayModeLoader.settings) return
-  
+
+  const settings = {}
   for (const [modeId, modeSettings] of Object.entries(PlayModeLoader.settings)) {
-    const category = modeIdToCategory[modeId]
-    if (category && typeof modeSettings.enabled === 'boolean') {
-      playModeSettings[category] = modeSettings.enabled
+    if (typeof modeSettings.enabled === 'boolean') {
+      settings[modeId] = modeSettings.enabled
     }
   }
+
+  return settings
 }
 
 // Populate pattern buttons based on device type and category
-// Waveform patterns organized by category
-const WaveformPatternsByCategory = {
-basic: ['sine', 'sawtooth', 'square', 'triangle', 'pulse', 'random', 'ramp_up', 'ramp_down'],
-denial: ['heartbeat', 'tickle', 'edging', 'ruin', 'teasing', 'desperation', 'mercy', 'tease_escalate', 'stop_start', 'random_tease', 'micro_tease', 'abrupt_edge', 'build_and_ruin', 'held_edge', 'flutter'],
-milking: ['crescendo', 'tidal_wave', 'milking_pump', 'relentless', 'overload', 'forced_peak', 'spiral_up', 'tsunami'],
-training: ['rapid_micro', 'peak_and_drop', 'ghost_tease', 'erratic'],
-robotic: ['mechanical', 'algorithm', 'systematic_ruin', 'cold_calculation'],
-evil: ['forbidden_peaks', 'multiple_peaks', 'intense_waves', 'ripple_thruster', 'rapid_fire', 'evil_ripple', 'cruel_sine', 'torture_pulse', 'wicked_build', 'malicious_flicker', 'sadistic_hold', 'torment_wave', 'vindictive_spikes'],
-frustration: ['fairy_dust', 'impish_flutter', 'maddening_tickle', 'phantom_touch', 'frustrating_flutter', 'unbearable_lightness', 'teasing_whisper', 'maddening_ripples', 'infuriating_flicker'],
-hypno: ['hypno_wave', 'trance_rhythm', 'sleepy_spiral', 'hypnotic_pulse', 'dreamy_flow', 'entrancement_zone', 'sleepy_build', 'trance_oscillation', 'hypnotic_drift', 'edge_trance'],
-chastity: ['gentle_checkup', 'caring_tap', 'tender_flutter', 'nurturing_pulse', 'cage_nurse', 'gentle_denial', 'tender_torment', 'loving_check', 'caretaker_hums', 'sweet_frustration', 'daily_routine'],
-sissy: ['sine', 'triangle', 'gentle', 'wave', 'flutter', 'teasing'],
-prejac: ['rapid_micro', 'rapid_fire', 'flutter', 'sine', 'pulse']
-}
+// Dynamically loads patterns and sequences from PlayModeLoader
+populatePatternButtons = function(deviceType = 'general') {
+  const container = $('#intiface-pattern-buttons')
+  container.empty()
 
-    populatePatternButtons = function(deviceType = 'general') {
-        const container = $('#intiface-pattern-buttons')
-        container.empty()
+  // Check if PlayModeLoader is initialized
+  if (!PlayModeLoader || typeof PlayModeLoader.getEnabledSequences !== 'function') {
+    container.html('<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">Loading modes...</div>')
+    return
+  }
 
-        // Check if PlayModeLoader is initialized
-        if (!PlayModeLoader || typeof PlayModeLoader.getEnabledSequences !== 'function') {
-            container.html('<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">Loading modes...</div>')
-            return
-        }
+  // Get presets for current category (using folder name)
+  let presets = {}
 
-        // Get presets for current category
-        let presets = {}
-
-if (currentPatternCategory === 'basic') {
+  if (currentPatternCategory === 'basic') {
     // Basic category: show basic waveform patterns from PlayModeLoader
-    const basicPatterns = ['sine', 'sawtooth', 'square', 'triangle', 'random', 'ramp_up', 'ramp_down']
-    basicPatterns.forEach(patternName => {
+    const basicPatterns = PlayModeLoader.getPatternsForMode('basic') || {}
+    Object.keys(basicPatterns).forEach(patternName => {
       presets[patternName] = {
         type: 'waveform',
         pattern: patternName,
@@ -3609,84 +3542,62 @@ if (currentPatternCategory === 'basic') {
       }
     })
   } else {
-            // Other categories: only show category-specific patterns and sequences
-            // Map category to mode ID
-            const categoryToModeId = {
-                'denial': 'denial_domina',
-                'milking': 'milk_maid',
-                'training': 'pet_training',
-                'robotic': 'robotic_ruination',
-                'sissy': 'sissy_surrender',
-                'prejac': 'prejac_princess',
-                'evil': 'evil_edging_mistress',
-                'frustration': 'frustration_fairy',
-                'hypno': 'hypno_helper',
-                'chastity': 'chastity_caretaker'
-            }
-            
-            const modeId = categoryToModeId[currentPatternCategory]
-            
-            if (modeId && PlayModeLoader.sequences[modeId]) {
-                // Add sequences from this mode
-                const modeSequences = PlayModeLoader.sequences[modeId]
-                for (const [seqName, seqData] of Object.entries(modeSequences)) {
-                    presets[seqName] = {
-                        type: 'sequence',
-                        sequence: seqData.steps,
-                        repeat: seqData.repeat !== false,
-                        description: seqData.description || seqName,
-                        compatibleDevices: seqData.compatibleDevices || ['general', 'cage', 'plug', 'stroker']
-                    }
-                }
-            }
-            
-            // Add category-specific waveform patterns (NOT basic patterns)
-            if (modeId && PlayModeLoader.patterns[modeId]) {
-                const modePatterns = PlayModeLoader.patterns[modeId]
-                Object.entries(modePatterns).forEach(([patternName, patternFunc]) => {
-                    presets[patternName] = {
-                        type: 'waveform',
-                        pattern: patternName,
-                        min: 20,
-                        max: 80,
-                        duration: 5000,
-                        cycles: 3,
-                        compatibleDevices: ['general', 'cage', 'plug', 'stroker']
-                    }
-                })
-            }
+    // Other categories: use folder name directly
+    const modeId = currentPatternCategory
+
+    // Add sequences from this mode
+    const modeSequences = PlayModeLoader.getSequencesForMode(modeId)
+    if (modeSequences) {
+      for (const [seqName, seqData] of Object.entries(modeSequences)) {
+        presets[seqName] = {
+          type: 'sequence',
+          sequence: seqData.steps,
+          repeat: seqData.repeat !== false,
+          description: seqData.description || seqName
         }
-
-        // Create buttons for each preset
-        Object.entries(presets).forEach(([key, preset]) => {
-            const isCompatible = preset.compatibleDevices ?
-                preset.compatibleDevices.includes(deviceType) || preset.compatibleDevices.includes('general') :
-                true
-
-            const displayName = key.replace(/_/g, ' ')
-
-            const btnHtml = `
-                <button class="menu_button pattern-btn" data-pattern="${key}" data-category="${currentPatternCategory}"
-                    title="${displayName} - Click to add to scene"
-                    style="padding: 6px 12px; font-size: 0.75em; border-radius: 4px; ${!isCompatible ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
-                    ${displayName}
-                </button>
-            `
-            const btn = $(btnHtml)
-
-            if (isCompatible) {
-                btn.on('click', () => {
-                    selectPatternForTimeline(key, currentPatternCategory)
-                })
-            }
-
-            container.append(btn)
-        })
-
-        if (Object.keys(presets).length === 0) {
-            container.html('<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">No patterns available for this category</div>')
-        }
+      }
     }
+
+    // Add patterns from this mode
+    const modePatterns = PlayModeLoader.getPatternsForMode(modeId)
+    if (modePatterns) {
+      Object.entries(modePatterns).forEach(([patternName, patternFunc]) => {
+        presets[patternName] = {
+          type: 'waveform',
+          pattern: patternName,
+          min: 20,
+          max: 80,
+          duration: 5000,
+          cycles: 3
+        }
+      })
+    }
+  }
+
+  // Create buttons for each preset - all patterns are clickable
+  Object.entries(presets).forEach(([key, preset]) => {
+    const displayName = key.replace(/_/g, ' ')
+
+    const btnHtml = `
+      <button class="menu_button pattern-btn" data-pattern="${key}" data-category="${currentPatternCategory}"
+        title="${displayName} - Click to add to scene"
+        style="padding: 6px 12px; font-size: 0.75em; border-radius: 4px;">
+        ${displayName}
+      </button>
+    `
+    const btn = $(btnHtml)
+
+    btn.on('click', () => {
+      selectPatternForTimeline(key, currentPatternCategory)
+    })
+
+    container.append(btn)
+  })
+
+  if (Object.keys(presets).length === 0) {
+    container.html('<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">No patterns available for this category</div>')
+  }
+}
 
 // Execute a Play Mode sequence
 executePlayModeSequence = async function(deviceIndex, modePreset) {
@@ -3763,22 +3674,12 @@ $(document).ready(async function() {
       await PlayModeLoader.init()
       console.log(`${NAME}: PlayModeLoader initialized with ${Object.keys(PlayModeLoader.modes || {}).length} modes`)
 
-      // Pull saved settings FROM PlayModeLoader into playModeSettings
-      syncLoaderToPlayModeSettings()
-      console.log(`${NAME}: Synced play mode settings from loader`)
-      
-      // Update UI checkboxes to reflect loaded settings
-      $('#intiface-mode-denial').prop('checked', playModeSettings.denial)
-      $('#intiface-mode-milking').prop('checked', playModeSettings.milking)
-      $('#intiface-mode-training').prop('checked', playModeSettings.training)
-      $('#intiface-mode-robotic').prop('checked', playModeSettings.robotic)
-      $('#intiface-mode-sissy').prop('checked', playModeSettings.sissy)
-      $('#intiface-mode-prejac').prop('checked', playModeSettings.prejac)
-      $('#intiface-mode-evil').prop('checked', playModeSettings.evil)
-      $('#intiface-mode-frustration').prop('checked', playModeSettings.frustration)
-      $('#intiface-mode-hypno').prop('checked', playModeSettings.hypno)
-      $('#intiface-mode-chastity').prop('checked', playModeSettings.chastity)
-      
+      // Generate UI dynamically from loaded modes
+      generatePlayModeUI()
+
+      // Load initial patterns for the Basic category (which is selected by default)
+      populatePatternButtons('general')
+
       // Update tab visibility
       updatePlayModeTabVisibility()
     } else {
@@ -3794,106 +3695,138 @@ $(document).ready(async function() {
 
 // Play Mode UI Event Handlers
 $(document).on('click', '.playmode-tab', function() {
-    const category = $(this).data('category')
-    currentPatternCategory = category
-    
-    $('.playmode-tab').css('background', 'rgba(0,0,0,0.1)')
-    $(this).css('background', 'rgba(100,150,255,0.3)')
-    
-    if (devices.length > 0) {
-        const deviceType = getDeviceType(devices[0])
-        populatePatternButtons(deviceType)
-    } else {
-        populatePatternButtons('general')
-    }
+  const category = $(this).data('category')
+  currentPatternCategory = category
+
+  $('.playmode-tab').css('background', 'rgba(0,0,0,0.1)')
+  $(this).css('background', 'rgba(100,150,255,0.3)')
+
+  if (devices.length > 0) {
+    const deviceType = getDeviceType(devices[0])
+    populatePatternButtons(deviceType)
+  } else {
+    populatePatternButtons('general')
+  }
 })
 
-function savePlayModeSettings() {
-  playModeSettings = {
-    denial: $('#intiface-mode-denial').is(':checked'),
-    milking: $('#intiface-mode-milking').is(':checked'),
-    training: $('#intiface-mode-training').is(':checked'),
-    robotic: $('#intiface-mode-robotic').is(':checked'),
-    sissy: $('#intiface-mode-sissy').is(':checked'),
-    prejac: $('#intiface-mode-prejac').is(':checked'),
-    evil: $('#intiface-mode-evil').is(':checked'),
-    frustration: $('#intiface-mode-frustration').is(':checked'),
-    hypno: $('#intiface-mode-hypno').is(':checked'),
-    chastity: $('#intiface-mode-chastity').is(':checked')
+// AI Play Modes toggle
+$('#intiface-ai-modes-toggle').on('click', function() {
+  const content = $('#intiface-ai-modes-content')
+  const arrow = $('#intiface-ai-modes-arrow')
+  if (content.is(':visible')) {
+    content.slideUp(200)
+    arrow.css('transform', 'rotate(0deg)')
+  } else {
+    content.slideDown(200)
+    arrow.css('transform', 'rotate(180deg)')
   }
-  localStorage.setItem('intiface-playmode-settings', JSON.stringify(playModeSettings))
-  console.log(`${NAME}: Play mode settings saved`, playModeSettings)
+})
 
-  // Sync category settings to PlayModeLoader (uses mode IDs)
-  syncPlayModeSettingsToLoader()
+// Mode Intensity Multipliers toggle
+$('#intiface-intensity-toggle').on('click', function() {
+  const content = $('#intiface-intensity-content')
+  const arrow = $('#intiface-intensity-arrow')
+  if (content.is(':visible')) {
+    content.slideUp(200)
+    arrow.css('transform', 'rotate(0deg)')
+  } else {
+    content.slideDown(200)
+    arrow.css('transform', 'rotate(180deg)')
+  }
+})
 
-  // Sync with AI mode settings
-  syncPlayModeToAIModes()
+// Generate Play Mode UI dynamically from PlayModeLoader
+function generatePlayModeUI() {
+  if (!PlayModeLoader || !PlayModeLoader.getUIData) {
+    console.warn(`${NAME}: PlayModeLoader not ready for UI generation`)
+    return
+  }
 
-  // Update tab visibility based on settings
-  updatePlayModeTabVisibility()
+  const uiData = PlayModeLoader.getUIData()
+
+  // Generate tabs
+  const tabsContainer = $('#intiface-playmode-tabs-container')
+  if (tabsContainer.length) {
+    tabsContainer.html(PlayModeLoader.generateTabsHTML())
+  }
+
+  // Generate toggles
+  const togglesContainer = $('#intiface-playmode-toggles-container')
+  if (togglesContainer.length) {
+    togglesContainer.html(PlayModeLoader.generateTogglesHTML())
+  }
+
+  // Generate intensity sliders
+  const intensityContainer = $('#intiface-playmode-intensity-container')
+  if (intensityContainer.length) {
+    intensityContainer.html(PlayModeLoader.generateIntensityHTML())
+  }
+
+  // Attach event handlers to dynamically generated elements
+  attachPlayModeEventHandlers()
+
+  console.log(`${NAME}: Generated Play Mode UI with ${uiData.modes.length} modes`)
 }
 
-// Sync Play Mode settings to AI Mode settings (so they control both UI and prompt)
-function syncPlayModeToAIModes() {
-  modeSettings.denialDomina = playModeSettings.denial
-  modeSettings.milkMaid = playModeSettings.milking
-  modeSettings.petTraining = playModeSettings.training
-  modeSettings.sissySurrender = playModeSettings.sissy
-  modeSettings.prejacPrincess = playModeSettings.prejac
-  modeSettings.roboticRuination = playModeSettings.robotic
-  modeSettings.evilEdgingMistress = playModeSettings.evil
-  modeSettings.frustrationFairy = playModeSettings.frustration
-  modeSettings.hypnoHelper = playModeSettings.hypno
-  modeSettings.chastityCaretaker = playModeSettings.chastity
-  
-  // Update the AI mode checkboxes to match
-  $("#intiface-mode-denial-domina").prop('checked', modeSettings.denialDomina)
-  $("#intiface-mode-milk-maid").prop('checked', modeSettings.milkMaid)
-  $("#intiface-mode-pet-training").prop('checked', modeSettings.petTraining)
-  $("#intiface-mode-sissy-surrender").prop('checked', modeSettings.sissySurrender)
-  $("#intiface-mode-prejac-princess").prop('checked', modeSettings.prejacPrincess)
-  $("#intiface-mode-robotic-ruination").prop('checked', modeSettings.roboticRuination)
-  $("#intiface-mode-evil-edging-mistress").prop('checked', modeSettings.evilEdgingMistress)
-  $("#intiface-mode-frustration-fairy").prop('checked', modeSettings.frustrationFairy)
-  $("#intiface-mode-hypno-helper").prop('checked', modeSettings.hypnoHelper)
-  $("#intiface-mode-chastity-caretaker").prop('checked', modeSettings.chastityCaretaker)
-  
-  // Save AI mode settings
-  localStorage.setItem('intiface-mode-settings', JSON.stringify(modeSettings))
-  
-  // Trigger prompt update
-  if (typeof updatePrompt === 'function') {
-    updatePrompt()
-  }
-  
-  console.log(`${NAME}: Synced Play Mode to AI Modes`, modeSettings)
+// Attach event handlers to dynamically generated play mode elements
+function attachPlayModeEventHandlers() {
+  // Mode toggle checkboxes
+  $(document).off('change', '.playmode-toggle')
+  $(document).on('change', '.playmode-toggle', function() {
+    const modeId = $(this).data('mode')
+    const enabled = $(this).is(':checked')
+
+    if (modeId && PlayModeLoader) {
+      PlayModeLoader.setModeEnabled(modeId, enabled)
+      console.log(`${NAME}: Mode ${modeId} ${enabled ? 'enabled' : 'disabled'}`)
+    }
+
+    // Show/hide intensity slider for this mode
+    const sliderContainer = $(`.intensity-slider-container[data-mode="${modeId}"]`)
+    if (sliderContainer.length) {
+      if (enabled) {
+        sliderContainer.slideDown(200)
+      } else {
+        sliderContainer.slideUp(200)
+      }
+    }
+
+    // Update tab visibility
+    updatePlayModeTabVisibility()
+  })
+
+  // Intensity sliders
+  $(document).off('input', '[id^="intiface-mode-intensity-"]')
+  $(document).on('input', '[id^="intiface-mode-intensity-"]', function() {
+    const modeId = $(this).data('mode')
+    const val = parseInt($(this).val())
+
+    if (modeId && PlayModeLoader) {
+      PlayModeLoader.setIntensityMultiplier(modeId, val / 100)
+    }
+
+    // Update display
+    const displayId = $(this).attr('id') + '-display'
+    $(`#${displayId}`).text(`${val}%`)
+  })
 }
 
 // Show/hide tabs based on play mode settings
 function updatePlayModeTabVisibility() {
-  const tabMap = {
-    'denial': '#intiface-tab-denial',
-    'milking': '#intiface-tab-milking',
-    'training': '#intiface-tab-training',
-    'robotic': '#intiface-tab-robotic',
-    'sissy': '#intiface-tab-sissy',
-    'prejac': '#intiface-tab-prejac',
-    'evil': '#intiface-tab-evil',
-    'frustration': '#intiface-tab-frustration',
-    'hypno': '#intiface-tab-hypno',
-    'chastity': '#intiface-tab-chastity'
-  }
-  
-  Object.entries(playModeSettings).forEach(([mode, enabled]) => {
-    const tabSelector = tabMap[mode]
-    if (tabSelector) {
-      if (enabled) {
-        $(tabSelector).show()
+  if (!PlayModeLoader || !PlayModeLoader.getUIData) return
+
+  const uiData = PlayModeLoader.getUIData()
+
+  // Hide/show tabs based on enabled status
+  uiData.modes.forEach(mode => {
+    const tab = $(`#intiface-tab-${mode.id}`)
+    if (tab.length) {
+      if (mode.enabled) {
+        tab.show()
       } else {
-        $(tabSelector).hide()
+        tab.hide()
         // If this was the active tab, switch to basic
-        if ($(tabSelector).hasClass('active')) {
+        if (tab.hasClass('active')) {
           currentPatternCategory = 'basic'
           $('.playmode-tab').removeClass('active').css('background', 'rgba(0,0,0,0.1)')
           $('#intiface-tab-basic').addClass('active').css('background', 'rgba(100,150,255,0.3)')
@@ -3904,65 +3837,419 @@ function updatePlayModeTabVisibility() {
   })
 }
 
-// Play mode settings are initialized in $(document).ready() after PlayModeLoader loads
-// The modeSettings Proxy handles real-time sync with PlayModeLoader
-
-  $('#intiface-mode-denial, #intiface-mode-milking, #intiface-mode-training, #intiface-mode-robotic, #intiface-mode-sissy, #intiface-mode-prejac, #intiface-mode-evil, #intiface-mode-frustration, #intiface-mode-hypno, #intiface-mode-chastity')
-  .on('change', savePlayModeSettings)
-
-// Global intensity slider
-$('#intiface-global-intensity').on('input', function() {
-    const val = parseInt($(this).val())
-    globalIntensityScale = val
-    $('#intiface-global-intensity-display').text(`${val}%`)
-    
-    const display = $('#intiface-global-intensity-display')
-    if (val < 100) display.css('color', '#4CAF50')
-    else if (val < 200) display.css('color', '#FFEB3B')
-    else if (val < 300) display.css('color', '#FF9800')
-    else display.css('color', '#F44336')
-})
-
-// Initialize global intensity display
-$('#intiface-global-intensity-display').text(`${globalIntensityScale}%`)
-$('#intiface-global-intensity').val(globalIntensityScale)
-
 // Handle reset button
-$("#intiface-reset-mode-intensities").on("click", function() {
-  // Reset all to 100% via PlayModeLoader
-  PlayModeLoader.setIntensityMultiplier('denial_domina', 1.0)
-  PlayModeLoader.setIntensityMultiplier('milk_maid', 1.0)
-  PlayModeLoader.setIntensityMultiplier('pet_training', 1.0)
-  PlayModeLoader.setIntensityMultiplier('sissy_surrender', 1.0)
-  PlayModeLoader.setIntensityMultiplier('prejac_princess', 1.0)
-  PlayModeLoader.setIntensityMultiplier('robotic_ruination', 1.0)
-  PlayModeLoader.setIntensityMultiplier('evil_edging_mistress', 1.0)
-  PlayModeLoader.setIntensityMultiplier('frustration_fairy', 1.0)
-  PlayModeLoader.setIntensityMultiplier('hypno_helper', 1.0)
-  PlayModeLoader.setIntensityMultiplier('chastity_caretaker', 1.0)
-  // Update all sliders
-  $("#intiface-mode-intensity-denial").val(100)
-  $("#intiface-mode-intensity-denial-display").text("100%")
-  $("#intiface-mode-intensity-milk").val(100)
-  $("#intiface-mode-intensity-milk-display").text("100%")
-  $("#intiface-mode-intensity-pet").val(100)
-  $("#intiface-mode-intensity-pet-display").text("100%")
-  $("#intiface-mode-intensity-sissy").val(100)
-  $("#intiface-mode-intensity-sissy-display").text("100%")
-  $("#intiface-mode-intensity-prejac").val(100)
-  $("#intiface-mode-intensity-prejac-display").text("100%")
-  $("#intiface-mode-intensity-robotic").val(100)
-  $("#intiface-mode-intensity-robotic-display").text("100%")
-  $("#intiface-mode-intensity-evil").val(100)
-  $("#intiface-mode-intensity-evil-display").text("100%")
-  $("#intiface-mode-intensity-frustration").val(100)
-  $("#intiface-mode-intensity-frustration-display").text("100%")
-  $("#intiface-mode-intensity-hypno").val(100)
-  $("#intiface-mode-intensity-hypno-display").text("100%")
-  $("#intiface-mode-intensity-chastity").val(100)
-  $("#intiface-mode-intensity-chastity-display").text("100%")
-  saveModeIntensity()
+$(document).off('click', '#intiface-reset-mode-intensities')
+$(document).on('click', '#intiface-reset-mode-intensities', function() {
+  if (!PlayModeLoader || !PlayModeLoader.getAllModes) return
+
+  // Reset all toggleable modes to 100%
+  const modes = PlayModeLoader.getAllModes()
+  Object.keys(modes).forEach(modeId => {
+    if (modeId !== 'basic') {
+      PlayModeLoader.setIntensityMultiplier(modeId, 1.0)
+    }
+  })
+
+  // Update all intensity sliders
+  $('[id^="intiface-mode-intensity-"]').each(function() {
+    const modeId = $(this).data('mode')
+    if (modeId && modeId !== 'basic') {
+      $(this).val(100)
+      $(`#${$(this).attr('id')}-display`).text('100%')
+    }
+  })
+
+  console.log(`${NAME}: Reset all mode intensities to 100%`)
 })
+
+// ==========================================
+// MODE BUILDER - Custom Play Mode Creation
+// ==========================================
+
+// Custom modes storage
+let customModes = {}
+let currentEditingMode = null
+
+// Load custom modes from localStorage
+function loadCustomModes() {
+  const saved = localStorage.getItem('intiface-custom-modes')
+  if (saved) {
+    try {
+      customModes = JSON.parse(saved)
+      console.log(`${NAME}: Loaded ${Object.keys(customModes).length} custom modes`)
+      updateCustomModesList()
+    } catch (e) {
+      console.error(`${NAME}: Failed to load custom modes:`, e)
+    }
+  }
+}
+
+// Save custom modes to localStorage
+function saveCustomModes() {
+  localStorage.setItem('intiface-custom-modes', JSON.stringify(customModes))
+}
+
+// Toggle Mode Builder visibility
+$('#intiface-mode-builder-toggle').on('click', function() {
+  const content = $('#intiface-mode-builder-content')
+  const arrow = $('#intiface-mode-builder-arrow')
+  if (content.is(':visible')) {
+    content.slideUp(200)
+    arrow.css('transform', 'rotate(0deg)')
+  } else {
+    content.slideDown(200)
+    arrow.css('transform', 'rotate(180deg)')
+    loadCustomModes()
+  }
+})
+
+// Create new mode button
+$('#intiface-create-mode-btn').on('click', function() {
+  currentEditingMode = null
+  resetModeEditor()
+  $('#intiface-mode-editor').slideDown(200)
+  $('#intiface-create-mode-btn').hide()
+})
+
+// Cancel editing
+$('#intiface-cancel-mode-btn').on('click', function() {
+  $('#intiface-mode-editor').slideUp(200)
+  $('#intiface-create-mode-btn').show()
+  currentEditingMode = null
+})
+
+// Reset mode editor form
+function resetModeEditor() {
+  $('#intiface-mode-id').val('').prop('disabled', false)
+  $('#intiface-mode-name').val('')
+  $('#intiface-mode-description').val('')
+  $('#intiface-mode-icon').val('fa-star')
+  $('#intiface-mode-color').val('#6464ff')
+  $('#intiface-mode-multiplier').val(1.0)
+  $('#intiface-mode-multiplier-display').text('1.0x')
+  $('#intiface-mode-system-prompt').val('')
+  $('#intiface-mode-activation').val('')
+  $('#intiface-mode-personality').val('')
+  $('#intiface-patterns-list').empty()
+  $('#intiface-sequences-list').empty()
+}
+
+// Update multiplier display
+$('#intiface-mode-multiplier').on('input', function() {
+  $('#intiface-mode-multiplier-display').text(`${$(this).val()}x`)
+})
+
+// Add pattern
+$('#intiface-add-pattern-btn').on('click', function() {
+  const patternId = `pattern-${Date.now()}`
+  const html = `
+    <div class="custom-pattern-entry" data-pattern-id="${patternId}" style="margin-bottom: 10px; padding: 8px; background: rgba(255,100,100,0.1); border-radius: 3px;">
+      <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+        <input type="text" class="pattern-name text_pole" placeholder="Pattern name (e.g., myWave)" style="flex: 1; font-size: 0.75em;">
+        <button class="remove-pattern-btn menu_button" style="padding: 2px 6px; font-size: 0.7em; background: rgba(255,0,0,0.3);">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+      <textarea class="pattern-code text_pole" placeholder="// JavaScript function: (phase, intensity) => value 0-1&#10;// Example:&#10;return Math.sin(phase * Math.PI * 2) * intensity;" 
+        style="width: 100%; font-size: 0.7em; min-height: 80px; resize: vertical; font-family: monospace;"></textarea>
+    </div>
+  `
+  $('#intiface-patterns-list').append(html)
+})
+
+// Remove pattern
+$(document).on('click', '.remove-pattern-btn', function() {
+  $(this).closest('.custom-pattern-entry').remove()
+})
+
+// Add sequence
+$('#intiface-add-sequence-btn').on('click', function() {
+  const seqId = `sequence-${Date.now()}`
+  const html = `
+    <div class="custom-sequence-entry" data-sequence-id="${seqId}" style="margin-bottom: 10px; padding: 8px; background: rgba(100,255,100,0.1); border-radius: 3px;">
+      <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+        <input type="text" class="sequence-name text_pole" placeholder="Sequence name" style="flex: 1; font-size: 0.75em;">
+        <label style="font-size: 0.7em; display: flex; align-items: center; gap: 3px;">
+          <input type="checkbox" class="sequence-repeat" checked> Repeat
+        </label>
+        <button class="remove-sequence-btn menu_button" style="padding: 2px 6px; font-size: 0.7em; background: rgba(255,0,0,0.3);">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+      <textarea class="sequence-steps text_pole" placeholder="// JSON array of steps&#10;// Example:&#10;[&#10;  {&quot;pattern&quot;: &quot;sine&quot;, &quot;min&quot;: 20, &quot;max&quot;: 80, &quot;duration&quot;: 5000, &quot;pause&quot;: 1000}&#10;]" 
+        style="width: 100%; font-size: 0.7em; min-height: 60px; resize: vertical; font-family: monospace;"></textarea>
+    </div>
+  `
+  $('#intiface-sequences-list').append(html)
+})
+
+// Remove sequence
+$(document).on('click', '.remove-sequence-btn', function() {
+  $(this).closest('.custom-sequence-entry').remove()
+})
+
+// Save mode
+$('#intiface-save-mode-btn').on('click', function() {
+  const modeId = $('#intiface-mode-id').val().trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+  
+  if (!modeId) {
+    alert('Please enter a mode ID')
+    return
+  }
+  
+  if (!currentEditingMode && customModes[modeId]) {
+    alert('A mode with this ID already exists')
+    return
+  }
+  
+  // Build patterns object
+  const patterns = {}
+  $('.custom-pattern-entry').each(function() {
+    const name = $(this).find('.pattern-name').val().trim()
+    const code = $(this).find('.pattern-code').val().trim()
+    if (name && code) {
+      patterns[name] = code
+    }
+  })
+  
+  // Build sequences object
+  const sequences = {}
+  $('.custom-sequence-entry').each(function() {
+    const name = $(this).find('.sequence-name').val().trim()
+    const stepsText = $(this).find('.sequence-steps').val().trim()
+    const repeat = $(this).find('.sequence-repeat').is(':checked')
+    if (name && stepsText) {
+      try {
+        const steps = JSON.parse(stepsText)
+        sequences[name] = {
+          steps: steps,
+          repeat: repeat,
+          description: `Custom sequence: ${name}`
+        }
+      } catch (e) {
+        console.warn(`${NAME}: Invalid sequence JSON for ${name}:`, e)
+      }
+    }
+  })
+  
+  const modeData = {
+    id: modeId,
+    name: $('#intiface-mode-name').val().trim() || modeId,
+    description: $('#intiface-mode-description').val().trim(),
+    version: '1.0.0',
+    category: modeId,
+    author: 'User',
+    intensityMultiplier: parseFloat($('#intiface-mode-multiplier').val()),
+    aiPrompts: {
+      system: $('#intiface-mode-system-prompt').val().trim(),
+      activation: $('#intiface-mode-activation').val().trim(),
+      personality: $('#intiface-mode-personality').val().trim(),
+      commands: []
+    },
+    ui: {
+      color: $('#intiface-mode-color').val(),
+      icon: $('#intiface-mode-icon').val().trim() || 'fa-star',
+      defaultEnabled: false,
+      toggleable: true
+    },
+    compatibleDevices: ['general', 'cage', 'plug', 'stroker'],
+    patterns: patterns,
+    sequences: sequences
+  }
+  
+  customModes[modeId] = modeData
+  saveCustomModes()
+  updateCustomModesList()
+
+  // Refresh PlayModeLoader with new custom modes
+  if (PlayModeLoader && PlayModeLoader.refresh) {
+    PlayModeLoader.refresh()
+    // Regenerate UI to include the new mode
+    generatePlayModeUI()
+    updatePlayModeTabVisibility()
+  }
+
+  $('#intiface-mode-editor').slideUp(200)
+  $('#intiface-create-mode-btn').show()
+
+  console.log(`${NAME}: Saved custom mode: ${modeId}`)
+})
+
+// Update custom modes list UI
+function updateCustomModesList() {
+  const container = $('#intiface-custom-modes-list')
+  const modes = Object.keys(customModes)
+  
+  if (modes.length === 0) {
+    container.html(`
+      <div style="color: #666; font-size: 0.8em; text-align: center; padding: 15px; border: 1px dashed rgba(100,100,100,0.3); border-radius: 4px;">
+        <i class="fa-solid fa-plus-circle"></i> No custom modes yet. Click "Create New Mode" to start!
+      </div>
+    `)
+    return
+  }
+  
+  let html = '<div style="display: flex; flex-direction: column; gap: 8px;">'
+  modes.forEach(modeId => {
+    const mode = customModes[modeId]
+    html += `
+      <div class="custom-mode-item" data-mode-id="${modeId}" style="padding: 10px; background: rgba(100,100,200,0.1); border-radius: 4px; border: 1px solid rgba(100,100,200,0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid ${mode.ui.icon}" style="color: ${mode.ui.color};"></i>
+            <span style="font-size: 0.85em; font-weight: bold;">${mode.name}</span>
+          </div>
+          <div style="display: flex; gap: 5px;">
+            <button class="edit-mode-btn menu_button" style="padding: 2px 8px; font-size: 0.7em;" data-mode-id="${modeId}">
+              <i class="fa-solid fa-pen"></i> Edit
+            </button>
+            <button class="delete-mode-btn menu_button" style="padding: 2px 8px; font-size: 0.7em; background: rgba(255,0,0,0.3);" data-mode-id="${modeId}">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <div style="font-size: 0.7em; color: #888;">${mode.description || 'No description'}</div>
+        <div style="font-size: 0.65em; color: #666; margin-top: 3px;">
+          <i class="fa-solid fa-wave-square"></i> ${Object.keys(mode.patterns || {}).length} patterns | 
+          <i class="fa-solid fa-list-ol"></i> ${Object.keys(mode.sequences || {}).length} sequences
+        </div>
+      </div>
+    `
+  })
+  html += '</div>'
+  container.html(html)
+}
+
+// Edit mode
+$(document).on('click', '.edit-mode-btn', function() {
+  const modeId = $(this).data('mode-id')
+  const mode = customModes[modeId]
+  if (!mode) return
+  
+  currentEditingMode = modeId
+  
+  $('#intiface-mode-id').val(modeId).prop('disabled', true)
+  $('#intiface-mode-name').val(mode.name)
+  $('#intiface-mode-description').val(mode.description)
+  $('#intiface-mode-icon').val(mode.ui.icon)
+  $('#intiface-mode-color').val(mode.ui.color)
+  $('#intiface-mode-multiplier').val(mode.intensityMultiplier)
+  $('#intiface-mode-multiplier-display').text(`${mode.intensityMultiplier}x`)
+  $('#intiface-mode-system-prompt').val(mode.aiPrompts.system)
+  $('#intiface-mode-activation').val(mode.aiPrompts.activation)
+  $('#intiface-mode-personality').val(mode.aiPrompts.personality)
+  
+  // Load patterns
+  $('#intiface-patterns-list').empty()
+  Object.entries(mode.patterns || {}).forEach(([name, code]) => {
+    const patternId = `pattern-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const html = `
+      <div class="custom-pattern-entry" data-pattern-id="${patternId}" style="margin-bottom: 10px; padding: 8px; background: rgba(255,100,100,0.1); border-radius: 3px;">
+        <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+          <input type="text" class="pattern-name text_pole" value="${name}" placeholder="Pattern name" style="flex: 1; font-size: 0.75em;">
+          <button class="remove-pattern-btn menu_button" style="padding: 2px 6px; font-size: 0.7em; background: rgba(255,0,0,0.3);">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+        <textarea class="pattern-code text_pole" placeholder="Pattern code..." 
+          style="width: 100%; font-size: 0.7em; min-height: 80px; resize: vertical; font-family: monospace;">${code}</textarea>
+      </div>
+    `
+    $('#intiface-patterns-list').append(html)
+  })
+  
+  // Load sequences
+  $('#intiface-sequences-list').empty()
+  Object.entries(mode.sequences || {}).forEach(([name, seqData]) => {
+    const seqId = `sequence-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const html = `
+      <div class="custom-sequence-entry" data-sequence-id="${seqId}" style="margin-bottom: 10px; padding: 8px; background: rgba(100,255,100,0.1); border-radius: 3px;">
+        <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+          <input type="text" class="sequence-name text_pole" value="${name}" placeholder="Sequence name" style="flex: 1; font-size: 0.75em;">
+          <label style="font-size: 0.7em; display: flex; align-items: center; gap: 3px;">
+            <input type="checkbox" class="sequence-repeat" ${seqData.repeat ? 'checked' : ''}> Repeat
+          </label>
+          <button class="remove-sequence-btn menu_button" style="padding: 2px 6px; font-size: 0.7em; background: rgba(255,0,0,0.3);">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+        <textarea class="sequence-steps text_pole" placeholder="Sequence steps..." 
+          style="width: 100%; font-size: 0.7em; min-height: 60px; resize: vertical; font-family: monospace;">${JSON.stringify(seqData.steps, null, 2)}</textarea>
+      </div>
+    `
+    $('#intiface-sequences-list').append(html)
+  })
+  
+  $('#intiface-mode-editor').slideDown(200)
+  $('#intiface-create-mode-btn').hide()
+})
+
+// Delete mode
+$(document).on('click', '.delete-mode-btn', function() {
+  const modeId = $(this).data('mode-id')
+  if (confirm(`Delete custom mode "${customModes[modeId]?.name || modeId}"?`)) {
+    delete customModes[modeId]
+    saveCustomModes()
+    updateCustomModesList()
+    console.log(`${NAME}: Deleted custom mode: ${modeId}`)
+  }
+})
+
+// Export all custom modes
+$('#intiface-export-modes-btn').on('click', function() {
+  const dataStr = JSON.stringify(customModes, null, 2)
+  const blob = new Blob([dataStr], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'intiface-custom-modes.json'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  console.log(`${NAME}: Exported ${Object.keys(customModes).length} custom modes`)
+})
+
+// Import custom modes
+$('#intiface-import-modes-btn').on('click', function() {
+  $('#intiface-import-file').click()
+})
+
+$('#intiface-import-file').on('change', function(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  
+  const reader = new FileReader()
+  reader.onload = function(event) {
+    try {
+      const imported = JSON.parse(event.target.result)
+      const importedCount = Object.keys(imported).length
+      
+        // Merge with existing custom modes
+        Object.assign(customModes, imported)
+        saveCustomModes()
+        updateCustomModesList()
+
+        // Refresh PlayModeLoader with imported modes
+        if (PlayModeLoader && PlayModeLoader.refresh) {
+          PlayModeLoader.refresh()
+          generatePlayModeUI()
+          updatePlayModeTabVisibility()
+        }
+
+        alert(`Imported ${importedCount} custom modes!`)
+        console.log(`${NAME}: Imported ${importedCount} custom modes`)
+    } catch (err) {
+      alert('Failed to import: Invalid JSON file')
+      console.error(`${NAME}: Import error:`, err)
+    }
+  }
+  reader.readAsText(file)
+  $(this).val('') // Reset input
+})
+
+// Initialize custom modes on load
+loadCustomModes()
 
 // Load and set up Intiface exe path
     const savedExePath = localStorage.getItem("intiface-exe-path")
@@ -4327,9 +4614,10 @@ initMediaModule({
 initMediaPlayer()
 
 // Initialize timeline module with dependencies
+// Note: Use window.devices instead of devices to ensure timeline module always sees current array
 initTimelineModule({
   NAME,
-  devices,
+  devices: window.devices,
   mediaPlayer,
   PlayModeLoader,
   updateStatus,

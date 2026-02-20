@@ -42,59 +42,20 @@
 </div>
 <div id="intiface-playmode-menu-content" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 4px;">
 
+
 <!-- Pattern Categories -->
 <div style="margin-bottom: 15px;">
 <div style="font-size: 0.85em; color: #aaa; margin-bottom: 10px;">
 <i class="fa-solid fa-layer-group"></i> Pattern Categories
 </div>
 
-<!-- Category Tabs -->
-<div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;">
-<button id="intiface-tab-basic" class="menu_button playmode-tab active" data-category="basic"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px; background: rgba(100,150,255,0.3);">
-<i class="fa-solid fa-circle-play"></i> Basic
-</button>
-<button id="intiface-tab-denial" class="menu_button playmode-tab" data-category="denial"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-heart" style="color: #ff6464;"></i> Denial
-</button>
-<button id="intiface-tab-milking" class="menu_button playmode-tab" data-category="milking"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-cow" style="color: #64ff64;"></i> Milking
-</button>
-<button id="intiface-tab-training" class="menu_button playmode-tab" data-category="training"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-paw" style="color: #6464ff;"></i> Training
-</button>
-<button id="intiface-tab-robotic" class="menu_button playmode-tab" data-category="robotic"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-robot" style="color: #ff00ff;"></i> Robotic
-</button>
-<button id="intiface-tab-sissy" class="menu_button playmode-tab" data-category="sissy"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-gem" style="color: #ff64c8;"></i> Sissy
-</button>
-<button id="intiface-tab-prejac" class="menu_button playmode-tab" data-category="prejac"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-crown" style="color: #00ffff;"></i> Prejac
-</button>
-<button id="intiface-tab-evil" class="menu_button playmode-tab" data-category="evil"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-skull" style="color: #bf00ff;"></i> Evil
-</button>
-<button id="intiface-tab-frustration" class="menu_button playmode-tab" data-category="frustration"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-wand-magic-sparkles" style="color: #ffff00;"></i> Frustration
-</button>
-<button id="intiface-tab-hypno" class="menu_button playmode-tab" data-category="hypno"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-eye" style="color: #dda0dd;"></i> Hypno
-</button>
-<button id="intiface-tab-chastity" class="menu_button playmode-tab" data-category="chastity"
-style="padding: 4px 10px; font-size: 0.75em; border-radius: 3px;">
-<i class="fa-solid fa-heart" style="color: #ffc0cb;"></i> Chastity
-</button>
-</div>
+  <!-- Category Tabs - Dynamically populated -->
+  <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;" id="intiface-playmode-tabs-container">
+    <!-- Tabs will be inserted here by PlayModeLoader -->
+    <div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 10px;">
+      Loading modes...
+    </div>
+  </div>
 
 <!-- Pattern Configuration Sliders -->
 <div style="margin: 10px 0; padding: 8px; background: rgba(50,50,70,0.2); border-radius: 4px; border: 1px solid rgba(100,100,150,0.2);">
@@ -131,13 +92,10 @@ Adjust pattern parameters before placing on timeline
 </div>
 </div>
 
-<!-- Pattern Buttons Container -->
-<div id="intiface-pattern-buttons" style="display: flex; flex-wrap: wrap; gap: 5px; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px; min-height: 60px;">
-<!-- Dynamically populated -->
-<div style="color: #666; font-size: 0.8em; width: 100%; text-align: center; padding: 20px;">
-Connect a device to see available patterns
-</div>
-</div>
+  <!-- Pattern Buttons Container -->
+  <div id="intiface-pattern-buttons" style="display: flex; flex-wrap: wrap; gap: 5px; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px; min-height: 60px;">
+    <!-- Dynamically populated by PlayModeLoader - starts empty since Basic is selected by default -->
+  </div>
 
 <!-- Timeline Sequencer - Multi-track Pattern Editor -->
 <div id="intiface-timeline-sequencer" style="margin-top: 15px; padding: 10px; background: rgba(30,30,50,0.3); border-radius: 4px; border: 1px solid rgba(100,100,150,0.3);">
@@ -273,216 +231,53 @@ Connect a device to see available patterns
 
 <!-- AI Mode Toggles -->
 <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-<div style="font-size: 0.85em; color: #aaa; margin-bottom: 10px;">
+<div id="intiface-ai-modes-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+<span style="display: flex; justify-content: space-between; align-items: center;">
+<span style="font-size: 0.85em; color: #aaa;">
 <i class="fa-solid fa-robot"></i> AI Play Modes
+</span>
+<span id="intiface-ai-modes-arrow" style="transition: transform 0.3s;">▼</span>
+</span>
 </div>
+<div id="intiface-ai-modes-content" style="display: none; margin-top: 10px;">
 <div style="font-size: 0.75em; color: #888; margin-bottom: 8px;">
 Enable which modes AI can use:
 </div>
 
-<div style="display: flex; flex-wrap: wrap; gap: 8px;">
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(255,100,100,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-denial" class="playmode-toggle" data-mode="denial" checked style="margin-right: 5px;">
-<i class="fa-solid fa-heart" style="margin-right: 4px; color: #ff6464; font-size: 0.8em;"></i>
-Denial
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(100,255,100,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-milking" class="playmode-toggle" data-mode="milking" checked style="margin-right: 5px;">
-<i class="fa-solid fa-cow" style="margin-right: 4px; color: #64ff64; font-size: 0.8em;"></i>
-Milking
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(100,100,255,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-training" class="playmode-toggle" data-mode="training" checked style="margin-right: 5px;">
-<i class="fa-solid fa-paw" style="margin-right: 4px; color: #6464ff; font-size: 0.8em;"></i>
-Training
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(255,0,255,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-robotic" class="playmode-toggle" data-mode="robotic" checked style="margin-right: 5px;">
-<i class="fa-solid fa-robot" style="margin-right: 4px; color: #ff00ff; font-size: 0.8em;"></i>
-Robotic
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(255,100,200,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-sissy" class="playmode-toggle" data-mode="sissy" checked style="margin-right: 5px;">
-<i class="fa-solid fa-gem" style="margin-right: 4px; color: #ff64c8; font-size: 0.8em;"></i>
-Sissy
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(0,255,255,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-prejac" class="playmode-toggle" data-mode="prejac" checked style="margin-right: 5px;">
-<i class="fa-solid fa-crown" style="margin-right: 4px; color: #00ffff; font-size: 0.8em;"></i>
-Prejac
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(128,0,128,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-evil" class="playmode-toggle" data-mode="evil" checked style="margin-right: 5px;">
-<i class="fa-solid fa-skull" style="margin-right: 4px; color: #bf00ff; font-size: 0.8em;"></i>
-Evil
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(255,255,0,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-frustration" class="playmode-toggle" data-mode="frustration" checked style="margin-right: 5px;">
-<i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 4px; color: #ffff00; font-size: 0.8em;"></i>
-Frustration
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(138,43,226,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-hypno" class="playmode-toggle" data-mode="hypno" checked style="margin-right: 5px;">
-<i class="fa-solid fa-eye" style="margin-right: 4px; color: #dda0dd; font-size: 0.8em;"></i>
-Hypno
-</label>
-<label style="font-size: 0.75em; display: flex; align-items: center; cursor: pointer; background: rgba(255,192,203,0.1); padding: 3px 8px; border-radius: 3px;">
-<input type="checkbox" id="intiface-mode-chastity" class="playmode-toggle" data-mode="chastity" checked style="margin-right: 5px;">
-<i class="fa-solid fa-heart" style="margin-right: 4px; color: #ffc0cb; font-size: 0.8em;"></i>
-Chastity
-</label>
+<!-- AI Mode Toggles - Dynamically populated -->
+<div style="display: flex; flex-wrap: wrap; gap: 8px;" id="intiface-playmode-toggles-container">
+<!-- Toggles will be inserted here by PlayModeLoader -->
+<div style="color: #888; font-size: 0.8em; width: 100%; text-align: center; padding: 10px;">
+Loading mode toggles...
+</div>
+</div>
 </div>
 </div>
 </div>
 
 <div id="intiface-mode-menu-content" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 4px;">
-<div style="font-size: 0.85em; color: #aaa; margin-bottom: 10px;">
-Enable/disable AI mode categories
+<div style="font-size: 0.85em; color: #888; margin-bottom: 10px;">
+<i class="fa-solid fa-info-circle"></i> AI modes are controlled via the toggles above
+</div>
 </div>
 
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
-<input type="checkbox" id="intiface-mode-denial-domina" style="margin-right: 8px;">
-<i class="fa-solid fa-heart" style="margin-right: 5px; color: #ff6464;"></i>
-Denial Domina Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
-<input type="checkbox" id="intiface-mode-milk-maid" style="margin-right: 8px;">
-<i class="fa-solid fa-cow" style="margin-right: 5px; color: #64ff64;"></i>
-Milk Maid Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
-<input type="checkbox" id="intiface-mode-pet-training" style="margin-right: 8px;">
-<i class="fa-solid fa-paw" style="margin-right: 5px; color: #6464ff;"></i>
-Pet Training Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
-<input type="checkbox" id="intiface-mode-sissy-surrender" style="margin-right: 8px;">
-<i class="fa-solid fa-gem" style="margin-right: 5px; color: #ff64c8;"></i>
-Sissy Surrender Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
-<input type="checkbox" id="intiface-mode-prejac-princess" style="margin-right: 8px;">
-<i class="fa-solid fa-crown" style="margin-right: 5px; color: #00ffff;"></i>
-Prejac Princess Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer;">
-<input type="checkbox" id="intiface-mode-robotic-ruination" style="margin-right: 8px;">
-<i class="fa-solid fa-robot" style="margin-right: 5px; color: #ff00ff;"></i>
-Robotic Ruination Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer;">
-<input type="checkbox" id="intiface-mode-evil-edging-mistress" style="margin-right: 8px;">
-<i class="fa-solid fa-skull" style="margin-right: 5px; color: #bf00ff;"></i>
-Evil Edging Mistress Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer;">
-<input type="checkbox" id="intiface-mode-frustration-fairy" style="margin-right: 8px;">
-<i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 5px; color: #ffff00;"></i>
-Frustration Fairy Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer;">
-<input type="checkbox" id="intiface-mode-hypno-helper" style="margin-right: 8px;">
-<i class="fa-solid fa-eye" style="margin-right: 5px; color: #dda0dd;"></i>
-Hypno Helper Modes
-</label>
-
-<label style="font-size: 0.8em; display: flex; align-items: center; cursor: pointer;">
-<input type="checkbox" id="intiface-mode-chastity-caretaker" style="margin-right: 8px;">
-<i class="fa-solid fa-heart" style="margin-right: 5px; color: #ffc0cb;"></i>
-Chastity Caretaker Modes
-</label>
-
+<!-- Mode Intensity Multipliers -->
 <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-<div style="font-size: 0.85em; color: #aaa; margin-bottom: 10px;">
+<div id="intiface-intensity-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(0,0,0,0.1); border-radius: 4px;">
+<span style="display: flex; justify-content: space-between; align-items: center;">
+<span style="font-size: 0.85em; color: #aaa;">
 <i class="fa-solid fa-sliders"></i> Mode Intensity Multipliers (50%-400%)
+</span>
+<span id="intiface-intensity-arrow" style="transition: transform 0.3s;">▼</span>
+</span>
 </div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Denial Domina</span>
-<span id="intiface-mode-intensity-denial-display" style="color: #64B5F6;">100%</span>
+<div id="intiface-intensity-content" style="display: none; margin-top: 10px;">
+<!-- Intensity Sliders - Dynamically populated -->
+<div id="intiface-playmode-intensity-container">
+<!-- Intensity sliders will be inserted here by PlayModeLoader -->
+<div style="color: #888; font-size: 0.8em; text-align: center; padding: 10px;">
+Loading intensity controls...
 </div>
-<input type="range" id="intiface-mode-intensity-denial" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Milk Maid</span>
-<span id="intiface-mode-intensity-milk-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-milk" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Pet Training</span>
-<span id="intiface-mode-intensity-pet-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-pet" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Sissy Surrender</span>
-<span id="intiface-mode-intensity-sissy-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-sissy" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Prejac Princess</span>
-<span id="intiface-mode-intensity-prejac-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-prejac" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Robotic Ruination</span>
-<span id="intiface-mode-intensity-robotic-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-robotic" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Evil Edging Mistress</span>
-<span id="intiface-mode-intensity-evil-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-evil" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Frustration Fairy</span>
-<span id="intiface-mode-intensity-frustration-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-frustration" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Hypno Helper</span>
-<span id="intiface-mode-intensity-hypno-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-hypno" min="50" max="400" value="100" style="width: 100%;">
-</div>
-
-<div style="margin-bottom: 10px;">
-<div style="display: flex; justify-content: space-between; font-size: 0.75em; margin-bottom: 3px;">
-<span>Chastity Caretaker</span>
-<span id="intiface-mode-intensity-chastity-display" style="color: #64B5F6;">100%</span>
-</div>
-<input type="range" id="intiface-mode-intensity-chastity" min="50" max="400" value="100" style="width: 100%;">
 </div>
 
 <button id="intiface-reset-mode-intensities" class="menu_button" style="width: 100%; margin-top: 10px; padding: 6px; font-size: 0.75em;">
@@ -491,6 +286,165 @@ Chastity Caretaker Modes
 </div>
 </div>
 </div>
+</div>
+
+<!-- Custom Mode Builder -->
+<div style="margin-top: 15px;">
+<div id="intiface-mode-builder-toggle" class="menu_button" style="width: 100%; text-align: left; padding: 8px; background: rgba(100,50,200,0.15); border-radius: 4px; border: 1px solid rgba(100,50,200,0.3);">
+<span style="display: flex; justify-content: space-between; align-items: center;">
+<span><i class="fa-solid fa-wand-magic-sparkles"></i> Mode Builder</span>
+<span id="intiface-mode-builder-arrow" style="transition: transform 0.3s;">▼</span>
+</span>
+</div>
+<div id="intiface-mode-builder-content" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 4px;">
+<div style="font-size: 0.85em; color: #aaa; margin-bottom: 10px;">
+<i class="fa-solid fa-hammer"></i> Create Custom Play Modes
+</div>
+<div style="font-size: 0.75em; color: #888; margin-bottom: 10px;">
+Design new play modes with custom patterns and sequences.
+</div>
+
+<!-- Mode List -->
+<div id="intiface-custom-modes-list" style="margin-top: 15px;">
+<div style="color: #666; font-size: 0.8em; text-align: center; padding: 10px;">
+<i class="fa-solid fa-circle-info"></i> Custom modes will appear here
+</div>
+</div>
+
+<!-- Create New Mode Button -->
+<button id="intiface-create-mode-btn" class="menu_button" style="width: 100%; margin-bottom: 10px; background: rgba(100,150,255,0.2);">
+<i class="fa-solid fa-plus"></i> Create New Mode
+</button>
+
+<!-- Mode Editor (hidden by default) -->
+<div id="intiface-mode-editor" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.1); border-radius: 4px; border: 1px solid rgba(100,150,255,0.3);">
+<div style="font-size: 0.85em; font-weight: bold; margin-bottom: 10px; color: #64B5F6;">
+<i class="fa-solid fa-pen-to-square"></i> Edit Mode
+</div>
+
+<!-- Mode Metadata -->
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Mode ID (folder name)</label>
+<input type="text" id="intiface-mode-id" class="text_pole" placeholder="my_custom_mode" style="width: 100%; font-size: 0.8em;" pattern="[a-z0-9_]+">
+<div style="font-size: 0.65em; color: #888; margin-top: 2px;">Lowercase, numbers, underscores only</div>
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Display Name</label>
+<input type="text" id="intiface-mode-name" class="text_pole" placeholder="My Custom Mode" style="width: 100%; font-size: 0.8em;">
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Description</label>
+<textarea id="intiface-mode-description" class="text_pole" placeholder="Describe what this mode does..." style="width: 100%; font-size: 0.8em; min-height: 60px; resize: vertical;"></textarea>
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Icon (FontAwesome class)</label>
+<input type="text" id="intiface-mode-icon" class="text_pole" placeholder="fa-star" value="fa-star" style="width: 100%; font-size: 0.8em;">
+<div style="font-size: 0.65em; color: #888; margin-top: 2px;">e.g., fa-heart, fa-bolt, fa-magic</div>
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Color</label>
+<input type="color" id="intiface-mode-color" value="#6464ff" style="width: 100%; height: 30px; border: none; border-radius: 3px;">
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Intensity Multiplier</label>
+<input type="range" id="intiface-mode-multiplier" min="0.5" max="2.0" step="0.1" value="1.0" style="width: 100%;">
+<span id="intiface-mode-multiplier-display" style="font-size: 0.7em; color: #64B5F6;">1.0x</span>
+</div>
+
+<!-- Pattern Editor -->
+<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+<div style="font-size: 0.8em; font-weight: bold; margin-bottom: 8px; color: #ffa0a0;">
+<i class="fa-solid fa-wave-square"></i> Waveform Patterns
+</div>
+<div style="font-size: 0.7em; color: #888; margin-bottom: 8px;">
+Define mathematical patterns (JavaScript functions).
+</div>
+
+<div id="intiface-patterns-list" style="margin-bottom: 10px;">
+<!-- Dynamic pattern entries -->
+</div>
+
+<button id="intiface-add-pattern-btn" class="menu_button" style="width: 100%; font-size: 0.75em; padding: 5px; background: rgba(255,100,100,0.1);">
+<i class="fa-solid fa-plus"></i> Add Pattern
+</button>
+</div>
+
+<!-- Sequence Editor -->
+<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+<div style="font-size: 0.8em; font-weight: bold; margin-bottom: 8px; color: #a0ffa0;">
+<i class="fa-solid fa-list-ol"></i> Sequences
+</div>
+<div style="font-size: 0.7em; color: #888; margin-bottom: 8px;">
+Create predefined step sequences.
+</div>
+
+<div id="intiface-sequences-list" style="margin-bottom: 10px;">
+<!-- Dynamic sequence entries -->
+</div>
+
+<button id="intiface-add-sequence-btn" class="menu_button" style="width: 100%; font-size: 0.75em; padding: 5px; background: rgba(100,255,100,0.1);">
+<i class="fa-solid fa-plus"></i> Add Sequence
+</button>
+</div>
+
+<!-- AI Prompt Editor -->
+<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+<div style="font-size: 0.8em; font-weight: bold; margin-bottom: 8px; color: #a0a0ff;">
+<i class="fa-solid fa-robot"></i> AI Prompts
+</div>
+<div style="font-size: 0.7em; color: #888; margin-bottom: 8px;">
+Instructions for AI to use this mode.
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">System Prompt</label>
+<textarea id="intiface-mode-system-prompt" class="text_pole" placeholder="You are a..." style="width: 100%; font-size: 0.8em; min-height: 80px; resize: vertical;"></textarea>
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Activation Trigger</label>
+<input type="text" id="intiface-mode-activation" class="text_pole" placeholder="When to activate this mode..." style="width: 100%; font-size: 0.8em;">
+</div>
+
+<div style="margin-bottom: 10px;">
+<label style="font-size: 0.75em; display: block; margin-bottom: 3px;">Personality</label>
+<input type="text" id="intiface-mode-personality" class="text_pole" placeholder="e.g., Cruel, teasing, dominant" style="width: 100%; font-size: 0.8em;">
+</div>
+</div>
+
+<!-- Actions -->
+<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px;">
+<button id="intiface-save-mode-btn" class="menu_button" style="flex: 1; background: rgba(100,255,100,0.2);">
+<i class="fa-solid fa-save"></i> Save Mode
+</button>
+<button id="intiface-cancel-mode-btn" class="menu_button" style="flex: 1; background: rgba(255,100,100,0.2);">
+<i class="fa-solid fa-times"></i> Cancel
+</button>
+</div>
+
+<div style="margin-top: 10px; font-size: 0.7em; color: #888; font-style: italic;">
+<i class="fa-solid fa-info-circle"></i> Custom modes are stored in your browser. Export to save permanently.
+</div>
+</div>
+
+<!-- Export/Import -->
+<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 10px;">
+<button id="intiface-export-modes-btn" class="menu_button" style="flex: 1; font-size: 0.75em;">
+<i class="fa-solid fa-download"></i> Export All
+</button>
+<button id="intiface-import-modes-btn" class="menu_button" style="flex: 1; font-size: 0.75em;">
+<i class="fa-solid fa-upload"></i> Import
+</button>
+</div>
+<input type="file" id="intiface-import-file" accept=".json" style="display: none;">
+</div>
+</div>
+
 
 <!-- Media Player Section in Menu -->
     <div style="margin-top: 15px;">
